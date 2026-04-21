@@ -1,0 +1,590 @@
+@page "/help"
+<PageTitle>User Guide – DMSPRO Reporting</PageTitle>
+
+<div class="container-lg py-4">
+
+    @* ══ Hero ══════════════════════════════════════════════════════ *@
+    <div class="d-flex align-items-center gap-3 mb-4 pb-3 border-bottom">
+        <i class="bi bi-book-half display-5 text-primary"></i>
+        <div>
+            <h2 class="mb-0 fw-bold">User Guide</h2>
+            <p class="text-muted mb-0 small">DMSPRO Reporting — complete feature reference</p>
+        </div>
+        <a class="btn btn-primary btn-sm ms-auto" href="/report">
+            <i class="bi bi-play-fill me-1"></i>Open Report
+        </a>
+    </div>
+
+    @* ══ Quick-navigation pills ════════════════════════════════════ *@
+    <div class="d-flex flex-wrap gap-2 mb-4">
+        @foreach (var (label, anchor, icon) in _sections)
+        {
+            <a href="#@anchor" class="btn btn-outline-secondary btn-sm">
+                <i class="bi @icon me-1"></i>@label
+            </a>
+        }
+    </div>
+
+    @* ══ 1. Overview ══════════════════════════════════════════════ *@
+    <section id="overview" class="mb-5">
+        <h4 class="section-heading"><i class="bi bi-info-circle-fill me-2 text-primary"></i>Overview</h4>
+        <div class="card shadow-sm border-0">
+            <div class="card-body">
+                <p>
+                    <strong>DMSPRO Reporting</strong> is a browser-based reporting tool that connects directly
+                    to SQL Server. You can query <em>Stored Procedures</em>, <em>Views</em>, or <em>Tables</em>,
+                    explore data in an interactive grid, build pivot cross-tabs, and export results — all without
+                    writing any SQL.
+                </p>
+                <div class="row g-3 mt-1">
+                    <div class="col-sm-6 col-lg-3">
+                        <div class="d-flex gap-2 align-items-start p-3 rounded bg-light h-100">
+                            <i class="bi bi-database-fill text-primary fs-5 flex-shrink-0"></i>
+                            <div><strong>Flexible Sources</strong><br /><span class="small text-muted">SP · View · Table</span></div>
+                        </div>
+                    </div>
+                    <div class="col-sm-6 col-lg-3">
+                        <div class="d-flex gap-2 align-items-start p-3 rounded bg-light h-100">
+                            <i class="bi bi-table text-success fs-5 flex-shrink-0"></i>
+                            <div><strong>Interactive Grid</strong><br /><span class="small text-muted">Sort · Filter · Reorder · Alias</span></div>
+                        </div>
+                    </div>
+                    <div class="col-sm-6 col-lg-3">
+                        <div class="d-flex gap-2 align-items-start p-3 rounded bg-light h-100">
+                            <i class="bi bi-grid-3x3-gap-fill text-purple fs-5 flex-shrink-0" style="color:#7c3aed"></i>
+                            <div><strong>Pivot Analysis</strong><br /><span class="small text-muted">Zone builder · Drill-down</span></div>
+                        </div>
+                    </div>
+                    <div class="col-sm-6 col-lg-3">
+                        <div class="d-flex gap-2 align-items-start p-3 rounded bg-light h-100">
+                            <i class="bi bi-download text-danger fs-5 flex-shrink-0"></i>
+                            <div><strong>Export</strong><br /><span class="small text-muted">Excel · CSV · PDF</span></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    @* ══ 2. Getting Started ════════════════════════════════════════ *@
+    <section id="getting-started" class="mb-5">
+        <h4 class="section-heading"><i class="bi bi-rocket-takeoff-fill me-2 text-success"></i>Getting Started</h4>
+        <div class="card shadow-sm border-0">
+            <div class="card-body">
+                <ol class="guide-steps">
+                    <li>
+                        <strong>Navigate to the Report page</strong> — click <em>Reports</em> in the top
+                        navigation bar, or use a direct link from the Home page.
+                    </li>
+                    <li>
+                        <strong>Choose a Source Type</strong> — select <code>StoredProcedure</code>,
+                        <code>View</code>, or <code>Table</code> from the first dropdown.
+                    </li>
+                    <li>
+                        <strong>Enter the Source Name</strong> — type the exact name of the SP, view, or
+                        table (e.g. <code>sp_DMS_RPT_ReportMasterDistributor</code>).
+                    </li>
+                    <li>
+                        <strong>Fill in parameters</strong> — for stored procedures, parameter inputs appear
+                        automatically below the source name. Required params are marked <span class="text-danger">*</span>.
+                        Typing a value triggers auto-execution after 600 ms.
+                    </li>
+                    <li>
+                        <strong>Click Run</strong> (or wait for auto-execute) — data loads into the grid.
+                    </li>
+                </ol>
+
+                <div class="alert alert-info d-flex gap-2 mb-0">
+                    <i class="bi bi-lightbulb-fill flex-shrink-0 mt-1"></i>
+                    <span>
+                        Use the <strong>📋 Reports…</strong> dropdown (if configured) to instantly load a
+                        pre-defined report from the <code>DMSViewReportTemplate</code> catalog —
+                        source, type, and default parameters are filled automatically.
+                    </span>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    @* ══ 3. Config Bar ════════════════════════════════════════════ *@
+    <section id="config-bar" class="mb-5">
+        <h4 class="section-heading"><i class="bi bi-sliders me-2 text-info"></i>Config Bar</h4>
+        <div class="card shadow-sm border-0">
+            <div class="card-body">
+                <p class="text-muted small mb-3">
+                    The sticky bar at the top of the report page contains all data-source controls.
+                    It stays visible as you scroll.
+                </p>
+                <table class="table table-sm table-hover align-middle">
+                    <thead class="table-dark">
+                        <tr><th>Control</th><th>Purpose</th><th>Behaviour</th></tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td><strong>📋 Reports…</strong></td>
+                            <td>Report catalog picker</td>
+                            <td>Populated from <code>DMSViewReportTemplate</code> view. Selecting a report fills all fields and auto-runs.</td>
+                        </tr>
+                        <tr>
+                            <td><strong>Source Type</strong></td>
+                            <td>SP / View / Table</td>
+                            <td>Changing type clears the source name and resets all results.</td>
+                        </tr>
+                        <tr>
+                            <td><strong>Source Name</strong></td>
+                            <td>Object name in SQL Server</td>
+                            <td>For SPs, blurring the field auto-discovers parameters via <code>sys.parameters</code>.</td>
+                        </tr>
+                        <tr>
+                            <td><strong>@@PageSize&nbsp;…</strong> <span class="text-muted small">(SP params)</span></td>
+                            <td>SP input parameters</td>
+                            <td>Typing triggers a 600 ms debounce then auto-executes. Required params shown with <span class="text-danger">*</span>.</td>
+                        </tr>
+                        <tr>
+                            <td><strong>Page Size</strong></td>
+                            <td>Rows per page</td>
+                            <td>Changing instantly re-slices cached data — no new DB call.</td>
+                        </tr>
+                        <tr>
+                            <td><i class="bi bi-play-fill text-primary"></i> <strong>Run</strong></td>
+                            <td>Execute the query</td>
+                            <td>Cancels any in-flight query, then loads fresh data. Shows spinner while loading.</td>
+                        </tr>
+                        <tr>
+                            <td><i class="bi bi-stop-fill text-danger"></i> <strong>Cancel</strong></td>
+                            <td>Abort current query</td>
+                            <td>Appears during loading. Stops the DB read; cached data (if any) is preserved.</td>
+                        </tr>
+                        <tr>
+                            <td><i class="bi bi-x-circle"></i> <strong>Clear</strong></td>
+                            <td>Reset everything</td>
+                            <td>Clears source name, parameters, aliases, and all results.</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </section>
+
+    @* ══ 4. Data Grid ═════════════════════════════════════════════ *@
+    <section id="data-grid" class="mb-5">
+        <h4 class="section-heading"><i class="bi bi-table me-2 text-success"></i>Data Grid</h4>
+        <div class="row g-3">
+
+            <div class="col-md-6">
+                <div class="card h-100 shadow-sm border-0">
+                    <div class="card-header fw-semibold bg-success text-white">
+                        <i class="bi bi-sort-alpha-down me-1"></i>Sorting
+                    </div>
+                    <div class="card-body small">
+                        <p>Click any <strong>column header</strong> to sort ascending. Click again to sort descending. A sort icon appears on the active column.</p>
+                        <p class="mb-0 text-muted">Only one sort column is active at a time.</p>
+                    </div>
+                </div>
+            </div>
+
+            <div class="col-md-6">
+                <div class="card h-100 shadow-sm border-0">
+                    <div class="card-header fw-semibold bg-info text-white">
+                        <i class="bi bi-funnel-fill me-1"></i>Filtering
+                    </div>
+                    <div class="card-body small">
+                        <p>Type in the <strong>filter row</strong> (the row of text inputs directly below the column headers). Filters are case-insensitive substring matches applied to all data in memory.</p>
+                        <p class="mb-0">Use the <strong>Clear filters</strong> button in the toolbar (appears only when filters are active) to remove all at once.</p>
+                    </div>
+                </div>
+            </div>
+
+            <div class="col-md-6">
+                <div class="card h-100 shadow-sm border-0">
+                    <div class="card-header fw-semibold bg-secondary text-white">
+                        <i class="bi bi-layout-three-columns me-1"></i>Column Management
+                    </div>
+                    <div class="card-body small">
+                        <ul class="ps-3 mb-0">
+                            <li>Click the <strong>Columns</strong> button (above the grid) to open the column panel.</li>
+                            <li>Check / uncheck columns to <strong>show or hide</strong> them.</li>
+                            <li>Use <strong>All</strong> / <strong>None</strong> buttons to show or hide everything at once.</li>
+                            <li><strong>Drag column headers</strong> left or right to reorder them. A blue highlight shows the drop target.</li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+
+            <div class="col-md-6">
+                <div class="card h-100 shadow-sm border-0">
+                    <div class="card-header fw-semibold bg-dark text-white">
+                        <i class="bi bi-pencil-fill me-1"></i>Column Renaming (Alias)
+                    </div>
+                    <div class="card-body small">
+                        <ul class="ps-3 mb-0">
+                            <li><strong>Double-click</strong> any column header to enter rename mode.</li>
+                            <li>Type the display name you want, then press <kbd>Enter</kbd> to save or <kbd>Esc</kbd> to cancel.</li>
+                            <li>A small <i class="bi bi-pencil-fill" style="font-size:.75rem"></i> icon appears on renamed columns; hovering shows the original DB name.</li>
+                            <li>Aliases are shown in the Columns panel with the DB name in parentheses.</li>
+                            <li>Double-click and clear the input to remove an alias.</li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+
+            <div class="col-12">
+                <div class="card shadow-sm border-0">
+                    <div class="card-header fw-semibold">
+                        <i class="bi bi-skip-forward-fill me-1"></i>Pagination
+                    </div>
+                    <div class="card-body small">
+                        <p class="mb-1">Use the <strong>page navigation</strong> below the grid or change <strong>Page Size</strong> in the config bar. All data is held in memory after the initial load — page changes and filter changes are instant.</p>
+                        <p class="mb-0 text-muted">The toolbar shows total row and column counts. Filters that reduce the row count are reflected immediately.</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    @* ══ 5. Pivot Analysis ════════════════════════════════════════ *@
+    <section id="pivot" class="mb-5">
+        <h4 class="section-heading"><i class="bi bi-grid-3x3-gap-fill me-2" style="color:#7c3aed"></i>Pivot Analysis</h4>
+        <div class="card shadow-sm border-0 mb-3">
+            <div class="card-body">
+                <p>Switch to the <strong>Pivot</strong> tab (after data has loaded) to access the zone-based pivot builder.</p>
+
+                <h6 class="fw-bold mt-3">Zone Builder</h6>
+                <div class="row g-2 mb-3">
+                    <div class="col-sm-4">
+                        <div class="p-2 rounded" style="background:#e0f2fe;border:2px solid #bae6fd">
+                            <strong style="color:#0369a1"><i class="bi bi-arrow-down me-1"></i>Row Field</strong>
+                            <p class="small mb-0 mt-1 text-muted">The column whose distinct values become <strong>row labels</strong> (left axis).</p>
+                        </div>
+                    </div>
+                    <div class="col-sm-4">
+                        <div class="p-2 rounded" style="background:#ede9fe;border:2px solid #ddd6fe">
+                            <strong style="color:#7c3aed"><i class="bi bi-arrow-right me-1"></i>Column Field</strong>
+                            <p class="small mb-0 mt-1 text-muted">The column whose distinct values become <strong>column headers</strong> (top axis).</p>
+                        </div>
+                    </div>
+                    <div class="col-sm-4">
+                        <div class="p-2 rounded" style="background:#d1fae5;border:2px solid #a7f3d0">
+                            <strong style="color:#065f46"><i class="bi bi-calculator me-1"></i>Value Field(s)</strong>
+                            <p class="small mb-0 mt-1 text-muted">One or more columns to <strong>aggregate</strong>. Each can have its own function (Sum, Count, Avg, Min, Max).</p>
+                        </div>
+                    </div>
+                </div>
+
+                <h6 class="fw-bold">Assigning Fields</h6>
+                <ul class="small">
+                    <li>Drag a chip from the <strong>Available Fields</strong> zone into Row, Column, or Values.</li>
+                    <li>Or click the <strong>R / C / V</strong> quick-assign buttons on each chip.</li>
+                    <li>Dropping a field into Row or Column <strong>displaces</strong> the previous occupant back to Available.</li>
+                    <li>Click the <span class="text-danger fw-bold">×</span> on a placed chip to return it to Available.</li>
+                </ul>
+
+                <h6 class="fw-bold">Multiple Value Fields</h6>
+                <p class="small">Add more than one value field to the Values zone. Each gets its own sub-column per pivot column key, with a two-row header (column group on top, aggregation/field below).</p>
+
+                <h6 class="fw-bold">Totals</h6>
+                <p class="small mb-0">Use the <strong>Row Totals</strong>, <strong>Col Totals</strong>, and <strong>Grand Total</strong> toggles to show or hide subtotal rows and columns.</p>
+            </div>
+        </div>
+
+        <div class="row g-3">
+            <div class="col-md-6">
+                <div class="card h-100 shadow-sm border-0">
+                    <div class="card-header fw-semibold">
+                        <i class="bi bi-zoom-in me-1"></i>Drill-Down
+                    </div>
+                    <div class="card-body small">
+                        <p>Click any <strong>data cell</strong> in the pivot table to open the drill-down modal.</p>
+                        <ul class="ps-3 mb-0">
+                            <li>Shows the raw detail rows that produced that cell's value.</li>
+                            <li>Filtered to the exact Row × Column intersection.</li>
+                            <li>Up to 500 rows shown; count is displayed in the modal footer.</li>
+                            <li>Click the backdrop or <strong>Close</strong> to dismiss.</li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-6">
+                <div class="card h-100 shadow-sm border-0">
+                    <div class="card-header fw-semibold">
+                        <i class="bi bi-cloud-arrow-up me-1"></i>Save &amp; Load Layouts
+                    </div>
+                    <div class="card-body small">
+                        <ul class="ps-3 mb-0">
+                            <li>Click <strong>Save Layout</strong> and enter a name to persist your pivot configuration per-user per-report.</li>
+                            <li>A layout named <strong>"Default"</strong> is applied automatically whenever the same report is opened.</li>
+                            <li>Click a saved layout name to restore it instantly.</li>
+                            <li>Click the <span class="text-danger">🗑</span> trash icon to delete a layout.</li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    @* ══ 6. Export ════════════════════════════════════════════════ *@
+    <section id="export" class="mb-5">
+        <h4 class="section-heading"><i class="bi bi-download me-2 text-danger"></i>Export</h4>
+        <div class="card shadow-sm border-0">
+            <div class="card-body">
+                <p>Export buttons appear in the <strong>toolbar</strong> (the bar directly below the config bar) once data has loaded.</p>
+                <table class="table table-sm table-hover align-middle">
+                    <thead class="table-dark">
+                        <tr><th>Format</th><th>Data Grid</th><th>Pivot Table</th></tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td><i class="bi bi-file-earmark-excel text-success me-1"></i><strong>Excel (.xlsx)</strong></td>
+                            <td>All rows (not just current page) with column headers</td>
+                            <td>Merged group headers for multi-value pivots, row/col totals, grand total</td>
+                        </tr>
+                        <tr>
+                            <td><i class="bi bi-filetype-csv text-secondary me-1"></i><strong>CSV</strong></td>
+                            <td>All rows, comma-delimited</td>
+                            <td>Flattened: one column per ColKey·ValueLabel combination</td>
+                        </tr>
+                        <tr>
+                            <td><i class="bi bi-file-earmark-pdf text-danger me-1"></i><strong>PDF</strong></td>
+                            <td>All rows in a formatted table</td>
+                            <td>Landscape orientation with two-row headers</td>
+                        </tr>
+                    </tbody>
+                </table>
+                <div class="alert alert-warning d-flex gap-2 mb-0">
+                    <i class="bi bi-exclamation-triangle-fill flex-shrink-0 mt-1"></i>
+                    <span>Exports always include <strong>all data</strong>, not just the current page. For very large datasets, Excel export may take a few seconds to generate.</span>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    @* ══ 7. URL Deep Links ════════════════════════════════════════ *@
+    <section id="url-params" class="mb-5">
+        <h4 class="section-heading"><i class="bi bi-link-45deg me-2 text-info"></i>URL Deep Links</h4>
+        <div class="card shadow-sm border-0">
+            <div class="card-body">
+                <p>You can link directly to a specific report with parameters pre-filled. The page auto-executes on load.</p>
+
+                <h6 class="fw-bold">Format</h6>
+                <code class="d-block bg-light p-2 rounded mb-3">
+                    /report?Source=<em>ObjectName</em>&amp;Type=<em>SP|View|Table</em>&amp;<em>ParamName</em>=<em>Value</em>
+                </code>
+
+                <h6 class="fw-bold">Examples</h6>
+                <table class="table table-sm table-hover mb-0">
+                    <thead class="table-secondary">
+                        <tr><th>URL</th><th>Effect</th></tr>
+                    </thead>
+                    <tbody class="small">
+                        <tr>
+                            <td><code>/report?Source=sp_DMS_RPT_ReportMasterDistributor&amp;Type=SP&amp;CompanyID=3</code></td>
+                            <td>Opens the Master Distributor SP with CompanyID=3 pre-filled and auto-runs</td>
+                        </tr>
+                        <tr>
+                            <td><code>/report?Source=vw_SalesSummary&amp;Type=View</code></td>
+                            <td>Opens the vw_SalesSummary view</td>
+                        </tr>
+                        <tr>
+                            <td><code>/report?Source=SalesOrders&amp;Type=Table</code></td>
+                            <td>Opens the SalesOrders table directly</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </section>
+
+    @* ══ 8. Report Catalog Setup ══════════════════════════════════ *@
+    <section id="report-catalog" class="mb-5">
+        <h4 class="section-heading"><i class="bi bi-collection-fill me-2 text-warning"></i>Report Catalog Setup</h4>
+        <div class="card shadow-sm border-0">
+            <div class="card-body">
+                <p>
+                    If the view <code>DMSViewReportTemplate</code> exists in your database, the app loads it
+                    automatically and shows a <strong>📋 Reports…</strong> dropdown in the config bar.
+                    Selecting an entry fills all fields and runs the report.
+                </p>
+
+                <h6 class="fw-bold mt-3">Expected Columns (auto-detected, any of these names work)</h6>
+                <table class="table table-sm table-hover align-middle mb-3">
+                    <thead class="table-secondary">
+                        <tr><th>Purpose</th><th>Accepted column names</th><th>Required?</th></tr>
+                    </thead>
+                    <tbody class="small">
+                        <tr>
+                            <td><strong>Display name</strong></td>
+                            <td><code>ReportName</code>, <code>Name</code>, <code>Title</code>, <code>DisplayName</code></td>
+                            <td><span class="badge bg-danger">Yes</span></td>
+                        </tr>
+                        <tr>
+                            <td><strong>Source object</strong></td>
+                            <td><code>SourceName</code>, <code>Source</code>, <code>ObjectName</code>, <code>SPName</code>, <code>ProcName</code>, <code>ViewName</code></td>
+                            <td><span class="badge bg-danger">Yes</span></td>
+                        </tr>
+                        <tr>
+                            <td><strong>Source type</strong></td>
+                            <td><code>SourceType</code>, <code>Type</code>, <code>ObjectType</code> — values: <code>SP</code>, <code>View</code>, <code>Table</code></td>
+                            <td><span class="badge bg-secondary">Auto-inferred</span></td>
+                        </tr>
+                        <tr>
+                            <td><strong>Default params</strong></td>
+                            <td>Any other non-null columns (e.g. <code>CompanyID</code>, <code>FromDate</code>)</td>
+                            <td><span class="badge bg-light text-dark border">Optional</span></td>
+                        </tr>
+                    </tbody>
+                </table>
+
+                <h6 class="fw-bold">Minimal example view</h6>
+                <pre class="bg-dark text-light p-3 rounded small mb-0"><code>CREATE OR ALTER VIEW DMSViewReportTemplate AS
+SELECT
+    N'Master Distributor'              AS ReportName,
+    'sp_DMS_RPT_ReportMasterDistributor' AS SourceName,
+    'SP'                               AS SourceType,
+    3                                  AS CompanyID
+UNION ALL
+SELECT
+    N'Sales Summary View',
+    'vw_SalesSummary',
+    'View',
+    NULL;</code></pre>
+
+                <div class="alert alert-info d-flex gap-2 mt-3 mb-0">
+                    <i class="bi bi-info-circle-fill flex-shrink-0"></i>
+                    <span>
+                        If the view does not exist or cannot be queried, the dropdown is simply hidden —
+                        no error is shown and all other features continue to work normally.
+                    </span>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    @* ══ 9. Large Data & Performance ══════════════════════════════ *@
+    <section id="performance" class="mb-5">
+        <h4 class="section-heading"><i class="bi bi-speedometer2 me-2 text-danger"></i>Large Data &amp; Performance</h4>
+        <div class="card shadow-sm border-0">
+            <div class="card-body">
+
+                <h6 class="fw-bold">Loading Progress</h6>
+                <p class="small">
+                    When a stored procedure returns a large result set, a live row counter and animated
+                    progress bar appear in the body area, along with a skeleton grid preview.
+                    The row count updates every 2,000 rows. Click <strong>Cancel</strong> at any time to abort.
+                </p>
+
+                <h6 class="fw-bold">Large SP Warning</h6>
+                <p class="small">
+                    If a stored procedure returns more than <strong>50,000 rows</strong> and does not have
+                    native paging parameters (<code>@@PageNumber</code> / <code>@@PageSize</code>), a yellow
+                    banner alerts you. All filtering, sorting, and pivot analysis still works — they run
+                    in-memory on the cached data.
+                </p>
+
+                <h6 class="fw-bold">Pivot Performance — Server-Side vs. In-Memory</h6>
+                <table class="table table-sm table-hover small mb-3">
+                    <thead class="table-secondary">
+                        <tr><th>Source type</th><th>Pivot method</th><th>How it works</th></tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td><strong>View / Table</strong></td>
+                            <td><span class="badge bg-success">SQL GROUP BY</span></td>
+                            <td>The database aggregates data; only the summarised result travels over the network. Fast even on millions of rows.</td>
+                        </tr>
+                        <tr>
+                            <td><strong>Stored Procedure</strong></td>
+                            <td><span class="badge bg-info text-dark">In-memory</span></td>
+                            <td>Pivot is computed from the cached row set already loaded in memory. Fast if the data fits in RAM.</td>
+                        </tr>
+                    </tbody>
+                </table>
+
+                <h6 class="fw-bold">Tips</h6>
+                <ul class="small mb-0">
+                    <li>Prefer <strong>Views</strong> over stored procedures for pivot analysis on very large tables.</li>
+                    <li>Add <code>@@PageNumber</code> and <code>@@PageSize</code> parameters to your SP to enable native server-side paging and avoid loading all rows.</li>
+                    <li>Use column filters to narrow the result set before exporting.</li>
+                    <li>Results are <strong>cached per user per source+params</strong> — re-running the same report with the same params is instant (served from cache).</li>
+                </ul>
+            </div>
+        </div>
+    </section>
+
+    @* ══ 10. Keyboard Shortcuts ═══════════════════════════════════ *@
+    <section id="shortcuts" class="mb-5">
+        <h4 class="section-heading"><i class="bi bi-keyboard me-2 text-secondary"></i>Keyboard Shortcuts</h4>
+        <div class="card shadow-sm border-0">
+            <div class="card-body">
+                <table class="table table-sm table-hover align-middle mb-0">
+                    <thead class="table-dark">
+                        <tr><th>Key</th><th>Context</th><th>Action</th></tr>
+                    </thead>
+                    <tbody class="small">
+                        <tr>
+                            <td><kbd>Enter</kbd></td>
+                            <td>Column alias input</td>
+                            <td>Save the new column display name</td>
+                        </tr>
+                        <tr>
+                            <td><kbd>Esc</kbd></td>
+                            <td>Column alias input</td>
+                            <td>Cancel renaming, restore previous name</td>
+                        </tr>
+                        <tr>
+                            <td>Double-click header</td>
+                            <td>Data grid</td>
+                            <td>Enter column rename mode</td>
+                        </tr>
+                        <tr>
+                            <td>Click header</td>
+                            <td>Data grid</td>
+                            <td>Toggle sort ascending / descending</td>
+                        </tr>
+                        <tr>
+                            <td>Drag header</td>
+                            <td>Data grid</td>
+                            <td>Reorder the column</td>
+                        </tr>
+                        <tr>
+                            <td>Click pivot cell</td>
+                            <td>Pivot table</td>
+                            <td>Open drill-down modal for that intersection</td>
+                        </tr>
+                        <tr>
+                            <td>Click backdrop</td>
+                            <td>Drill-down modal / Column manager</td>
+                            <td>Close the panel</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </section>
+
+    @* ══ Back to top ═══════════════════════════════════════════════ *@
+    <div class="text-center py-3 border-top">
+        <a href="#" class="btn btn-outline-secondary btn-sm me-2">
+            <i class="bi bi-arrow-up me-1"></i>Back to top
+        </a>
+        <a href="/report" class="btn btn-primary btn-sm">
+            <i class="bi bi-play-fill me-1"></i>Open Report
+        </a>
+    </div>
+
+</div>
+
+@code {
+    private static readonly (string Label, string Anchor, string Icon)[] _sections =
+    [
+        ("Overview",        "overview",       "bi-info-circle"),
+        ("Getting Started", "getting-started","bi-rocket-takeoff"),
+        ("Config Bar",      "config-bar",     "bi-sliders"),
+        ("Data Grid",       "data-grid",      "bi-table"),
+        ("Pivot",           "pivot",          "bi-grid-3x3-gap"),
+        ("Export",          "export",         "bi-download"),
+        ("URL Links",       "url-params",     "bi-link-45deg"),
+        ("Report Catalog",  "report-catalog", "bi-collection"),
+        ("Performance",     "performance",    "bi-speedometer2"),
+        ("Shortcuts",       "shortcuts",      "bi-keyboard"),
+    ];
+}

@@ -1,0 +1,1148 @@
+@page "/report"
+@using System.Text.Json
+@inject NavigationManager Nav
+@inject IDataRepository Repo
+@inject IPivotService PivotSvc
+@inject IUserLayoutService LayoutSvc
+@inject IExportService ExportSvc
+@inject ICacheService Cache
+@inject IHttpContextAccessor HttpCtx
+@inject IJSRuntime JS
+@using BlazorReporting.Components
+
+@* <PageTitle>@(_config.Source.Length > 0 ? _config.Source : "Report") – BlazorReporting</PageTitle> *@
+<PageTitle>DMSPRO Reporting</PageTitle>
+
+@* ══════════════════════════════════════════════════════════════
+   CONFIG BAR — Bar 1: always-visible primary row
+              — Bar 2: SP parameters (when applicable)
+══════════════════════════════════════════════════════════════ *@
+<div class="report-config-bar bg-light border-bottom">
+    <div class="px-2 px-md-3 py-2">
+
+        @* ── Bar 1: primary control row ── *@
+        <div class="d-flex align-items-center gap-2 flex-wrap">
+
+            @* Source type — pill toggle (SP / View / Table) *@
+            <div class="source-type-group btn-group btn-group-sm flex-shrink-0" role="group"
+                 aria-label="Source type">
+                @foreach (var t in Enum.GetValues<DataSourceType>())
+                {
+                    <button type="button"
+                            class="btn @(_config.SourceType == t ? "btn-primary" : "btn-outline-primary")"
+                            @onclick="() => OnSourceTypeButtonClick(t)"
+                            disabled="@_loading"
+                            title="@t.ToString()">
+                        <i class="bi @SourceTypeIcon(t) me-1"></i>@SourceTypeLabel(t)
+                    </button>
+                }
+            </div>
+
+            @* Report catalog — only shown when templates exist *@
+            @if (_reportTemplates.Count > 0)
+            {
+                <select class="form-select form-select-sm flex-shrink-0"
+                        style="max-width:200px"
+                        title="Select a saved report"
+                        @onchange="SelectTemplateByName"
+                        disabled="@_loading">
+                    <option value="">&#x1F4CB; Reports&#x2026;</option>
+                    @foreach (var t in _reportTemplates)
+                    {
+                        <option value="@t.Name">@t.Name</option>
+                    }
+                </select>
+            }
+
+            @* Source name input with DB icon *@
+            <div class="input-group input-group-sm flex-fill" style="min-width:160px">
+                <span class="input-group-text">
+                    <i class="bi bi-database" style="font-size:.8rem"></i>
+                </span>
+                <input class="form-control"
+                       placeholder="@SourcePlaceholder"
+                       @bind="_config.Source"
+                       @bind:event="oninput"
+                       @onblur="OnSourceNameBlur"
+                       disabled="@_loading" />
+            </div>
+
+            @* Page size *@
+            <select class="form-select form-select-sm flex-shrink-0"
+                    style="width:auto"
+                    title="Rows per page"
+                    value="@_config.PageSize"
+                    @onchange="OnHeaderPageSizeChanged"
+                    disabled="@_loading">
+                <option value="25">25</option>
+                <option value="50">50</option>
+                <option value="100">100</option>
+                <option value="200">200</option>
+                <option value="500">500</option>
+            </select>
+
+            @* Action buttons *@
+            <div class="d-flex gap-1 flex-shrink-0">
+                @* Run *@
+                <button class="btn btn-primary btn-sm" @onclick="ExecuteAsync"
+                        disabled="@_loading" title="Run report">
+                    @if (_loading)
+                    {
+                        <span class="spinner-border spinner-border-sm" role="status"
+                              aria-hidden="true"></span>
+                    }
+                    else
+                    {
+                        <i class="bi bi-play-fill"></i>
+                    }
+                    <span class="d-none d-sm-inline ms-1">Run</span>
+                </button>
+
+                @* Cancel — only while loading *@
+                @if (_loading)
+                {
+                    <button class="btn btn-danger btn-sm" @onclick="CancelAsync" title="Cancel query">
+                        <i class="bi bi-stop-fill"></i>
+                        <span class="d-none d-sm-inline ms-1">Cancel</span>
+                    </button>
+                }
+
+                @* Clear *@
+                <button class="btn btn-outline-secondary btn-sm" @onclick="ResetSource"
+                        title="Clear source and results" disabled="@_loading">
+                    <i class="bi bi-x-circle"></i>
+                    <span class="d-none d-lg-inline ms-1">Clear</span>
+                </button>
+
+                @* Help *@
+                <a class="btn btn-outline-light btn-sm" href="/help" target="_blank"
+                   title="Open User Guide">
+                    <i class="bi bi-question-circle"></i>
+                </a>
+            </div>
+        </div>
+
+        @* ── Bar 2: SP parameter row (visible only when SourceType == SP and params exist) ── *@
+        @if (_config.SourceType == DataSourceType.StoredProcedure && _spParams.Count > 0)
+        {
+            <div class="d-flex flex-wrap gap-2 mt-2 pt-2 border-top">
+                @foreach (var p in _spParams)
+                {
+                    <div class="input-group input-group-sm" style="width:auto;max-width:220px">
+                        <span class="input-group-text param-label"
+                              title="@@@p.Name (@p.TypeName)">
+                            @@@p.Name
+                            @if (!p.HasDefault)
+                            {
+                                <span class="text-danger ms-1">&#x25CF;</span>
+                            }
+                        </span>
+                        <input class="form-control"
+                               placeholder="@(p.HasDefault ? p.TypeName : "required")"
+                               value="@GetParamValue(p.Name)"
+                               @oninput="e => SetParamValue(p.Name, e.Value?.ToString())" />
+                    </div>
+                }
+            </div>
+        }
+    </div>
+</div>
+
+@* ══════════════════════════════════════════════════════════════
+   ALERTS
+══════════════════════════════════════════════════════════════ *@
+
+@* Error *@
+@if (!string.IsNullOrEmpty(_error))
+{
+    <div class="alert alert-danger alert-dismissible mx-2 mx-md-3 mt-2 mb-0" role="alert">
+        <i class="bi bi-exclamation-triangle-fill me-2"></i>@_error
+        <button type="button" class="btn-close" @onclick="() => _error = string.Empty"></button>
+    </div>
+}
+
+@* Large SP data warning — shown once load finishes *@
+@if (_isBigSpData && !_loading)
+{
+    <div class="alert alert-warning alert-dismissible mx-2 mx-md-3 mt-2 mb-0" role="alert">
+        <i class="bi bi-exclamation-triangle-fill me-2"></i>
+        <strong>Large dataset:</strong> @_allData.Count.ToString("N0") rows loaded into memory from this stored procedure.
+        Pivot and filtering run in-memory; consider adding <code>@@PageNumber</code> / <code>@@PageSize</code>
+        parameters to the SP for server-side paging, or switch to a View/Table for better performance.
+        <button type="button" class="btn-close" @onclick="() => _isBigSpData = false"></button>
+    </div>
+}
+
+@* ══════════════════════════════════════════════════════════════
+   TOOLBAR: stats + export buttons
+══════════════════════════════════════════════════════════════ *@
+@if (_pagedResult != null)
+{
+    <div class="report-toolbar bg-white border-bottom px-2 px-md-3 py-2">
+        <div class="d-flex align-items-center gap-2 flex-wrap">
+
+            @* ── Stats badges ── *@
+            <span class="badge bg-secondary">
+                <i class="bi bi-table me-1"></i>@_pagedResult.TotalCount.ToString("N0") rows
+            </span>
+            <span class="badge bg-secondary">
+                <i class="bi bi-layout-three-columns me-1"></i>@_columns.Count cols
+            </span>
+
+            @* ── Clear filters (only when active) ── *@
+            @if (_config.Filters.Count > 0)
+            {
+                <button class="btn btn-outline-warning btn-sm"
+                        @onclick="ClearFilters"
+                        title="Clear all column filters">
+                    <i class="bi bi-funnel-fill me-1"></i>
+                    Clear filters (@_config.Filters.Count)
+                </button>
+            }
+
+            @* ── Export — pushed right ── *@
+            <div class="d-flex gap-1 flex-wrap ms-auto">
+                <div class="btn-group btn-group-sm">
+                    <button class="btn btn-outline-success"
+                            @onclick="() => ExportAsync(ExportFormat.Excel, false)"
+                            title="Export data to Excel">
+                        <i class="bi bi-file-earmark-excel"></i>
+                        <span class="d-none d-sm-inline ms-1">Excel</span>
+                    </button>
+                    <button class="btn btn-outline-secondary"
+                            @onclick="() => ExportAsync(ExportFormat.Csv, false)"
+                            title="Export data to CSV">
+                        <i class="bi bi-filetype-csv"></i>
+                        <span class="d-none d-sm-inline ms-1">CSV</span>
+                    </button>
+                    <button class="btn btn-outline-danger"
+                            @onclick="() => ExportAsync(ExportFormat.Pdf, false)"
+                            title="Export data to PDF">
+                        <i class="bi bi-file-earmark-pdf"></i>
+                        <span class="d-none d-sm-inline ms-1">PDF</span>
+                    </button>
+                </div>
+
+                @* Pivot export (only when pivot exists) *@
+                @if (_pivotResult.RowKeys.Count > 0)
+                {
+                    <div class="btn-group btn-group-sm" title="Export pivot table">
+                        <button class="btn btn-success"
+                                @onclick="() => ExportAsync(ExportFormat.Excel, true)">
+                            <i class="bi bi-file-earmark-excel"></i>
+                            <span class="d-none d-lg-inline ms-1">Pivot XLS</span>
+                        </button>
+                        <button class="btn btn-secondary"
+                                @onclick="() => ExportAsync(ExportFormat.Csv, true)">
+                            <i class="bi bi-filetype-csv"></i>
+                            <span class="d-none d-lg-inline ms-1">Pivot CSV</span>
+                        </button>
+                        <button class="btn btn-danger"
+                                @onclick="() => ExportAsync(ExportFormat.Pdf, true)">
+                            <i class="bi bi-file-earmark-pdf"></i>
+                            <span class="d-none d-lg-inline ms-1">Pivot PDF</span>
+                        </button>
+                    </div>
+                }
+            </div>
+        </div>
+    </div>
+}
+
+@* ══════════════════════════════════════════════════════════════
+   MAIN CONTENT
+══════════════════════════════════════════════════════════════ *@
+<div class="report-body px-2 px-md-3 py-2">
+
+    @if (_pagedResult != null)
+    {
+        @* Tab strip — scrollable on mobile *@
+        <div class="report-tabs-wrap mb-2">
+            <ul class="nav nav-tabs flex-nowrap overflow-auto">
+                <li class="nav-item">
+                    <button class="nav-link text-nowrap @(_activeTab == "data" ? "active" : "")"
+                            @onclick="@(() => _activeTab = "data")">
+                        <i class="bi bi-table me-1"></i>
+                        <span class="d-none d-sm-inline">Data Grid</span>
+                        <span class="d-sm-none">Grid</span>
+                    </button>
+                </li>
+                <li class="nav-item">
+                    <button class="nav-link text-nowrap @(_activeTab == "pivot" ? "active" : "")"
+                            @onclick="@(() => _activeTab = "pivot")">
+                        <i class="bi bi-grid-3x3-gap me-1"></i>
+                        <span>Pivot</span>
+                        @if (_pivotResult.RowKeys.Count > 0)
+                        {
+                            <span class="badge bg-primary ms-1">@_pivotResult.RowKeys.Count</span>
+                        }
+                    </button>
+                </li>
+            </ul>
+        </div>
+
+        @* ── DATA GRID ─────────────────────────────────────────── *@
+        @if (_activeTab == "data")
+        {
+            <DataGrid Data="@_pagedResult.Items"
+                      Columns="@_columns"
+                      IsLoading="@_loading"
+                      ShowFilters="true"
+                      SortColumn="@_config.SortColumn"
+                      SortDescending="@_config.SortDescending"
+                      Filters="@_config.Filters"
+                      PageNumber="@_config.PageNumber"
+                      PageSize="@_config.PageSize"
+                      TotalCount="@_pagedResult.TotalCount"
+                      TotalPages="@_pagedResult.TotalPages"
+                      ColumnAliases="@_colAliases"
+                      OnSort="OnSortChanged"
+                      OnFilter="OnFilterChanged"
+                      OnPageChanged="OnPageChanged"
+                      OnAliasChanged="OnColumnAliasChanged" />
+        }
+
+        @* ── PIVOT ─────────────────────────────────────────────── *@
+        @if (_activeTab == "pivot")
+        {
+            <PivotConfigurator Config="@_pivotConfig"
+                               Columns="@_columns"
+                               SavedLayouts="@_savedLayouts"
+                               OnApply="ApplyPivotAsync"
+                               OnClear="ClearPivot"
+                               OnSave="SaveLayoutAsync"
+                               OnLoad="LoadLayoutAsync"
+                               OnDelete="DeleteLayoutAsync" />
+
+            @if (_pivotLoading)
+            {
+                <div class="d-flex gap-2 align-items-center text-muted py-4 justify-content-center">
+                    <div class="spinner-border text-primary"></div>
+                    <span>Building pivot…</span>
+                </div>
+            }
+            else
+            {
+                <PivotTable Pivot="@_pivotResult"
+                            RowField="@_pivotConfig.RowField"
+                            ColField="@_pivotConfig.ColumnField"
+                            Config="@_pivotConfig"
+                            DrillDownProvider="@GetDrillDownDataAsync" />
+            }
+        }
+    }
+    else if (_loading)
+    {
+        @* ── Progress header ── *@
+        <div class="d-flex align-items-center gap-3 py-3 px-1 flex-wrap">
+            <div class="spinner-border text-primary" style="width:1.8rem;height:1.8rem;flex-shrink:0"></div>
+
+            <div class="flex-fill">
+                <div class="fw-semibold">
+                    Loading <strong>@_config.Source</strong>…
+                </div>
+
+                @if (_rowsLoaded > 0)
+                {
+                    @* Row counter + indeterminate bar — appears as soon as first batch arrives *@
+                    <div class="d-flex align-items-center gap-2 mt-1 flex-wrap">
+                        <span class="badge bg-primary">
+                            <i class="bi bi-arrow-down-circle me-1"></i>@_rowsLoaded.ToString("N0") rows
+                        </span>
+                        <div class="progress flex-fill" style="height:5px;min-width:120px">
+                            <div class="progress-bar progress-bar-striped progress-bar-animated bg-primary"
+                                 style="width:100%"></div>
+                        </div>
+                        <span style="font-size:.72rem" class="text-muted">
+                            Large dataset&ensp;—&ensp;fetching…
+                        </span>
+                    </div>
+                }
+            </div>
+
+            <button class="btn btn-outline-danger btn-sm" @onclick="CancelAsync" title="Cancel query">
+                <i class="bi bi-stop-fill me-1"></i>Cancel
+            </button>
+        </div>
+
+        @* ── Skeleton grid — shown as soon as rows start arriving ── *@
+        @if (_rowsLoaded > 0)
+        {
+            <DataGrid Data="@_emptyRows"
+                      Columns="@_columns"
+                      IsLoading="true"
+                      ShowFilters="false"
+                      PageNumber="1"
+                      PageSize="50"
+                      TotalCount="0"
+                      TotalPages="0" />
+        }
+        else
+        {
+            @* Before first batch: centred spinner only *@
+            <div class="d-flex justify-content-center py-5">
+                <div class="spinner-border text-primary opacity-25"
+                     style="width:3rem;height:3rem;"></div>
+            </div>
+        }
+    }
+    else if (_cancelled)
+    {
+        <div class="alert alert-warning mt-3 mx-auto" style="max-width:420px">
+            <i class="bi bi-slash-circle me-2"></i>
+            Query cancelled. Adjust parameters and click <strong>Run</strong> again.
+        </div>
+    }
+    else if (_hasExecuted)
+    {
+        <div class="alert alert-info mt-3">
+            <i class="bi bi-info-circle me-2"></i>No records returned by <code>@_config.Source</code>.
+        </div>
+    }
+    else
+    {
+        <div class="text-center py-5 text-muted">
+            <i class="bi bi-play-circle display-1 text-primary opacity-25"></i>
+            <h5 class="mt-3">No report loaded</h5>
+            <p class="small">Enter a source name above and tap <strong>Run</strong>.</p>
+        </div>
+    }
+</div>
+
+@* ── AI Chat Widget ── *@
+<ChatWindow ReportSource="@_config.Source"
+            Columns="@_columns"
+            RowCount="@(_pagedResult?.TotalCount ?? 0)" />
+
+@code {
+    // ──────────────────────────────────────────────────────────────
+    // State
+    // ──────────────────────────────────────────────────────────────
+
+    private DataSourceConfig _config = new();
+    private PagedResult<Dictionary<string, object?>>? _pagedResult;
+    private IReadOnlyList<string> _columns = [];
+    private IReadOnlyList<Dictionary<string, object?>> _allData = [];
+
+    private IReadOnlyList<SpParameter> _spParams = [];
+    private Dictionary<string, string> _paramValues = new(StringComparer.OrdinalIgnoreCase);
+
+    private PivotConfig _pivotConfig = new();
+    private PivotResult _pivotResult = PivotResult.Empty;
+    private IReadOnlyList<UserPivotLayout> _savedLayouts = [];
+
+    private string _activeTab = "data";
+    private bool _loading;
+    private bool _pivotLoading;
+    private bool _hasExecuted;
+    private bool _cancelled;
+    private bool _isBigSpData;          // SP returned >50k rows without native paging
+    private int  _rowsLoaded;           // progress counter for large SP loads
+    private string _error = "";
+    private string _userId = "anonymous";
+
+    // Column display-name aliases (raw DB name → friendly label)
+    private Dictionary<string, string> _colAliases =
+        new(StringComparer.OrdinalIgnoreCase);
+
+    // Report catalog — loaded from DMSViewReportTemplate view
+    private sealed record ReportTemplate(
+        string Name,
+        string Source,
+        DataSourceType SourceType,
+        Dictionary<string, string> DefaultParams);
+
+    private IReadOnlyList<ReportTemplate> _reportTemplates = [];
+
+    private string SourcePlaceholder => _config.SourceType switch
+    {
+        DataSourceType.StoredProcedure => "sp_Name",
+        DataSourceType.View            => "vw_Name / ViewName",
+        _                              => "TableName"
+    };
+
+    // Cancellation
+    private CancellationTokenSource? _cts;
+
+    // Debounce timer — auto-executes 600 ms after the last SP param keystroke
+    private System.Threading.Timer? _paramDebounce;
+
+    // Empty row list — passed to skeleton DataGrid during large-data loads
+    private static readonly IReadOnlyList<Dictionary<string, object?>> _emptyRows = [];
+
+    // Mobile config panel
+    private bool _configOpen;
+    private bool _isDesktop;
+
+    private enum ExportFormat { Excel, Csv, Pdf }
+
+    // ──────────────────────────────────────────────────────────────
+    // Lifecycle
+    // ──────────────────────────────────────────────────────────────
+
+    protected override async Task OnInitializedAsync()
+    {
+        _userId = HttpCtx.HttpContext?.User?.Identity?.Name ?? "anonymous";
+        ParseQueryString();
+
+        // Load report catalog in parallel — non-blocking, shows when ready
+        _ = LoadReportTemplatesAsync();
+
+        if (_config.SourceType == DataSourceType.StoredProcedure &&
+            !string.IsNullOrWhiteSpace(_config.Source))
+            await LoadSpParamsAsync();
+
+        if (!string.IsNullOrWhiteSpace(_config.Source))
+            await ExecuteAsync();
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            _isDesktop = await JS.InvokeAsync<bool>("eval", "window.innerWidth >= 768");
+            _configOpen = !_isDesktop;
+            if (!string.IsNullOrWhiteSpace(_config.Source)) _configOpen = false;
+            StateHasChanged();
+        }
+    }
+
+    private void ToggleConfigPanel() => _configOpen = !_configOpen;
+
+    // ──────────────────────────────────────────────────────────────
+    // Query-string parsing
+    // ──────────────────────────────────────────────────────────────
+
+    private static readonly HashSet<string> _reservedQsKeys =
+        new(StringComparer.OrdinalIgnoreCase) { "Source", "Type" };
+
+    private void ParseQueryString()
+    {
+        var uri = new Uri(Nav.Uri);
+        var qs = Microsoft.AspNetCore.WebUtilities.QueryHelpers.ParseQuery(uri.Query);
+
+        if (qs.TryGetValue("Source", out var src)) _config.Source = src.ToString();
+        if (qs.TryGetValue("Type", out var type) &&
+            Enum.TryParse<DataSourceType>(type, true, out var dt))
+            _config.SourceType = dt;
+
+        foreach (var kv in qs)
+        {
+            if (_reservedQsKeys.Contains(kv.Key)) continue;
+            if (!string.IsNullOrEmpty(kv.Value.ToString()))
+                _paramValues[kv.Key] = kv.Value.ToString();
+        }
+    }
+
+    // ──────────────────────────────────────────────────────────────
+    // SP parameters
+    // ──────────────────────────────────────────────────────────────
+
+    private string GetParamValue(string name) =>
+        _paramValues.TryGetValue(name, out var v) ? v : "";
+
+    private void SetParamValue(string name, string? value)
+    {
+        if (string.IsNullOrEmpty(value)) _paramValues.Remove(name);
+        else _paramValues[name] = value;
+
+        // Auto-execute: restart 600 ms debounce on every keystroke
+        _paramDebounce?.Dispose();
+        _paramDebounce = new System.Threading.Timer(
+            async _ => await InvokeAsync(ExecuteAsync),
+            null, 600, System.Threading.Timeout.Infinite);
+    }
+
+    private async Task LoadSpParamsAsync()
+    {
+        if (string.IsNullOrWhiteSpace(_config.Source)) return;
+        try { _spParams = await Repo.GetSpParametersAsync(_config.Source); }
+        catch { _spParams = []; }
+    }
+
+    /// <summary>Source type dropdown changed in header — clear source name and SP params.</summary>
+    private async Task OnSourceTypeChanged(ChangeEventArgs e)
+    {
+        if (Enum.TryParse<DataSourceType>(e.Value?.ToString(), out var dt))
+            _config.SourceType = dt;
+
+        // Changing type means the old source name is no longer valid
+        _config.Source = string.Empty;
+        _spParams      = [];
+        _paramValues.Clear();
+        _allData     = [];
+        _pagedResult = null;
+        _columns     = [];
+        _colAliases.Clear();
+        _pivotResult = PivotResult.Empty;
+        _hasExecuted = false;
+    }
+
+    /// <summary>Pill-toggle source type button clicked — resets state without auto-execute.</summary>
+    private async Task OnSourceTypeButtonClick(DataSourceType t)
+    {
+        if (_config.SourceType == t) return; // no change
+        _config.SourceType = t;
+        _config.Source = string.Empty;
+        _spParams = [];
+        _paramValues.Clear();
+        _allData = [];
+        _pagedResult = null;
+        _columns = [];
+        _colAliases.Clear();
+        _pivotResult = PivotResult.Empty;
+        _hasExecuted = false;
+        // don't auto-execute — source is now empty
+    }
+
+    private static string SourceTypeIcon(DataSourceType t) => t switch
+    {
+        DataSourceType.StoredProcedure => "bi-code-slash",
+        DataSourceType.View            => "bi-eye",
+        DataSourceType.Table           => "bi-grid-1x2-fill",
+        _                              => "bi-database"
+    };
+
+    private static string SourceTypeLabel(DataSourceType t) => t switch
+    {
+        DataSourceType.StoredProcedure => "SP",
+        DataSourceType.View            => "View",
+        DataSourceType.Table           => "Table",
+        _                              => t.ToString()
+    };
+
+    private async Task OnSourceNameBlur()
+    {
+        if (_config.SourceType == DataSourceType.StoredProcedure &&
+            !string.IsNullOrWhiteSpace(_config.Source))
+            await LoadSpParamsAsync();
+    }
+
+    /// <summary>Page size changed in header → instant in-memory reslice, no DB round-trip.</summary>
+    private void OnHeaderPageSizeChanged(ChangeEventArgs e)
+    {
+        if (!int.TryParse(e.Value?.ToString(), out var size)) return;
+        _config.PageSize   = size;
+        _config.PageNumber = 1;
+        if (_allData.Count > 0)
+            _pagedResult = SlicePage(_allData);
+    }
+
+    // ──────────────────────────────────────────────────────────────
+    // Report catalog  (DMSViewReportTemplate)
+    // ──────────────────────────────────────────────────────────────
+
+    // Candidate column names for auto-detection (case-insensitive)
+    private static readonly string[] _nameColumns   = ["ReportName","Name","Title","DisplayName","RPT_NAME","REPORT_NAME"];
+    private static readonly string[] _sourceColumns = ["SourceName","Source","ObjectName","SPName","ProcName","ViewName","TableName","RPT_SOURCE","SourceObject"];
+    private static readonly string[] _typeColumns   = ["SourceType","Type","ObjectType","RPT_TYPE","SourceKind"];
+
+    private async Task LoadReportTemplatesAsync()
+    {
+        try
+        {
+            var cfg = new DataSourceConfig
+            {
+                Source     = "DMSViewReportTemplate",
+                SourceType = DataSourceType.View,
+                PageSize   = 1000
+            };
+            var rows = await Repo.FetchAllAsync(cfg);
+
+            // Build a set of "system" column names to exclude from DefaultParams
+            var systemCols = new HashSet<string>(
+                _nameColumns.Concat(_sourceColumns).Concat(_typeColumns),
+                StringComparer.OrdinalIgnoreCase);
+
+            var templates = new List<ReportTemplate>();
+            foreach (var row in rows)
+            {
+                var name   = PickColumn(row, _nameColumns);
+                var source = PickColumn(row, _sourceColumns);
+                if (string.IsNullOrWhiteSpace(name) || string.IsNullOrWhiteSpace(source))
+                    continue;
+
+                var typeStr = PickColumn(row, _typeColumns);
+                var type    = InferSourceType(typeStr, source);
+
+                // All remaining non-null columns become default param values
+                var parms = row
+                    .Where(kv => !systemCols.Contains(kv.Key) && kv.Value != null)
+                    .ToDictionary(kv => kv.Key, kv => kv.Value!.ToString()!,
+                                  StringComparer.OrdinalIgnoreCase);
+
+                templates.Add(new ReportTemplate(name, source, type, parms));
+            }
+
+            _reportTemplates = templates;
+            await InvokeAsync(StateHasChanged);
+        }
+        catch { /* view may not exist in all environments */ }
+    }
+
+    private async Task SelectTemplateByName(ChangeEventArgs e)
+    {
+        var name = e.Value?.ToString();
+        if (string.IsNullOrEmpty(name)) return;
+        var t = _reportTemplates.FirstOrDefault(r => r.Name == name);
+        if (t == null) return;
+
+        _config.Source     = t.Source;
+        _config.SourceType = t.SourceType;
+        _paramValues       = new Dictionary<string, string>(
+            t.DefaultParams, StringComparer.OrdinalIgnoreCase);
+        _spParams          = [];
+        _colAliases.Clear();
+
+        if (t.SourceType == DataSourceType.StoredProcedure)
+            await LoadSpParamsAsync();
+
+        await ExecuteAsync();
+    }
+
+    private static string? PickColumn(Dictionary<string, object?> row, string[] candidates)
+    {
+        foreach (var c in candidates)
+            if (row.TryGetValue(c, out var v) && v != null)
+                return v.ToString();
+        return null;
+    }
+
+    private static DataSourceType InferSourceType(string? typeVal, string? sourceName)
+    {
+        if (!string.IsNullOrEmpty(typeVal))
+        {
+            return typeVal.Trim().ToLowerInvariant() switch
+            {
+                "sp" or "storedprocedure" or "stored_procedure" or "procedure" or "proc"
+                    => DataSourceType.StoredProcedure,
+                "view" or "vw" => DataSourceType.View,
+                "table" or "tbl" => DataSourceType.Table,
+                _ => DataSourceType.View
+            };
+        }
+        // Infer from source name prefix when no explicit type column
+        if (!string.IsNullOrEmpty(sourceName))
+        {
+            var lower = sourceName.ToLowerInvariant();
+            if (lower.StartsWith("sp_") || lower.StartsWith("usp_") || lower.StartsWith("proc_"))
+                return DataSourceType.StoredProcedure;
+            if (lower.StartsWith("vw_") || lower.StartsWith("view_") || lower.StartsWith("v_"))
+                return DataSourceType.View;
+        }
+        return DataSourceType.View;
+    }
+
+    /// <summary>Clear button — resets source name, params, and results.</summary>
+    private void ResetSource()
+    {
+        _config.Source = string.Empty;
+        _spParams      = [];
+        _paramValues.Clear();
+        _allData     = [];
+        _pagedResult = null;
+        _columns     = [];
+        _colAliases.Clear();
+        _pivotResult = PivotResult.Empty;
+        _pivotConfig = new();
+        _error       = "";
+        _hasExecuted = false;
+        _cancelled   = false;
+        _isBigSpData = false;
+    }
+
+    // ──────────────────────────────────────────────────────────────
+    // Execute / Cancel
+    // ──────────────────────────────────────────────────────────────
+
+    private async Task ExecuteAsync()
+    {
+        if (string.IsNullOrWhiteSpace(_config.Source)) return;
+
+        // Cancel any previous in-flight query
+        _cts?.Cancel();
+        _cts?.Dispose();
+        _cts = new CancellationTokenSource();
+        var ct = _cts.Token;
+
+        _error      = "";
+        _loading    = true;
+        _cancelled  = false;
+        _hasExecuted = true;
+        _isBigSpData = false;
+        _rowsLoaded  = 0;
+        _pagedResult = null;
+        _allData     = [];
+        _pivotResult = PivotResult.Empty;
+        _configOpen  = false;
+        StateHasChanged();
+
+        try
+        {
+            BuildSpParams();
+
+            var cacheKey = ICacheService.BuildKey(
+                _userId, _config.Source, _config.SourceType.ToString(),
+                string.Join(",", _config.Parameters.Select(kv => $"{kv.Key}={kv.Value}")));
+
+            _allData = await Cache.GetAsync<List<Dictionary<string, object?>>>(cacheKey + "|ALL") ?? [];
+
+            if (_allData.Count == 0)
+            {
+                // Progress callback — marshal to UI thread so StateHasChanged is safe
+                var progress = new Progress<int>(count =>
+                {
+                    _rowsLoaded = count;
+                    InvokeAsync(StateHasChanged);
+                });
+
+                _allData = await Repo.FetchAllAsync(_config, progress, ct);
+
+                // Flag large uncached SP loads (no server-side paging available)
+                if (_config.SourceType == DataSourceType.StoredProcedure && _allData.Count > 50_000)
+                {
+                    // Check whether native paging params exist
+                    var hasNativePaging = _spParams.Any(p =>
+                        p.Name.Equals("PageNumber", StringComparison.OrdinalIgnoreCase) ||
+                        p.Name.Equals("PageSize", StringComparison.OrdinalIgnoreCase));
+                    _isBigSpData = !hasNativePaging;
+                }
+
+                await Cache.SetAsync(cacheKey + "|ALL", _allData);
+            }
+
+            _columns     = _allData.Count > 0 ? _allData[0].Keys.ToList() : [];
+            _pagedResult = SlicePage(_allData);
+            _savedLayouts = await LayoutSvc.ListAsync(_userId, _config.Source);
+
+            // Apply default saved layout if one exists
+            var defaultLayout = _savedLayouts.FirstOrDefault(l => l.LayoutName == "Default");
+            if (defaultLayout != null)
+                ApplyLayoutJson(defaultLayout.LayoutJson);
+
+            // Auto-apply pivot whenever pivot fields are already configured
+            if (_pivotConfig.IsValid)
+                await ApplyPivotAsync();
+        }
+        catch (OperationCanceledException)
+        {
+            _cancelled   = true;
+            _pagedResult = null;
+            _allData     = [];
+        }
+        catch (Exception ex) { _error = ex.Message; }
+        finally
+        {
+            _loading    = false;
+            _rowsLoaded = 0;
+            StateHasChanged();
+        }
+    }
+
+    private void CancelAsync()
+    {
+        _cts?.Cancel();
+    }
+
+    private void BuildSpParams()
+    {
+        _config.Parameters.Clear();
+        foreach (var (name, val) in _paramValues)
+            _config.Parameters[name] = string.IsNullOrEmpty(val) ? null : (object)val;
+    }
+
+    // ──────────────────────────────────────────────────────────────
+    // Grid callbacks
+    // ──────────────────────────────────────────────────────────────
+
+    private PagedResult<Dictionary<string, object?>> SlicePage(
+        IReadOnlyList<Dictionary<string, object?>> all)
+    {
+        var filtered = all.AsEnumerable();
+
+        foreach (var (col, term) in _config.Filters)
+            if (!string.IsNullOrEmpty(term))
+                filtered = filtered.Where(r =>
+                    r.TryGetValue(col, out var v) &&
+                    v?.ToString()?.Contains(term, StringComparison.OrdinalIgnoreCase) == true);
+
+        if (!string.IsNullOrEmpty(_config.SortColumn))
+            filtered = _config.SortDescending
+                ? filtered.OrderByDescending(r => r.TryGetValue(_config.SortColumn, out var v) ? v?.ToString() : "")
+                : filtered.OrderBy(r => r.TryGetValue(_config.SortColumn, out var v) ? v?.ToString() : "");
+
+        var list = filtered.ToList();
+        var page = list
+            .Skip((_config.PageNumber - 1) * _config.PageSize)
+            .Take(_config.PageSize).ToList();
+
+        return new PagedResult<Dictionary<string, object?>>
+        {
+            Items      = page,
+            TotalCount = list.Count,
+            PageNumber = _config.PageNumber,
+            PageSize   = _config.PageSize
+        };
+    }
+
+    private void OnSortChanged((string col, bool desc) args)
+    {
+        _config.SortColumn    = args.col;
+        _config.SortDescending = args.desc;
+        _config.PageNumber    = 1;
+        _pagedResult = SlicePage(_allData);
+    }
+
+    private void OnFilterChanged((string col, string? term) args)
+    {
+        if (string.IsNullOrEmpty(args.term)) _config.Filters.Remove(args.col);
+        else _config.Filters[args.col] = args.term;
+        _config.PageNumber = 1;
+        _pagedResult = SlicePage(_allData);
+    }
+
+    private void OnPageChanged(int page)
+    {
+        _config.PageNumber = page;
+        _pagedResult = SlicePage(_allData);
+    }
+
+    private void ClearFilters()
+    {
+        _config.Filters.Clear();
+        _config.PageNumber = 1;
+        _pagedResult = SlicePage(_allData);
+    }
+
+    private void OnColumnAliasChanged((string col, string alias) args)
+    {
+        if (string.IsNullOrWhiteSpace(args.alias))
+            _colAliases.Remove(args.col);
+        else
+            _colAliases[args.col] = args.alias.Trim();
+    }
+
+    // ──────────────────────────────────────────────────────────────
+    // Pivot — smart routing
+    //   View / Table  → SQL GROUP BY  (server aggregates, no full scan)
+    //   StoredProc    → in-memory on cached _allData
+    // ──────────────────────────────────────────────────────────────
+
+    private async Task ApplyPivotAsync()
+    {
+        if (!_pivotConfig.IsValid) return;
+        _pivotLoading = true;
+        StateHasChanged();
+
+        try
+        {
+            var vds = _pivotConfig.ValidValues;
+            bool useServerGroupBy = _config.SourceType != DataSourceType.StoredProcedure
+                                    && !string.IsNullOrWhiteSpace(_config.Source);
+
+            if (useServerGroupBy)
+            {
+                // Server-side GROUP BY — only returns N_rows × N_cols aggregated rows
+                var grouped = await Repo.FetchPivotGroupByAsync(
+                    _config,
+                    _pivotConfig.RowField,
+                    _pivotConfig.ColumnField,
+                    vds);
+
+                _pivotResult = await Task.Run(() => BuildPivotFromGroupBy(grouped, vds));
+            }
+            else
+            {
+                // In-memory pivot from cached SP data
+                _pivotResult = await Task.Run(() => PivotSvc.Build(_allData, _pivotConfig));
+            }
+        }
+        catch (Exception ex)
+        {
+            _error = $"Pivot error: {ex.Message}";
+            _pivotResult = PivotResult.Empty;
+        }
+        finally { _pivotLoading = false; StateHasChanged(); }
+    }
+
+    /// <summary>
+    /// Builds a PivotResult from pre-aggregated GROUP BY rows returned by
+    /// FetchPivotGroupByAsync. Each row contains one (rowKey, colKey) combination
+    /// with columns named vd.Label (e.g. "Sum(Sales)").
+    /// </summary>
+    private PivotResult BuildPivotFromGroupBy(
+        IReadOnlyList<Dictionary<string, object?>> grouped,
+        IReadOnlyList<PivotValueDef> vds)
+    {
+        var rowField = _pivotConfig.RowField;
+        var colField = _pivotConfig.ColumnField;
+
+        var rowSet = new SortedSet<string>(StringComparer.OrdinalIgnoreCase);
+        var colSet = new SortedSet<string>(StringComparer.OrdinalIgnoreCase);
+        var data   = new Dictionary<string, Dictionary<string, Dictionary<string, object?>>>(
+                         StringComparer.OrdinalIgnoreCase);
+
+        foreach (var row in grouped)
+        {
+            var rk = GetKey(row, rowField);
+            var ck = GetKey(row, colField);
+            rowSet.Add(rk);
+            colSet.Add(ck);
+
+            if (!data.ContainsKey(rk))
+                data[rk] = new(StringComparer.OrdinalIgnoreCase);
+            if (!data[rk].ContainsKey(ck))
+                data[rk][ck] = new(StringComparer.OrdinalIgnoreCase);
+
+            foreach (var vd in vds)
+            {
+                // DB alias matches vd.Label exactly (e.g. "Sum(Sales)")
+                if (row.TryGetValue(vd.Label, out var val))
+                    data[rk][ck][vd.Label] = val;
+            }
+        }
+
+        var rowKeys = rowSet.ToList();
+        var colKeys = colSet.ToList();
+
+        // Ensure all (rk, ck) cells exist — null for missing intersections
+        foreach (var rk in rowKeys)
+        {
+            if (!data.ContainsKey(rk)) data[rk] = new(StringComparer.OrdinalIgnoreCase);
+            foreach (var ck in colKeys)
+                if (!data[rk].ContainsKey(ck))
+                    data[rk][ck] = vds.ToDictionary(
+                        vd => vd.Label, _ => (object?)null,
+                        StringComparer.OrdinalIgnoreCase);
+        }
+
+        // Compute totals by summing the pre-aggregated values
+        var rowTotals  = new Dictionary<string, Dictionary<string, object?>>(StringComparer.OrdinalIgnoreCase);
+        var colTotals  = new Dictionary<string, Dictionary<string, object?>>(StringComparer.OrdinalIgnoreCase);
+        var grandTotals = vds.ToDictionary(
+            vd => vd.Label, _ => (object?)0.0, StringComparer.OrdinalIgnoreCase);
+
+        foreach (var rk in rowKeys)
+        {
+            rowTotals[rk] = vds.ToDictionary(
+                vd => vd.Label, _ => (object?)0.0, StringComparer.OrdinalIgnoreCase);
+
+            foreach (var ck in colKeys)
+            {
+                if (!colTotals.ContainsKey(ck))
+                    colTotals[ck] = vds.ToDictionary(
+                        vd => vd.Label, _ => (object?)0.0, StringComparer.OrdinalIgnoreCase);
+
+                foreach (var vd in vds)
+                {
+                    var raw = data[rk][ck].TryGetValue(vd.Label, out var v) ? v : null;
+                    if (raw != null && double.TryParse(raw.ToString(), out var d))
+                    {
+                        rowTotals[rk][vd.Label]  = (double)rowTotals[rk][vd.Label]!  + d;
+                        colTotals[ck][vd.Label]  = (double)colTotals[ck][vd.Label]!  + d;
+                        grandTotals[vd.Label]    = (double)grandTotals[vd.Label]!     + d;
+                    }
+                }
+            }
+        }
+
+        return new PivotResult
+        {
+            RowKeys     = rowKeys,
+            ColumnKeys  = colKeys,
+            ValueDefs   = vds,
+            Data        = data,
+            RowTotals   = rowTotals,
+            ColTotals   = colTotals,
+            GrandTotals = grandTotals
+        };
+    }
+
+    private static string GetKey(Dictionary<string, object?> row, string field) =>
+        row.TryGetValue(field, out var v) && v != null ? v.ToString()! : "(blank)";
+
+    private void ClearPivot()
+    {
+        _pivotConfig = new();
+        _pivotResult = PivotResult.Empty;
+    }
+
+    private async Task<IReadOnlyList<Dictionary<string, object?>>> GetDrillDownDataAsync(
+        Dictionary<string, object?> filters) =>
+        await Repo.FetchDrillDownAsync(_config, filters);
+
+    // ──────────────────────────────────────────────────────────────
+    // Layout
+    // ──────────────────────────────────────────────────────────────
+
+    private async Task SaveLayoutAsync((string name, string json) args)
+    {
+        await LayoutSvc.SaveAsync(new UserPivotLayout
+        {
+            UserId     = _userId, ReportName = _config.Source,
+            LayoutName = args.name, LayoutJson = args.json
+        });
+        _savedLayouts = await LayoutSvc.ListAsync(_userId, _config.Source);
+    }
+
+    private async Task LoadLayoutAsync(int layoutId)
+    {
+        var layout = _savedLayouts.FirstOrDefault(l => l.Id == layoutId);
+        if (layout == null) return;
+        ApplyLayoutJson(layout.LayoutJson);
+        await ApplyPivotAsync();
+        _activeTab = "pivot";
+    }
+
+    private async Task DeleteLayoutAsync(int layoutId)
+    {
+        await LayoutSvc.DeleteAsync(layoutId);
+        _savedLayouts = await LayoutSvc.ListAsync(_userId, _config.Source);
+    }
+
+    private void ApplyLayoutJson(string json)
+    {
+        try
+        {
+            var cfg = JsonSerializer.Deserialize<PivotConfig>(json);
+            if (cfg != null) _pivotConfig = cfg;
+        }
+        catch { /* ignore malformed JSON */ }
+    }
+
+    // ──────────────────────────────────────────────────────────────
+    // Export
+    // ──────────────────────────────────────────────────────────────
+
+    private async Task ExportAsync(ExportFormat fmt, bool pivot)
+    {
+        byte[] bytes;
+        string mime, ext;
+        var filename = $"{_config.Source}_{DateTime.Now:yyyyMMdd_HHmmss}";
+
+        switch (fmt)
+        {
+            case ExportFormat.Excel:
+                bytes = pivot
+                    ? await ExportSvc.ToExcelPivotAsync(_pivotResult, _pivotConfig, filename)
+                    : await ExportSvc.ToExcelAsync(_allData, filename);
+                mime = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
+                ext  = "xlsx";
+                break;
+            case ExportFormat.Csv:
+                bytes = pivot ? ExportSvc.ToCsvPivot(_pivotResult, _pivotConfig) : ExportSvc.ToCsv(_allData);
+                mime  = "text/csv";
+                ext   = "csv";
+                break;
+            default:
+                bytes = pivot
+                    ? ExportSvc.ToPdfPivot(_pivotResult, _pivotConfig, filename)
+                    : ExportSvc.ToPdf(_allData, filename);
+                mime = "application/pdf";
+                ext  = "pdf";
+                break;
+        }
+
+        await JS.InvokeVoidAsync("blazorDownloadFile", $"{filename}.{ext}", mime, bytes);
+    }
+}

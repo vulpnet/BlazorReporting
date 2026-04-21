@@ -1,0 +1,52 @@
+@inherits LayoutComponentBase
+
+<div class="d-flex flex-column min-vh-100">
+
+    <nav class="navbar navbar-expand-md navbar-dark bg-dark px-3 py-2">
+        <a class="navbar-brand fw-bold d-flex align-items-center gap-2" href="/">
+            <i class="bi bi-bar-chart-fill"></i>
+            <span class="d-none d-sm-inline"> Reports</span>
+            <span class="d-sm-none">BR</span>
+        </a>
+
+        <button class="navbar-toggler border-0" type="button"
+                data-bs-toggle="collapse" data-bs-target="#mainNav"
+                aria-controls="mainNav" aria-expanded="false" aria-label="Toggle navigation">
+            <span class="navbar-toggler-icon"></span>
+        </button>
+
+        <div class="collapse navbar-collapse" id="mainNav">
+            <ul class="navbar-nav me-auto mt-2 mt-md-0">
+                <li class="nav-item">
+                    <a class="nav-link" href="/"><i class="bi bi-house me-1"></i>Home</a>
+                </li>
+                <li class="nav-item">
+                    <a class="nav-link" href="/report">
+                        <i class="bi bi-table me-1"></i>Reports
+                    </a>
+                </li>
+            </ul>
+            <ul class="navbar-nav mt-2 mt-md-0">
+                <li class="nav-item">
+                    <a class="nav-link" href="/help" title="User Guide">
+                        <i class="bi bi-question-circle me-1"></i>
+                        <span class="d-md-none">Help</span>
+                        <span class="d-none d-md-inline">User Guide</span>
+                    </a>
+                </li>
+            </ul>
+        </div>
+    </nav>
+
+    <main class="flex-grow-1 overflow-hidden">
+        @Body
+    </main>
+
+    <footer class="text-center text-muted py-2 bg-light border-top" style="font-size:.78rem">
+        Reporting &copy; @DateTime.Now.Year
+    </footer>
+</div>
+
+<div id="blazor-error-ui" class="alert alert-danger m-2" style="display:none;position:fixed;bottom:1rem;left:1rem;right:1rem;z-index:9999">
+    An unhandled error has occurred. <a href="" class="alert-link">Reload</a>
+</div>

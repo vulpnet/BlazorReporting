@@ -1,0 +1,379 @@
+@* DataGrid — sortable, filterable, paginated.
+   Columns can be hidden/shown and reordered via drag-and-drop on headers. *@
+
+@* ── Column Manager Button ── *@
+<div class="d-flex align-items-center gap-2 mb-2 flex-wrap">
+    <div class="position-relative">
+        <button class="btn btn-outline-secondary btn-sm" @onclick="ToggleColMgr"
+                title="Show / hide columns">
+            <i class="bi bi-layout-three-columns me-1"></i>
+            Columns
+            <span class="badge bg-primary ms-1">
+                @_colStates.Count(c => c.Visible)/@_colStates.Count
+            </span>
+        </button>
+
+        @if (_showColMgr)
+        {
+            @* backdrop to close *@
+            <div class="col-mgr-backdrop" @onclick="ToggleColMgr"></div>
+
+            <div class="col-mgr-panel shadow border rounded bg-white p-2">
+                <div class="d-flex justify-content-between align-items-center mb-2 border-bottom pb-1">
+                    <span class="fw-semibold small">Column Visibility</span>
+                    <div class="d-flex gap-1">
+                        <button class="btn btn-xs btn-link p-0 text-success small"
+                                @onclick="ShowAll">All</button>
+                        <span class="text-muted">|</span>
+                        <button class="btn btn-xs btn-link p-0 text-danger small"
+                                @onclick="HideAll">None</button>
+                    </div>
+                </div>
+                <div class="col-mgr-list">
+                    @foreach (var cs in _colStates.OrderBy(c => c.Order))
+                    {
+                        <div class="form-check form-check-sm py-1 border-bottom">
+                            <input class="form-check-input" type="checkbox"
+                                   id="col_@cs.Name"
+                                   checked="@cs.Visible"
+                                   @onchange="() => ToggleCol(cs)" />
+                            <label class="form-check-label small text-truncate d-block"
+                                   for="col_@cs.Name"
+                                   style="max-width:180px"
+                                   title="@(HasAlias(cs.Name) ? $"{cs.Name} → {DisplayName(cs.Name)}" : cs.Name)">
+                                @DisplayName(cs.Name)
+                                @if (HasAlias(cs.Name))
+                                {
+                                    <span class="text-muted" style="font-size:.68rem"> (@cs.Name)</span>
+                                }
+                            </label>
+                        </div>
+                    }
+                </div>
+                <div class="mt-2 pt-1 border-top">
+                    <span class="text-muted" style="font-size:.72rem">
+                        <i class="bi bi-grip-vertical"></i> Drag column headers to reorder
+                    </span>
+                </div>
+            </div>
+        }
+    </div>
+
+    @if (_colStates.Any(c => !c.Visible))
+    {
+        <button class="btn btn-outline-warning btn-sm" @onclick="ShowAll">
+            <i class="bi bi-eye me-1"></i>Show all columns
+        </button>
+    }
+</div>
+
+@* ── Table ── *@
+<div class="table-responsive">
+    @if (IsLoading)
+    {
+        @* Skeleton shimmer table — shows structure while data loads *@
+        <table class="table table-sm table-bordered align-middle report-table mb-0">
+            <thead class="sticky-top">
+                <tr>
+                    @for (int c = 0; c < SkeletonCols; c++)
+                    {
+                        <th><div class="skeleton-cell" style="width:@(SkeletonColWidth(c))px"></div></th>
+                    }
+                </tr>
+            </thead>
+            <tbody>
+                @for (int r = 0; r < SkeletonRows; r++)
+                {
+                    <tr class="skeleton-row">
+                        @for (int c = 0; c < SkeletonCols; c++)
+                        {
+                            <td><div class="skeleton-cell" style="width:@(SkeletonColWidth(c))px"></div></td>
+                        }
+                    </tr>
+                }
+            </tbody>
+        </table>
+    }
+    else if (Data.Count == 0)
+    {
+        <div class="alert alert-info py-2">No records found.</div>
+    }
+    else
+    {
+        <table class="table table-sm table-hover table-bordered align-middle report-table">
+            <thead class="sticky-top">
+                @* ── Column header row (sortable + drag-to-reorder) ── *@
+                <tr>
+                    @foreach (var col in VisibleCols)
+                    {
+                        <th class="user-select-none @(_dragOver == col ? "drag-over" : "")"
+                            draggable="@(_editAliasCol != col)"
+                            style="white-space:nowrap; @(_editAliasCol == col ? "cursor:text" : "cursor:grab")"
+                            title="@(HasAlias(col) ? $"{col} → {DisplayName(col)}" : "Click to sort · Double-click to rename · Drag to reorder")"
+                            @onclick="() => { if (_editAliasCol != col) OnSortClick(col); }"
+                            @ondblclick="() => StartAlias(col)"
+                            @ondragstart="() => OnDragStart(col)"
+                            @ondragover:preventDefault="true"
+                            @ondragover="() => _dragOver = col"
+                            @ondragleave="() => _dragOver = null"
+                            @ondrop="() => OnDrop(col)"
+                            @ondragend="OnDragEnd">
+
+                            @if (_editAliasCol == col)
+                            {
+                                @* Inline alias editor — shown on double-click *@
+                                <input class="alias-input"
+                                       value="@_editAliasValue"
+                                       @oninput="e => _editAliasValue = e.Value?.ToString() ?? string.Empty"
+                                       @onblur="CommitAlias"
+                                       @onkeydown="AliasKeyDown"
+                                       @onclick:stopPropagation="true"
+                                       @ondblclick:stopPropagation="true"
+                                       placeholder="@col"
+                                       autofocus />
+                            }
+                            else
+                            {
+                                <span class="me-1">@DisplayName(col)</span>
+                                @if (HasAlias(col))
+                                {
+                                    <i class="bi bi-pencil-fill text-white-50 me-1" style="font-size:.6rem" title="Renamed from: @col"></i>
+                                }
+                                @if (SortColumn == col)
+                                {
+                                    <i class="bi @(SortDescending ? "bi-sort-down" : "bi-sort-up")"></i>
+                                }
+                                else
+                                {
+                                    <i class="bi bi-grip-vertical text-muted opacity-50" style="font-size:.7rem"></i>
+                                }
+                            }
+                        </th>
+                    }
+                </tr>
+
+                @* ── Filter row ── *@
+                @if (ShowFilters)
+                {
+                    <tr class="filter-row">
+                        @foreach (var col in VisibleCols)
+                        {
+                            <th>
+                                <input class="form-control form-control-sm"
+                                       placeholder="Filter…"
+                                       value="@GetFilter(col)"
+                                       @oninput="e => OnFilterChange(col, e.Value?.ToString())" />
+                            </th>
+                        }
+                    </tr>
+                }
+            </thead>
+            <tbody>
+                @foreach (var row in Data)
+                {
+                    <tr>
+                        @foreach (var col in VisibleCols)
+                        {
+                            <td>@(row.TryGetValue(col, out var v) ? v?.ToString() : "")</td>
+                        }
+                    </tr>
+                }
+            </tbody>
+        </table>
+    }
+</div>
+
+@* ── Pagination ── *@
+@if (TotalPages > 1)
+{
+    <nav>
+        <ul class="pagination pagination-sm justify-content-center flex-wrap mt-2 mb-1">
+            <li class="page-item @(PageNumber <= 1 ? "disabled" : "")">
+                <button class="page-link" @onclick="() => GoPage(1)">«</button>
+            </li>
+            <li class="page-item @(PageNumber <= 1 ? "disabled" : "")">
+                <button class="page-link" @onclick="() => GoPage(PageNumber - 1)">‹</button>
+            </li>
+            @foreach (var p in PageNumbers)
+            {
+                <li class="page-item @(p == PageNumber ? "active" : "")">
+                    <button class="page-link" @onclick="() => GoPage(p)">@p</button>
+                </li>
+            }
+            <li class="page-item @(PageNumber >= TotalPages ? "disabled" : "")">
+                <button class="page-link" @onclick="() => GoPage(PageNumber + 1)">›</button>
+            </li>
+            <li class="page-item @(PageNumber >= TotalPages ? "disabled" : "")">
+                <button class="page-link" @onclick="() => GoPage(TotalPages)">»</button>
+            </li>
+        </ul>
+        <p class="text-center text-muted mb-0" style="font-size:.78rem">
+            Page <strong>@PageNumber</strong> of <strong>@TotalPages</strong>
+            &nbsp;·&nbsp; <strong>@TotalCount.ToString("N0")</strong> records
+        </p>
+    </nav>
+}
+
+@code {
+    // ── Parameters ────────────────────────────────────────────────
+    [Parameter, EditorRequired] public IReadOnlyList<Dictionary<string, object?>> Data    { get; set; } = [];
+    [Parameter, EditorRequired] public IReadOnlyList<string>                      Columns { get; set; } = [];
+    [Parameter] public bool IsLoading   { get; set; }
+    [Parameter] public bool ShowFilters { get; set; } = true;
+
+    // Column aliases: DB column name → friendly display label
+    [Parameter] public Dictionary<string, string> ColumnAliases { get; set; } = new();
+    [Parameter] public EventCallback<(string col, string alias)> OnAliasChanged { get; set; }
+
+    // Sort
+    [Parameter] public string? SortColumn    { get; set; }
+    [Parameter] public bool    SortDescending { get; set; }
+    [Parameter] public EventCallback<(string col, bool desc)> OnSort { get; set; }
+
+    // Filter
+    [Parameter] public Dictionary<string, string> Filters { get; set; } = [];
+    [Parameter] public EventCallback<(string col, string? term)> OnFilter { get; set; }
+
+    // Paging
+    [Parameter] public int PageNumber  { get; set; } = 1;
+    [Parameter] public int PageSize    { get; set; } = 50;
+    [Parameter] public int TotalCount  { get; set; }
+    [Parameter] public int TotalPages  { get; set; }
+    [Parameter] public EventCallback<int> OnPageChanged { get; set; }
+
+    // ── Column state ──────────────────────────────────────────────
+    private sealed class ColState
+    {
+        public string Name    { get; init; } = "";
+        public bool   Visible { get; set;  } = true;
+        public int    Order   { get; set;  }
+    }
+
+    private List<ColState> _colStates = [];
+    private bool           _showColMgr;
+
+    // Drag-and-drop
+    private string? _dragCol;
+    private string? _dragOver;
+
+    // Inline alias editing
+    private string? _editAliasCol;
+    private string  _editAliasValue = "";
+
+    // Computed visible columns in current order
+    private IReadOnlyList<string> VisibleCols =>
+        _colStates.Where(c => c.Visible).OrderBy(c => c.Order).Select(c => c.Name).ToList();
+
+    // ── Skeleton loading helpers ──────────────────────────────────
+    // Use actual column count when available, otherwise a sensible default
+    private int SkeletonCols => _colStates.Count > 0 ? Math.Min(_colStates.Count, 10) : 6;
+    private const int SkeletonRows = 8;
+
+    // Vary widths slightly for a realistic skeleton look
+    private static readonly int[] _skeletonWidths = [80, 120, 60, 100, 90, 70, 110, 80, 95, 65];
+    private static int SkeletonColWidth(int colIndex) => _skeletonWidths[colIndex % _skeletonWidths.Length];
+
+    private IEnumerable<int> PageNumbers
+    {
+        get
+        {
+            int start = Math.Max(1, PageNumber - 3);
+            int end   = Math.Min(TotalPages, PageNumber + 3);
+            return Enumerable.Range(start, end - start + 1);
+        }
+    }
+
+    // ── Lifecycle ─────────────────────────────────────────────────
+    protected override void OnParametersSet()
+    {
+        // Preserve existing state, append new columns at end
+        var existing = _colStates.ToDictionary(c => c.Name, StringComparer.OrdinalIgnoreCase);
+        int maxOrder = _colStates.Count > 0 ? _colStates.Max(c => c.Order) + 1 : 0;
+
+        // Add any new columns not yet tracked
+        foreach (var (name, idx) in Columns.Select((n, i) => (n, i)))
+        {
+            if (!existing.ContainsKey(name))
+                _colStates.Add(new ColState { Name = name, Visible = true, Order = maxOrder++ });
+        }
+
+        // Remove columns that no longer exist
+        var colSet = new HashSet<string>(Columns, StringComparer.OrdinalIgnoreCase);
+        _colStates = _colStates.Where(c => colSet.Contains(c.Name)).ToList();
+
+        // Re-normalise orders to 0..n
+        var ordered = _colStates.OrderBy(c => c.Order).ToList();
+        for (int i = 0; i < ordered.Count; i++) ordered[i].Order = i;
+        _colStates = ordered;
+    }
+
+    // ── Column visibility ─────────────────────────────────────────
+    private void ToggleColMgr() => _showColMgr = !_showColMgr;
+    private void ToggleCol(ColState cs) => cs.Visible = !cs.Visible;
+    private void ShowAll() => _colStates.ForEach(c => c.Visible = true);
+    private void HideAll() => _colStates.ForEach(c => c.Visible = false);
+
+    // ── Column alias helpers ──────────────────────────────────────
+    private string DisplayName(string col) =>
+        ColumnAliases.TryGetValue(col, out var a) && !string.IsNullOrEmpty(a) ? a : col;
+
+    private bool HasAlias(string col) =>
+        ColumnAliases.TryGetValue(col, out var a) && !string.IsNullOrEmpty(a);
+
+    private void StartAlias(string col)
+    {
+        _editAliasCol   = col;
+        _editAliasValue = ColumnAliases.TryGetValue(col, out var a) ? a : "";
+    }
+
+    private async Task CommitAlias()
+    {
+        if (_editAliasCol is null) return;
+        var col = _editAliasCol;
+        _editAliasCol = null;
+        await OnAliasChanged.InvokeAsync((col, _editAliasValue));
+    }
+
+    private async Task AliasKeyDown(Microsoft.AspNetCore.Components.Web.KeyboardEventArgs e)
+    {
+        if (e.Key == "Enter")  await CommitAlias();
+        if (e.Key == "Escape") _editAliasCol = null;
+    }
+
+    // ── Drag-to-reorder ───────────────────────────────────────────
+    private void OnDragStart(string col) => _dragCol = col;
+
+    private void OnDrop(string targetCol)
+    {
+        if (_dragCol is null || _dragCol == targetCol) return;
+
+        var src = _colStates.FirstOrDefault(c => c.Name == _dragCol);
+        var tgt = _colStates.FirstOrDefault(c => c.Name == targetCol);
+        if (src is null || tgt is null) return;
+
+        // Swap orders then re-normalise
+        (src.Order, tgt.Order) = (tgt.Order, src.Order);
+        var ordered = _colStates.OrderBy(c => c.Order).ToList();
+        for (int i = 0; i < ordered.Count; i++) ordered[i].Order = i;
+        _colStates = ordered;
+    }
+
+    private void OnDragEnd() { _dragCol = null; _dragOver = null; }
+
+    // ── Sort ──────────────────────────────────────────────────────
+    private async Task OnSortClick(string col)
+    {
+        bool desc = SortColumn == col && !SortDescending;
+        await OnSort.InvokeAsync((col, desc));
+    }
+
+    // ── Filter ────────────────────────────────────────────────────
+    private string? GetFilter(string col) =>
+        Filters.TryGetValue(col, out var v) ? v : null;
+
+    private async Task OnFilterChange(string col, string? term) =>
+        await OnFilter.InvokeAsync((col, term));
+
+    // ── Paging ───────────────────────────────────────────────────
+    private async Task GoPage(int p) => await OnPageChanged.InvokeAsync(p);
+}

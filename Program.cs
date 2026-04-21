@@ -1,0 +1,49 @@
+using BlazorReporting.Data;
+using BlazorReporting.Services;
+using QuestPDF.Infrastructure;
+
+QuestPDF.Settings.License = LicenseType.Community;
+
+var builder = WebApplication.CreateBuilder(args);
+
+// Blazor Server
+builder.Services.AddRazorPages();
+builder.Services.AddServerSideBlazor();
+
+// HTTP context for user identity
+builder.Services.AddHttpContextAccessor();
+
+// Data layer
+builder.Services.AddScoped<IDataRepository, DataRepository>();
+
+// Application services
+builder.Services.AddScoped<IPivotService, PivotService>();
+builder.Services.AddScoped<IUserLayoutService, UserLayoutService>();
+builder.Services.AddScoped<IExportService, ExportService>();
+
+// Chatbot — Anthropic Claude
+builder.Services.AddHttpClient<ChatbotService>();
+
+// Caching — swap to Redis by uncommenting below
+builder.Services.AddMemoryCache();
+builder.Services.AddSingleton<ICacheService, MemoryCacheService>();
+// builder.Services.AddStackExchangeRedisCache(o =>
+//     o.Configuration = builder.Configuration.GetConnectionString("Redis"));
+// builder.Services.AddSingleton<ICacheService, RedisCacheService>();
+
+var app = builder.Build();
+
+if (!app.Environment.IsDevelopment())
+{
+    app.UseExceptionHandler("/Error");
+    app.UseHsts();
+}
+
+app.UseHttpsRedirection();
+app.UseStaticFiles();
+app.UseRouting();
+
+app.MapBlazorHub();
+app.MapFallbackToPage("/_Host");
+
+app.Run();

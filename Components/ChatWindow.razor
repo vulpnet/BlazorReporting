@@ -1,0 +1,296 @@
+@using BlazorReporting.Services
+@inject ChatbotService Chatbot
+@inject IJSRuntime JS
+
+@* ═══════════════════════════════════════
+   FLOATING AI CHAT WIDGET
+═══════════════════════════════════════ *@
+<div class="cw-root">
+
+    @* ── Nút mở / đóng ── *@
+    <button class="cw-fab @(_open ? "cw-fab--open" : "")"
+            title="@(_open ? "Đóng" : "AI Assistant")"
+            @onclick="ToggleAsync">
+        <span class="cw-fab-icon cw-fab-icon--chat"><i class="bi bi-chat-dots-fill"></i></span>
+        <span class="cw-fab-icon cw-fab-icon--close"><i class="bi bi-x-lg"></i></span>
+    </button>
+
+    @* ── Cửa sổ chat ── *@
+    @if (_open)
+    {
+        <div class="cw-window">
+
+            @* ── HEADER ── *@
+            <div class="cw-header">
+                <div class="cw-header-avatar">
+                    <i class="bi bi-robot"></i>
+                </div>
+                <div class="cw-header-info">
+                    <div class="cw-header-title">AI Assistant</div>
+                    <div class="cw-header-sub">
+                        @if (_loadingModels)
+                        {
+                            <span class="cw-connecting">
+                                <span class="cw-dot-pulse"></span> Đang kết nối…
+                            </span>
+                        }
+                        else if (_models.Count == 0)
+                        {
+                            <span class="cw-offline">
+                                <i class="bi bi-circle-fill" style="font-size:.45rem;color:#f87171"></i>
+                                Ollama offline
+                            </span>
+                        }
+                        else
+                        {
+                            <span class="cw-online">
+                                <i class="bi bi-circle-fill" style="font-size:.45rem;color:#4ade80"></i>
+                                Online
+                            </span>
+                        }
+                    </div>
+                </div>
+
+                @* Model selector *@
+                @if (_models.Count > 0)
+                {
+                    <select class="cw-model-select" @bind="_selectedModel" title="Chọn model">
+                        @foreach (var m in _models)
+                        {
+                            <option value="@m.Name">@ShortName(m.Name)</option>
+                        }
+                    </select>
+                }
+
+                @* Action buttons *@
+                <div class="cw-header-actions">
+                    <button class="cw-icon-btn" title="Xoá hội thoại" @onclick="ClearHistory">
+                        <i class="bi bi-arrow-counterclockwise"></i>
+                    </button>
+                    <button class="cw-icon-btn" title="Đóng" @onclick="ToggleAsync">
+                        <i class="bi bi-x-lg"></i>
+                    </button>
+                </div>
+            </div>
+
+            @* ── BODY / MESSAGES ── *@
+            <div class="cw-body" id="cw-body">
+
+                @if (_messages.Count == 0)
+                {
+                    <div class="cw-empty">
+                        <div class="cw-empty-avatar">
+                            <i class="bi bi-robot"></i>
+                        </div>
+                        <p class="cw-empty-title">Xin chào! 👋</p>
+                        <p class="cw-empty-sub">
+                            Tôi có thể giúp bạn phân tích dữ liệu báo cáo.<br/>
+                            @if (!string.IsNullOrEmpty(ReportSource))
+                            {
+                                <span>Đang xem: <strong>@ReportSource</strong></span>
+                            }
+                        </p>
+
+                        @* Gợi ý câu hỏi nhanh *@
+                        @if (Columns?.Count > 0)
+                        {
+                            <div class="cw-suggestions">
+                                <button class="cw-suggestion-chip" @onclick='() => QuickAsk("Tóm tắt dữ liệu báo cáo này cho tôi")'>
+                                    📊 Tóm tắt dữ liệu
+                                </button>
+                                <button class="cw-suggestion-chip" @onclick='() => QuickAsk("Các cột nào quan trọng nhất?")'>
+                                    🔍 Cột quan trọng
+                                </button>
+                                <button class="cw-suggestion-chip" @onclick='() => QuickAsk("Gợi ý cách lọc dữ liệu hiệu quả")'>
+                                    ⚡ Gợi ý bộ lọc
+                                </button>
+                            </div>
+                        }
+                    </div>
+                }
+
+                @foreach (var msg in _messages)
+                {
+                    @if (msg.Role == "user")
+                    {
+                        <div class="cw-row cw-row--user">
+                            <div class="cw-bubble cw-bubble--user">
+                                @((MarkupString)FormatText(msg.Content))
+                            </div>
+                        </div>
+                    }
+                    else
+                    {
+                        <div class="cw-row cw-row--ai">
+                            <div class="cw-ai-avatar"><i class="bi bi-robot"></i></div>
+                            <div class="cw-bubble cw-bubble--ai">
+                                @((MarkupString)FormatText(msg.Content))
+                            </div>
+                        </div>
+                    }
+                }
+
+                @if (_busy)
+                {
+                    <div class="cw-row cw-row--ai">
+                        <div class="cw-ai-avatar"><i class="bi bi-robot"></i></div>
+                        <div class="cw-bubble cw-bubble--ai cw-bubble--typing">
+                            <span></span><span></span><span></span>
+                        </div>
+                    </div>
+                }
+
+                <div id="cw-scroll-anchor"></div>
+            </div>
+
+            @* ── FOOTER / INPUT ── *@
+            <div class="cw-footer">
+                <div class="cw-input-wrap @(_busy ? "cw-input-wrap--disabled" : "")">
+                    <textarea class="cw-input"
+                              @bind="_input"
+                              @bind:event="oninput"
+                              @onkeydown="OnKeyDown"
+                              @onkeydown:preventDefault="@_suppressEnter"
+                              placeholder="@(_models.Count == 0 ? "Ollama chưa kết nối…" : "Nhập câu hỏi…")"
+                              rows="1"
+                              disabled="@(_busy || _models.Count == 0)"></textarea>
+                    <button class="cw-send-btn @(!string.IsNullOrWhiteSpace(_input) && !_busy ? "cw-send-btn--active" : "")"
+                            @onclick="SendAsync"
+                            disabled="@(_busy || string.IsNullOrWhiteSpace(_input) || _models.Count == 0)"
+                            title="Gửi (Enter)">
+                        @if (_busy)
+                        {
+                            <span class="cw-send-spinner"></span>
+                        }
+                        else
+                        {
+                            <i class="bi bi-send-fill"></i>
+                        }
+                    </button>
+                </div>
+                <div class="cw-footer-hint">
+                    <span>Enter gửi · Shift+Enter xuống dòng</span>
+                </div>
+            </div>
+
+        </div>
+    }
+</div>
+
+@code {
+    [Parameter] public string? ReportSource { get; set; }
+    [Parameter] public IReadOnlyList<string>? Columns { get; set; }
+    [Parameter] public int RowCount { get; set; }
+
+    private bool   _open;
+    private bool   _busy;
+    private bool   _suppressEnter;
+    private bool   _loadingModels;
+    private string _input = "";
+    private string _selectedModel = "";
+    private IReadOnlyList<OllamaModel> _models = [];
+    private readonly List<ChatMessage> _messages = [];
+
+    private string SystemPrompt
+    {
+        get
+        {
+            var sb = new System.Text.StringBuilder();
+            sb.Append("Bạn là trợ lý phân tích dữ liệu tích hợp trong DMSPRO Reporting — hệ thống báo cáo BI cho DMS.");
+            if (!string.IsNullOrEmpty(ReportSource))
+                sb.Append($" Người dùng đang xem báo cáo '{ReportSource}'");
+            if (Columns?.Count > 0)
+                sb.Append($" với {RowCount:N0} dòng và các cột: {string.Join(", ", Columns)}.");
+            sb.Append(" Trả lời ngắn gọn, thực tế. Dùng ngôn ngữ người dùng đang viết.");
+            return sb.ToString();
+        }
+    }
+
+    private async Task ToggleAsync()
+    {
+        _open = !_open;
+        if (_open && _models.Count == 0)
+            await LoadModelsAsync();
+    }
+
+    private async Task LoadModelsAsync()
+    {
+        _loadingModels = true;
+        StateHasChanged();
+        try
+        {
+            _models = await Chatbot.GetModelsAsync();
+            if (_models.Count > 0) _selectedModel = _models[0].Name;
+        }
+        finally { _loadingModels = false; StateHasChanged(); }
+    }
+
+    private void ClearHistory() => _messages.Clear();
+
+    private async Task QuickAsk(string question)
+    {
+        _input = question;
+        await SendAsync();
+    }
+
+    private async Task OnKeyDown(KeyboardEventArgs e)
+    {
+        _suppressEnter = e.Key == "Enter" && !e.ShiftKey;
+        if (_suppressEnter) await SendAsync();
+    }
+
+    private async Task SendAsync()
+    {
+        var text = _input.Trim();
+        if (string.IsNullOrEmpty(text) || _busy || string.IsNullOrEmpty(_selectedModel)) return;
+
+        _messages.Add(new ChatMessage("user", text));
+        _input = "";
+        _busy  = true;
+        StateHasChanged();
+        await ScrollAsync();
+
+        try
+        {
+            var history = _messages.Take(_messages.Count - 1).ToList();
+            var reply   = await Chatbot.SendAsync(_selectedModel, history, text, SystemPrompt);
+            _messages.Add(new ChatMessage("assistant", reply));
+        }
+        catch (Exception ex)
+        {
+            _messages.Add(new ChatMessage("assistant", $"⚠ {ex.Message}"));
+        }
+        finally
+        {
+            _busy = false;
+            StateHasChanged();
+            await ScrollAsync();
+        }
+    }
+
+    private async Task ScrollAsync()
+    {
+        try
+        {
+            await JS.InvokeVoidAsync("eval",
+                "var b=document.getElementById('cw-body');if(b)b.scrollTop=b.scrollHeight;");
+        }
+        catch { }
+    }
+
+    private static string ShortName(string name)
+    {
+        // "llama3:8b-instruct" → "llama3:8b"  |  keep max 20 chars
+        var s = name.Length > 22 ? name[..22] + "…" : name;
+        return s;
+    }
+
+    private static string FormatText(string raw)
+    {
+        var t = System.Net.WebUtility.HtmlEncode(raw);
+        t = System.Text.RegularExpressions.Regex.Replace(t, @"\*\*(.+?)\*\*", "<strong>$1</strong>");
+        t = System.Text.RegularExpressions.Regex.Replace(t, @"`([^`\n]+)`", "<code class='cw-code'>$1</code>");
+        t = t.Replace("\n", "<br/>");
+        return t;
+    }
+}

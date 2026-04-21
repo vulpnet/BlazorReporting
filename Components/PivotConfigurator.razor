@@ -1,0 +1,478 @@
+@* Pivot Configurator — Excel-style "PivotTable Fields" panel.
+   Available Fields → drag or click R/C/V → Row / Column / Values zones.
+   Values zone supports multiple fields, each with its own aggregation. *@
+
+<div class="xl-pivot-panel card border-0 shadow-sm mb-3">
+
+    @* ── Panel header ── *@
+    <div class="card-header bg-primary text-white d-flex justify-content-between align-items-center py-2">
+        <span class="fw-semibold small">
+            <i class="bi bi-grid-3x3-gap me-2"></i>PivotTable Fields
+        </span>
+        <button class="btn btn-sm btn-outline-light py-0 px-2"
+                @onclick="() => _collapsed = !_collapsed"
+                title="@(_collapsed ? "Expand" : "Collapse")">
+            <i class="bi @(_collapsed ? "bi-chevron-down" : "bi-chevron-up")"></i>
+        </button>
+    </div>
+
+    @if (!_collapsed)
+    {
+        <div class="card-body p-0">
+
+            @* ── Main body: left field pane + right 4-zone grid ── *@
+            <div class="d-flex flex-column flex-md-row">
+
+                @* ══ LEFT — Field List ══ *@
+                <div class="xl-field-pane border-end-md">
+
+                    @* Search *@
+                    <div class="xl-field-search p-2 border-bottom">
+                        <div class="input-group input-group-sm">
+                            <span class="input-group-text bg-white border-end-0">
+                                <i class="bi bi-search text-muted" style="font-size:.75rem"></i>
+                            </span>
+                            <input class="form-control border-start-0 ps-0"
+                                   placeholder="Search fields…"
+                                   @bind="_search"
+                                   @bind:event="oninput"
+                                   style="font-size:.8rem" />
+                        </div>
+                    </div>
+
+                    @* Scrollable field list *@
+                    <div class="xl-field-items">
+                        @{
+                            var visibleFields = string.IsNullOrWhiteSpace(_search)
+                                ? _available
+                                : _available.Where(f => f.Contains(_search, StringComparison.OrdinalIgnoreCase)).ToList();
+                        }
+                        @foreach (var f in visibleFields)
+                        {
+                            <div class="xl-field-row"
+                                 draggable="true"
+                                 @ondragstart="() => BeginDrag(f, ZoneKind.Available)"
+                                 @ondragend="EndDrag">
+                                <i class="bi bi-grip-vertical text-muted me-1" style="font-size:.8rem"></i>
+                                <span class="flex-fill text-truncate small">@f</span>
+                                <div class="xl-qbtns">
+                                    <button class="xl-qbtn" title="Set as Row"
+                                            @onclick:stopPropagation="true"
+                                            @onclick="() => QuickAssign(f, ZoneKind.Row)">R</button>
+                                    <button class="xl-qbtn" title="Set as Column"
+                                            @onclick:stopPropagation="true"
+                                            @onclick="() => QuickAssign(f, ZoneKind.Col)">C</button>
+                                    <button class="xl-qbtn xl-qbtn-val" title="Add to Values"
+                                            @onclick:stopPropagation="true"
+                                            @onclick="() => QuickAssign(f, ZoneKind.Val)">V</button>
+                                </div>
+                            </div>
+                        }
+                        @if (_available.Count == 0)
+                        {
+                            <div class="px-3 py-2 text-muted small fst-italic">All fields assigned</div>
+                        }
+                        else if (!visibleFields.Any())
+                        {
+                            <div class="px-3 py-2 text-muted small fst-italic">No fields match "@_search"</div>
+                        }
+                    </div>
+                </div>
+
+                @* ══ RIGHT — 4-zone 2×2 grid ══ *@
+                <div class="xl-zones flex-fill p-2">
+
+                    @* ── Filters zone (feature coming soon) ── *@
+                    <div class="xl-zone @(_dropTarget == ZoneKind.Filter ? "drag-over" : "")"
+                         @ondragover:preventDefault="true"
+                         @ondragover="() => _dropTarget = ZoneKind.Filter"
+                         @ondragleave="() => _dropTarget = null"
+                         @ondrop="() => _dropTarget = null">
+                        <div class="xl-zone-hdr xl-zone-hdr-filter">
+                            <i class="bi bi-funnel me-1"></i>Filters
+                        </div>
+                        <div class="xl-zone-body">
+                            <span class="text-muted small fst-italic" style="font-size:.72rem">
+                                Feature coming soon
+                            </span>
+                        </div>
+                    </div>
+
+                    @* ── Columns zone ── *@
+                    <div class="xl-zone @(_dropTarget == ZoneKind.Col ? "drag-over" : "")"
+                         @ondragover:preventDefault="true"
+                         @ondragover="() => _dropTarget = ZoneKind.Col"
+                         @ondragleave="() => _dropTarget = null"
+                         @ondrop="() => CommitDrop(ZoneKind.Col)">
+                        <div class="xl-zone-hdr xl-zone-hdr-col">
+                            <i class="bi bi-arrow-right-short me-1"></i>Columns
+                        </div>
+                        <div class="xl-zone-body">
+                            @if (!string.IsNullOrEmpty(Config.ColumnField))
+                            {
+                                <span class="xl-chip xl-chip-col"
+                                      draggable="true"
+                                      @ondragstart="() => BeginDrag(Config.ColumnField, ZoneKind.Col)"
+                                      @ondragend="EndDrag">
+                                    <i class="bi bi-grip-vertical" style="font-size:.7rem;cursor:grab"></i>
+                                    <span class="text-truncate">@Config.ColumnField</span>
+                                    <button class="xl-chip-remove"
+                                            @onclick="() => RemoveField(ZoneKind.Col, Config.ColumnField)"
+                                            title="Remove">×</button>
+                                </span>
+                            }
+                            else
+                            {
+                                <span class="text-muted small fst-italic" style="font-size:.72rem">
+                                    Drop a field here
+                                </span>
+                            }
+                        </div>
+                    </div>
+
+                    @* ── Rows zone ── *@
+                    <div class="xl-zone @(_dropTarget == ZoneKind.Row ? "drag-over" : "")"
+                         @ondragover:preventDefault="true"
+                         @ondragover="() => _dropTarget = ZoneKind.Row"
+                         @ondragleave="() => _dropTarget = null"
+                         @ondrop="() => CommitDrop(ZoneKind.Row)">
+                        <div class="xl-zone-hdr xl-zone-hdr-row">
+                            <i class="bi bi-arrow-down-short me-1"></i>Rows
+                        </div>
+                        <div class="xl-zone-body">
+                            @if (!string.IsNullOrEmpty(Config.RowField))
+                            {
+                                <span class="xl-chip xl-chip-row"
+                                      draggable="true"
+                                      @ondragstart="() => BeginDrag(Config.RowField, ZoneKind.Row)"
+                                      @ondragend="EndDrag">
+                                    <i class="bi bi-grip-vertical" style="font-size:.7rem;cursor:grab"></i>
+                                    <span class="text-truncate">@Config.RowField</span>
+                                    <button class="xl-chip-remove"
+                                            @onclick="() => RemoveField(ZoneKind.Row, Config.RowField)"
+                                            title="Remove">×</button>
+                                </span>
+                            }
+                            else
+                            {
+                                <span class="text-muted small fst-italic" style="font-size:.72rem">
+                                    Drop a field here
+                                </span>
+                            }
+                        </div>
+                    </div>
+
+                    @* ── Values zone (multi) ── *@
+                    <div class="xl-zone @(_dropTarget == ZoneKind.Val ? "drag-over" : "")"
+                         @ondragover:preventDefault="true"
+                         @ondragover="() => _dropTarget = ZoneKind.Val"
+                         @ondragleave="() => _dropTarget = null"
+                         @ondrop="() => CommitDrop(ZoneKind.Val)">
+                        <div class="xl-zone-hdr xl-zone-hdr-val">
+                            <i class="bi bi-calculator me-1"></i>Values
+                        </div>
+                        <div class="xl-zone-body">
+                            @foreach (var vd in Config.ValueFields.Where(v => !string.IsNullOrEmpty(v.Field)))
+                            {
+                                <span class="xl-chip xl-chip-val"
+                                      draggable="true"
+                                      @ondragstart="() => BeginDrag(vd.Field, ZoneKind.Val)"
+                                      @ondragend="EndDrag">
+                                    <i class="bi bi-grip-vertical" style="font-size:.7rem;cursor:grab"></i>
+                                    <span class="text-truncate" style="max-width:80px">@vd.Field</span>
+                                    <select class="xl-agg-select" @bind="vd.Aggregation" title="Aggregation">
+                                        @foreach (var a in Enum.GetValues<AggregationType>())
+                                        {
+                                            <option value="@a">@a</option>
+                                        }
+                                    </select>
+                                    <button class="xl-chip-remove"
+                                            @onclick="() => RemoveField(ZoneKind.Val, vd.Field)"
+                                            title="Remove">×</button>
+                                </span>
+                            }
+                            @if (!Config.ValueFields.Any(v => !string.IsNullOrEmpty(v.Field)))
+                            {
+                                <span class="text-muted small fst-italic" style="font-size:.72rem">
+                                    Drop fields here
+                                </span>
+                            }
+                        </div>
+                    </div>
+
+                </div>@* /xl-zones *@
+            </div>@* /d-flex *@
+
+            @* ── Footer — checkboxes + action buttons ── *@
+            <div class="xl-footer border-top px-3 py-2">
+                <div class="d-flex flex-wrap align-items-center gap-3">
+
+                    @* Left — totals checkboxes *@
+                    <div class="d-flex flex-wrap gap-3">
+                        <div class="form-check form-check-sm mb-0">
+                            <input class="form-check-input" type="checkbox"
+                                   id="xlChkRowTot" @bind="Config.ShowRowTotals" />
+                            <label class="form-check-label small" for="xlChkRowTot">Row Totals</label>
+                        </div>
+                        <div class="form-check form-check-sm mb-0">
+                            <input class="form-check-input" type="checkbox"
+                                   id="xlChkColTot" @bind="Config.ShowColTotals" />
+                            <label class="form-check-label small" for="xlChkColTot">Column Totals</label>
+                        </div>
+                        <div class="form-check form-check-sm mb-0">
+                            <input class="form-check-input" type="checkbox"
+                                   id="xlChkGrand" @bind="Config.ShowGrandTotal" />
+                            <label class="form-check-label small" for="xlChkGrand">Grand Total</label>
+                        </div>
+                    </div>
+
+                    @* Right — action buttons *@
+                    <div class="ms-auto d-flex gap-2 flex-shrink-0">
+                        <button class="btn btn-primary btn-sm"
+                                @onclick="OnApplyClicked"
+                                disabled="@(!Config.IsValid)">
+                            <i class="bi bi-play-fill me-1"></i>Apply Pivot
+                        </button>
+                        <button class="btn btn-outline-secondary btn-sm"
+                                @onclick="ResetAll">
+                            <i class="bi bi-arrow-counterclockwise me-1"></i>Reset
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            @* ── Layout save/load (collapsible) ── *@
+            <div class="xl-layout-panel border-top">
+                <button class="btn btn-link btn-sm text-decoration-none text-muted w-100 text-start px-3 py-1"
+                        @onclick="() => _layoutOpen = !_layoutOpen"
+                        style="font-size:.78rem">
+                    <i class="bi @(_layoutOpen ? "bi-chevron-up" : "bi-chevron-down") me-1"></i>
+                    Layout Save / Load
+                </button>
+
+                @if (_layoutOpen)
+                {
+                    <div class="px-3 pb-3">
+                        <div class="d-flex flex-wrap gap-2 align-items-end">
+
+                            @* Layout name + Save *@
+                            <div>
+                                <label class="form-label mb-1 small fw-semibold">Layout Name</label>
+                                <div class="input-group input-group-sm">
+                                    <input class="form-control" style="width:140px"
+                                           @bind="_layoutName" placeholder="Default" />
+                                    <button class="btn btn-success" @onclick="SaveLayout" title="Save layout">
+                                        <i class="bi bi-floppy"></i>
+                                    </button>
+                                </div>
+                            </div>
+
+                            @* Load / Delete (only when saved layouts exist) *@
+                            @if (SavedLayouts.Count > 0)
+                            {
+                                <div>
+                                    <label class="form-label mb-1 small fw-semibold">Load Layout</label>
+                                    <div class="input-group input-group-sm">
+                                        <select class="form-select" style="width:200px"
+                                                @bind="_selectedLayoutId">
+                                            <option value="0">— select layout —</option>
+                                            @foreach (var l in SavedLayouts)
+                                            {
+                                                <option value="@l.Id">
+                                                    @l.LayoutName (@l.UpdatedAt.ToLocalTime().ToString("yyyy-MM-dd"))
+                                                </option>
+                                            }
+                                        </select>
+                                        <button class="btn btn-outline-primary" @onclick="LoadLayout" title="Load">
+                                            <i class="bi bi-folder2-open"></i>
+                                        </button>
+                                        @if (_selectedLayoutId > 0)
+                                        {
+                                            <button class="btn btn-outline-danger" @onclick="DeleteLayout" title="Delete">
+                                                <i class="bi bi-trash"></i>
+                                            </button>
+                                        }
+                                    </div>
+                                </div>
+                            }
+                        </div>
+
+                        @if (!string.IsNullOrEmpty(_msg))
+                        {
+                            <div class="alert alert-success py-1 px-2 small mt-2 mb-0">@_msg</div>
+                        }
+                    </div>
+                }
+            </div>@* /xl-layout-panel *@
+
+        </div>@* /card-body *@
+    }
+</div>@* /xl-pivot-panel *@
+
+@code {
+    [Parameter, EditorRequired] public PivotConfig Config { get; set; } = new();
+    [Parameter, EditorRequired] public IReadOnlyList<string> Columns { get; set; } = [];
+    [Parameter] public IReadOnlyList<UserPivotLayout> SavedLayouts { get; set; } = [];
+    [Parameter] public EventCallback OnApply   { get; set; }
+    [Parameter] public EventCallback OnClear   { get; set; }
+    [Parameter] public EventCallback<(string name, string json)> OnSave   { get; set; }
+    [Parameter] public EventCallback<int> OnLoad   { get; set; }
+    [Parameter] public EventCallback<int> OnDelete { get; set; }
+
+    // ── State ─────────────────────────────────────────────────────
+    private enum ZoneKind { Available, Filter, Row, Col, Val }
+
+    private List<string> _available = [];
+    private bool         _collapsed;
+    private bool         _layoutOpen;
+    private string       _search    = "";
+    private string?      _dragField;
+    private ZoneKind?    _dragSource;
+    private ZoneKind?    _dropTarget;
+    private string       _layoutName = "Default";
+    private int          _selectedLayoutId;
+    private string       _msg = "";
+
+    // ── Lifecycle ─────────────────────────────────────────────────
+    protected override void OnParametersSet() => RebuildAvailable();
+
+    private void RebuildAvailable()
+    {
+        var used = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        if (!string.IsNullOrEmpty(Config.RowField))    used.Add(Config.RowField);
+        if (!string.IsNullOrEmpty(Config.ColumnField)) used.Add(Config.ColumnField);
+        foreach (var vd in Config.ValueFields.Where(v => !string.IsNullOrEmpty(v.Field)))
+            used.Add(vd.Field);
+
+        _available = Columns.Where(c => !used.Contains(c)).ToList();
+    }
+
+    // ── Drag ──────────────────────────────────────────────────────
+    private void BeginDrag(string field, ZoneKind source)
+    {
+        _dragField  = field;
+        _dragSource = source;
+    }
+
+    private void EndDrag() { _dragField = null; _dragSource = null; _dropTarget = null; }
+
+    private void CommitDrop(ZoneKind target)
+    {
+        if (_dragField is null) return;
+        Assign(_dragField, _dragSource ?? ZoneKind.Available, target);
+        EndDrag();
+    }
+
+    // ── Quick-assign (R/C/V buttons) ──────────────────────────────
+    private void QuickAssign(string field, ZoneKind target) =>
+        Assign(field, ZoneKind.Available, target);
+
+    // ── Core assign logic ─────────────────────────────────────────
+    private void Assign(string field, ZoneKind from, ZoneKind to)
+    {
+        if (from == to) return;
+
+        // Remove from source zone
+        RemoveFromZone(from, field);
+
+        // Assign to target zone
+        switch (to)
+        {
+            case ZoneKind.Row:
+                // If something already in Row, push it back to available
+                if (!string.IsNullOrEmpty(Config.RowField) && Config.RowField != field)
+                    _available.Add(Config.RowField);
+                Config.RowField = field;
+                break;
+
+            case ZoneKind.Col:
+                if (!string.IsNullOrEmpty(Config.ColumnField) && Config.ColumnField != field)
+                    _available.Add(Config.ColumnField);
+                Config.ColumnField = field;
+                break;
+
+            case ZoneKind.Val:
+                // Allow same field multiple times with different aggregations
+                Config.ValueFields.Add(new PivotValueDef { Field = field });
+                break;
+
+            case ZoneKind.Available:
+                _available.Add(field);
+                break;
+
+            case ZoneKind.Filter:
+                // Filters zone drops are ignored — field stays in source zone
+                break;
+        }
+
+        RebuildAvailable();
+    }
+
+    private void RemoveFromZone(ZoneKind zone, string field)
+    {
+        switch (zone)
+        {
+            case ZoneKind.Available:
+                _available.Remove(field);
+                break;
+            case ZoneKind.Row:
+                if (Config.RowField == field) Config.RowField = "";
+                break;
+            case ZoneKind.Col:
+                if (Config.ColumnField == field) Config.ColumnField = "";
+                break;
+            case ZoneKind.Val:
+                var hit = Config.ValueFields.FirstOrDefault(v => v.Field == field);
+                if (hit != null) Config.ValueFields.Remove(hit);
+                break;
+        }
+    }
+
+    private void RemoveField(ZoneKind zone, string field)
+    {
+        RemoveFromZone(zone, field);
+        RebuildAvailable();
+    }
+
+    private void ResetAll()
+    {
+        Config.RowField    = "";
+        Config.ColumnField = "";
+        Config.ValueFields.Clear();
+        Config.ShowRowTotals  = true;
+        Config.ShowColTotals  = true;
+        Config.ShowGrandTotal = true;
+        _search = "";
+        RebuildAvailable();
+        OnClear.InvokeAsync();
+    }
+
+    private async Task OnApplyClicked() => await OnApply.InvokeAsync();
+
+    // ── Layout save / load / delete ───────────────────────────────
+    private async Task SaveLayout()
+    {
+        var json = System.Text.Json.JsonSerializer.Serialize(Config);
+        await OnSave.InvokeAsync((_layoutName, json));
+        _msg = $"Layout '{_layoutName}' saved.";
+        StateHasChanged();
+        await Task.Delay(2500);
+        _msg = "";
+    }
+
+    private async Task LoadLayout()
+    {
+        if (_selectedLayoutId > 0)
+            await OnLoad.InvokeAsync(_selectedLayoutId);
+        RebuildAvailable();
+    }
+
+    private async Task DeleteLayout()
+    {
+        if (_selectedLayoutId > 0)
+        {
+            await OnDelete.InvokeAsync(_selectedLayoutId);
+            _selectedLayoutId = 0;
+        }
+    }
+}
