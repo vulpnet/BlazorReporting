@@ -21,7 +21,10 @@ builder.Services.AddScoped<IPivotService, PivotService>();
 builder.Services.AddScoped<IUserLayoutService, UserLayoutService>();
 builder.Services.AddScoped<IExportService, ExportService>();
 
-// Chatbot — Anthropic Claude
+// Auth (scoped = per Blazor circuit / session)
+builder.Services.AddScoped<AuthService>();
+
+// Chatbot — Ollama local
 builder.Services.AddHttpClient<ChatbotService>();
 
 // Caching — swap to Redis by uncommenting below

@@ -1,52 +1,126 @@
 @inherits LayoutComponentBase
+@using BlazorReporting.Services
+@using Microsoft.AspNetCore.Components.Server.ProtectedBrowserStorage
+@inject AuthService Auth
+@inject NavigationManager Nav
+@inject ProtectedLocalStorage Store
 
-<div class="d-flex flex-column min-vh-100">
-
-    <nav class="navbar navbar-expand-md navbar-dark bg-dark px-3 py-2">
-        <a class="navbar-brand fw-bold d-flex align-items-center gap-2" href="/">
-            <i class="bi bi-bar-chart-fill"></i>
-            <span class="d-none d-sm-inline"> Reports</span>
-            <span class="d-sm-none">BR</span>
-        </a>
-
-        <button class="navbar-toggler border-0" type="button"
-                data-bs-toggle="collapse" data-bs-target="#mainNav"
-                aria-controls="mainNav" aria-expanded="false" aria-label="Toggle navigation">
-            <span class="navbar-toggler-icon"></span>
-        </button>
-
-        <div class="collapse navbar-collapse" id="mainNav">
-            <ul class="navbar-nav me-auto mt-2 mt-md-0">
-                <li class="nav-item">
-                    <a class="nav-link" href="/"><i class="bi bi-house me-1"></i>Home</a>
-                </li>
-                <li class="nav-item">
-                    <a class="nav-link" href="/report">
-                        <i class="bi bi-table me-1"></i>Reports
-                    </a>
-                </li>
-            </ul>
-            <ul class="navbar-nav mt-2 mt-md-0">
-                <li class="nav-item">
-                    <a class="nav-link" href="/help" title="User Guide">
-                        <i class="bi bi-question-circle me-1"></i>
-                        <span class="d-md-none">Help</span>
-                        <span class="d-none d-md-inline">User Guide</span>
-                    </a>
-                </li>
-            </ul>
+@if (!Auth.IsInitialized)
+{
+    @* Đang kiểm tra session — hiện màn loading mỏng tránh flash redirect *@
+    <div class="d-flex align-items-center justify-content-center min-vh-100 bg-light">
+        <div class="text-center text-muted">
+            <div class="spinner-border text-primary mb-3" style="width:2rem;height:2rem"></div>
+            <div style="font-size:.8rem">Đang khởi động…</div>
         </div>
-    </nav>
+    </div>
+}
+else if (!Auth.IsLoggedIn)
+{
+    @* Đã xác nhận chưa login → redirect *@
+    Nav.NavigateTo("/", forceLoad: false);
+}
+else
+{
+    <div class="d-flex flex-column min-vh-100">
 
-    <main class="flex-grow-1 overflow-hidden">
-        @Body
-    </main>
+        <nav class="navbar navbar-expand-md navbar-dark px-3 py-2" style="background:#1a1a2e">
+            <a class="navbar-brand fw-bold d-flex align-items-center gap-2" href="/report">
+                <div style="width:28px;height:28px;border-radius:6px;
+                            background:linear-gradient(135deg,#4f46e5,#7c3aed);
+                            display:flex;align-items:center;justify-content:center;font-size:.9rem">
+                    <i class="bi bi-bar-chart-line-fill"></i>
+                </div>
+                <span class="d-none d-sm-inline" style="font-size:.95rem;letter-spacing:.02em">
+                    DMSPRO <span style="font-weight:300;opacity:.7">Reporting</span>
+                </span>
+            </a>
 
-    <footer class="text-center text-muted py-2 bg-light border-top" style="font-size:.78rem">
-        Reporting &copy; @DateTime.Now.Year
-    </footer>
+            <button class="navbar-toggler border-0" type="button"
+                    data-bs-toggle="collapse" data-bs-target="#mainNav"
+                    aria-controls="mainNav" aria-expanded="false">
+                <span class="navbar-toggler-icon"></span>
+            </button>
+
+            <div class="collapse navbar-collapse" id="mainNav">
+                <ul class="navbar-nav me-auto mt-2 mt-md-0">
+                    <li class="nav-item">
+                        <a class="nav-link" href="/report">
+                            <i class="bi bi-table me-1"></i>Báo cáo
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="/help" target="_blank">
+                            <i class="bi bi-question-circle me-1"></i>Hướng dẫn
+                        </a>
+                    </li>
+                </ul>
+
+                <ul class="navbar-nav mt-2 mt-md-0 align-items-md-center gap-2">
+                    <li class="nav-item d-flex align-items-center gap-2">
+                        <div class="nav-user-avatar">
+                            @(Auth.FullName.Length > 0 ? Auth.FullName[0].ToString().ToUpper() : "U")
+                        </div>
+                        <div class="d-none d-md-block">
+                            <div style="font-size:.8rem;color:#e2e8f0;line-height:1.1">@Auth.FullName</div>
+                            <div style="font-size:.68rem;color:#94a3b8">@Auth.Role</div>
+                        </div>
+                    </li>
+                    <li class="nav-item">
+                        <button class="btn btn-sm nav-logout-btn" @onclick="LogoutAsync">
+                            <i class="bi bi-box-arrow-right me-1"></i>
+                            <span class="d-none d-md-inline">Đăng xuất</span>
+                        </button>
+                    </li>
+                </ul>
+            </div>
+        </nav>
+
+        <main class="flex-grow-1 overflow-hidden">
+            @Body
+        </main>
+
+        <footer class="text-center text-muted py-2 border-top"
+                style="font-size:.72rem;background:#f8fafc">
+            DMSPRO Reporting &copy; @DateTime.Now.Year
+        </footer>
+    </div>
+}
+
+<div id="blazor-error-ui" class="alert alert-danger m-2"
+     style="display:none;position:fixed;bottom:1rem;left:1rem;right:1rem;z-index:9999">
+    Có lỗi xảy ra. <a href="" class="alert-link">Tải lại</a>
 </div>
 
-<div id="blazor-error-ui" class="alert alert-danger m-2" style="display:none;position:fixed;bottom:1rem;left:1rem;right:1rem;z-index:9999">
-    An unhandled error has occurred. <a href="" class="alert-link">Reload</a>
-</div>
+@code {
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (!firstRender) return;
+
+        // Chưa có session trong memory → thử đọc từ localStorage
+        if (!Auth.IsInitialized)
+        {
+            try
+            {
+                var result = await Store.GetAsync<AuthSession>("dmspro_auth");
+                if (result.Success && result.Value is not null)
+                    Auth.Restore(result.Value);
+                else
+                    Auth.MarkInitialized();
+            }
+            catch
+            {
+                Auth.MarkInitialized();
+            }
+
+            StateHasChanged();
+        }
+    }
+
+    private async Task LogoutAsync()
+    {
+        try { await Store.DeleteAsync("dmspro_auth"); } catch { }
+        Auth.Logout();
+        Nav.NavigateTo("/");
+    }
+}

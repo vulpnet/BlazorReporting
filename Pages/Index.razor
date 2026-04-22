@@ -1,71 +1,248 @@
 @page "/"
-<PageTitle>Home – DMSPRO  Reporting</PageTitle>
+@layout LoginLayout
+@using BlazorReporting.Shared
+@using BlazorReporting.Services
+@using Microsoft.AspNetCore.Components.Server.ProtectedBrowserStorage
+@inject AuthService Auth
+@inject NavigationManager Nav
+@inject ProtectedLocalStorage Store
 
-<div class="container py-5">
-    <div class="text-center mb-5">
-        <i class="bi bi-bar-chart-fill display-1 text-primary"></i>
-        <h1 class="mt-3">DMSPRO Reporting</h1>
-        <p class="lead text-muted">Dynamic SQL Server reports with pivot, drill-down, and export.</p>
-        @* <a class="btn btn-primary btn-lg mt-2"
-           href="/report?Source=sp_DMS_RPT_ReportMasterDistributor&Type=SP&CompanyID=3">
-            <i class="bi bi-play-fill me-2"></i>Master Distributor Report (CompanyID=3)
-        </a> *@
+@if (_checking)
+{
+    @* Đang kiểm tra session, chờ OnAfterRenderAsync *@
+    <div class="d-flex align-items-center justify-content-center min-vh-100">
+        <div class="spinner-border text-primary"></div>
+    </div>
+}
+else
+{
+
+<div class="login-page">
+
+    @* ══════════════════════════════════════
+       CỘT TRÁI — Brand / Hero
+    ══════════════════════════════════════ *@
+    <div class="login-brand">
+        <div class="login-brand-inner">
+
+            @* Logo *@
+            <div class="login-logo">
+                <div class="login-logo-icon">
+                    <i class="bi bi-bar-chart-line-fill"></i>
+                </div>
+                <div>
+                    <div class="login-logo-name">DMSPRO</div>
+                    <div class="login-logo-sub">Reporting</div>
+                </div>
+            </div>
+
+            @* Tagline *@
+            <h2 class="login-tagline">
+                Nền tảng báo cáo<br/>thông minh cho DMS
+            </h2>
+            <p class="login-desc">
+                Phân tích dữ liệu phân phối, theo dõi KPI và xuất báo cáo
+                trong tích tắc — mọi lúc, mọi nơi.
+            </p>
+
+            @* Features *@
+            <ul class="login-features">
+                <li>
+                    <span class="login-feat-icon"><i class="bi bi-database-fill"></i></span>
+                    <span>Kết nối trực tiếp SQL Server — SP, View, Table</span>
+                </li>
+                <li>
+                    <span class="login-feat-icon"><i class="bi bi-grid-3x3-gap-fill"></i></span>
+                    <span>Pivot động, drill-down đến từng cell</span>
+                </li>
+                <li>
+                    <span class="login-feat-icon"><i class="bi bi-file-earmark-arrow-down-fill"></i></span>
+                    <span>Xuất Excel, CSV, PDF chỉ 1 click</span>
+                </li>
+                <li>
+                    <span class="login-feat-icon"><i class="bi bi-robot"></i></span>
+                    <span>Trợ lý AI phân tích dữ liệu (Ollama)</span>
+                </li>
+            </ul>
+
+            @* Decorative circles *@
+            <div class="login-deco login-deco-1"></div>
+            <div class="login-deco login-deco-2"></div>
+            <div class="login-deco login-deco-3"></div>
+        </div>
     </div>
 
-    @* ── Quick report links ── *@
-    <div class="row g-3 mb-5">
-        <div class="col-12">
-            <h5 class="text-muted mb-3">Quick Reports</h5>
-        </div>
-        <div class="col-md-6 col-lg-4">
-            <div class="card shadow-sm border-primary">
-                <div class="card-body">
-                    <h6 class="card-title fw-bold">
-                        <i class="bi bi-people-fill me-2 text-primary"></i>Master Distributor
-                    </h6>
-                    <p class="card-text small text-muted mb-2">
-                        <code>sp_DMS_RPT_ReportMasterDistributor</code><br/>
-                        Params: CompanyID, ProvinceID, ChannelID, SalesAreaID
-                    </p>
-                    <div class="d-flex gap-2 flex-wrap">
-                        <a class="btn btn-sm btn-primary"
-                           href="/report?Source=sp_DMS_RPT_ReportMasterDistributor&Type=SP&CompanyID=3">
-                            CompanyID = 3
-                        </a>
-                        <a class="btn btn-sm btn-outline-primary"
-                           href="/report?Source=sp_DMS_RPT_ReportMasterDistributor&Type=SP">
-                            All (no filter)
-                        </a>
+    @* ══════════════════════════════════════
+       CỘT PHẢI — Form đăng nhập
+    ══════════════════════════════════════ *@
+    <div class="login-form-side">
+        <div class="login-card">
+
+            @* Header card *@
+            <div class="login-card-header">
+                <div class="login-card-logo-sm">
+                    <i class="bi bi-bar-chart-line-fill"></i>
+                </div>
+                <h4 class="login-card-title">Đăng nhập</h4>
+                <p class="login-card-sub">Chào mừng trở lại! Vui lòng nhập thông tin của bạn.</p>
+            </div>
+
+            @* Error alert *@
+            @if (_error)
+            {
+                <div class="login-alert">
+                    <i class="bi bi-shield-exclamation me-2"></i>
+                    Tên đăng nhập hoặc mật khẩu không đúng.
+                </div>
+            }
+
+            @* Form *@
+            <div class="login-fields">
+
+                @* Username *@
+                <div class="lf-group @(_focusUser ? "lf-group--focus" : "") @(!string.IsNullOrEmpty(_username) ? "lf-group--filled" : "")">
+                    <label class="lf-label">Tên đăng nhập</label>
+                    <div class="lf-input-wrap">
+                        <span class="lf-icon"><i class="bi bi-person-fill"></i></span>
+                        <input class="lf-input"
+                               type="text"
+                               autocomplete="username"
+                               spellcheck="false"
+                               @bind="_username"
+                               @bind:event="oninput"
+                               @onfocus="() => _focusUser = true"
+                               @onblur="() => _focusUser = false"
+                               @onkeydown="OnKeyDown"
+                               disabled="@_loading"
+                               placeholder="Nhập tên đăng nhập" />
                     </div>
                 </div>
+
+                @* Password *@
+                <div class="lf-group @(_focusPass ? "lf-group--focus" : "") @(!string.IsNullOrEmpty(_password) ? "lf-group--filled" : "")">
+                    <label class="lf-label">Mật khẩu</label>
+                    <div class="lf-input-wrap">
+                        <span class="lf-icon"><i class="bi bi-lock-fill"></i></span>
+                        <input class="lf-input"
+                               type="@(_showPass ? "text" : "password")"
+                               autocomplete="current-password"
+                               @bind="_password"
+                               @bind:event="oninput"
+                               @onfocus="() => _focusPass = true"
+                               @onblur="() => _focusPass = false"
+                               @onkeydown="OnKeyDown"
+                               disabled="@_loading"
+                               placeholder="Nhập mật khẩu" />
+                        <button class="lf-eye" type="button" tabindex="-1"
+                                @onclick="() => _showPass = !_showPass"
+                                title="@(_showPass ? "Ẩn mật khẩu" : "Hiện mật khẩu")">
+                            <i class="bi @(_showPass ? "bi-eye-slash" : "bi-eye")"></i>
+                        </button>
+                    </div>
+                </div>
+
+                @* Login button *@
+                <button class="lf-submit @(_loading ? "lf-submit--loading" : "")"
+                        @onclick="LoginAsync"
+                        disabled="@(_loading || string.IsNullOrWhiteSpace(_username) || string.IsNullOrWhiteSpace(_password))">
+                    @if (_loading)
+                    {
+                        <span class="lf-spinner"></span>
+                        <span>Đang đăng nhập…</span>
+                    }
+                    else
+                    {
+                        <i class="bi bi-box-arrow-in-right me-2"></i>
+                        <span>Đăng nhập</span>
+                    }
+                </button>
+
             </div>
+
+            @* Footer *@
+            <div class="login-card-footer">
+                <i class="bi bi-shield-lock me-1"></i>
+                Kết nối được mã hoá & bảo mật
+            </div>
+
+        </div>
+
+        @* Copyright *@
+        <div class="login-copyright">
+            © @DateTime.Now.Year DMSPRO Reporting — All rights reserved
         </div>
     </div>
 
-    <div class="row g-4">
-        <div class="col-md-4">
-            <div class="card h-100 shadow-sm">
-                <div class="card-body">
-                    <h5 class="card-title"><i class="bi bi-database me-2 text-primary"></i>Flexible Sources</h5>
-                    <p class="card-text text-muted">Connect to Stored Procedures, Views, or Tables with runtime parameters.</p>
-                </div>
-            </div>
-        </div>
-        <div class="col-md-4">
-            <div class="card h-100 shadow-sm">
-                <div class="card-body">
-                    <h5 class="card-title"><i class="bi bi-grid-3x3-gap me-2 text-success"></i>Pivot Analysis</h5>
-                    <p class="card-text text-muted">Cross-tabulate any columns, save layouts per user, drill into cells.</p>
-                </div>
-            </div>
-        </div>
-        <div class="col-md-4">
-            <div class="card h-100 shadow-sm">
-                <div class="card-body">
-                    <h5 class="card-title"><i class="bi bi-download me-2 text-danger"></i>Export Anywhere</h5>
-                    <p class="card-text text-muted">Download as Excel, CSV, or PDF — raw or pivot layout.</p>
-                </div>
-            </div>
-        </div>
-    </div>
 </div>
+
+} @* end else (_checking) *@
+
+@code {
+    private string _username = "";
+    private string _password = "";
+    private bool   _loading;
+    private bool   _error;
+    private bool   _showPass;
+    private bool   _focusUser;
+    private bool   _focusPass;
+    private bool   _checking = true;   // true trong khi chưa kiểm tra xong storage
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (!firstRender) return;
+
+        // Kiểm tra xem đã có session lưu trong localStorage chưa
+        try
+        {
+            var result = await Store.GetAsync<AuthSession>("dmspro_auth");
+            if (result.Success && result.Value is not null)
+            {
+                Auth.Restore(result.Value);
+                Nav.NavigateTo("/report");
+                return;
+            }
+        }
+        catch { }
+
+        _checking = false;
+        StateHasChanged();
+    }
+
+    private async Task LoginAsync()
+    {
+        if (string.IsNullOrWhiteSpace(_username) || string.IsNullOrWhiteSpace(_password)) return;
+
+        _loading = true;
+        _error   = false;
+        StateHasChanged();
+
+        await Task.Delay(500);
+
+        var ok = Auth.Login(_username, _password);
+        _loading = false;
+
+        if (ok)
+        {
+            // Lưu session vào ProtectedLocalStorage (mã hoá phía server)
+            try
+            {
+                await Store.SetAsync("dmspro_auth",
+                    new AuthSession(Auth.UserName, Auth.FullName, Auth.Role));
+            }
+            catch { }
+
+            Nav.NavigateTo("/report");
+        }
+        else
+        {
+            _error    = true;
+            _password = "";
+            StateHasChanged();
+        }
+    }
+
+    private async Task OnKeyDown(KeyboardEventArgs e)
+    {
+        if (e.Key == "Enter") await LoginAsync();
+    }
+}

@@ -8,6 +8,14 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <!-- Loại trừ thư mục BlazorReporting\ lồng bên trong (backup / sub-project cũ) -->
+    <Compile Remove="BlazorReporting\**" />
+    <Content Remove="BlazorReporting\**" />
+    <EmbeddedResource Remove="BlazorReporting\**" />
+    <None Remove="BlazorReporting\**" />
+  </ItemGroup>
+
+  <ItemGroup>
     <PackageReference Include="Dapper"                                           Version="2.1.35" />
     <PackageReference Include="Microsoft.Data.SqlClient"                          Version="5.2.1" />
     <PackageReference Include="ClosedXML"                                         Version="0.102.3" />
