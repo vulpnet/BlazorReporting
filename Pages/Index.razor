@@ -7,25 +7,12 @@
 @inject NavigationManager Nav
 @inject ProtectedLocalStorage Store
 
-@if (_checking)
-{
-    @* Đang kiểm tra session, chờ OnAfterRenderAsync *@
-    <div class="d-flex align-items-center justify-content-center min-vh-100">
-        <div class="spinner-border text-primary"></div>
-    </div>
-}
-else
-{
-
 <div class="login-page">
 
-    @* ══════════════════════════════════════
-       CỘT TRÁI — Brand / Hero
-    ══════════════════════════════════════ *@
+    @* ══ CỘT TRÁI — Brand ══════════════════════════════ *@
     <div class="login-brand">
         <div class="login-brand-inner">
 
-            @* Logo *@
             <div class="login-logo">
                 <div class="login-logo-icon">
                     <i class="bi bi-bar-chart-line-fill"></i>
@@ -36,7 +23,6 @@ else
                 </div>
             </div>
 
-            @* Tagline *@
             <h2 class="login-tagline">
                 Nền tảng báo cáo<br/>thông minh cho DMS
             </h2>
@@ -45,7 +31,6 @@ else
                 trong tích tắc — mọi lúc, mọi nơi.
             </p>
 
-            @* Features *@
             <ul class="login-features">
                 <li>
                     <span class="login-feat-icon"><i class="bi bi-database-fill"></i></span>
@@ -60,25 +45,25 @@ else
                     <span>Xuất Excel, CSV, PDF chỉ 1 click</span>
                 </li>
                 <li>
+                    <span class="login-feat-icon"><i class="bi bi-geo-alt-fill"></i></span>
+                    <span>Bản đồ vị trí & lộ trình Salesman</span>
+                </li>
+                <li>
                     <span class="login-feat-icon"><i class="bi bi-robot"></i></span>
                     <span>Trợ lý AI phân tích dữ liệu (Ollama)</span>
                 </li>
             </ul>
 
-            @* Decorative circles *@
             <div class="login-deco login-deco-1"></div>
             <div class="login-deco login-deco-2"></div>
             <div class="login-deco login-deco-3"></div>
         </div>
     </div>
 
-    @* ══════════════════════════════════════
-       CỘT PHẢI — Form đăng nhập
-    ══════════════════════════════════════ *@
+    @* ══ CỘT PHẢI — Form ═══════════════════════════════ *@
     <div class="login-form-side">
         <div class="login-card">
 
-            @* Header card *@
             <div class="login-card-header">
                 <div class="login-card-logo-sm">
                     <i class="bi bi-bar-chart-line-fill"></i>
@@ -87,7 +72,6 @@ else
                 <p class="login-card-sub">Chào mừng trở lại! Vui lòng nhập thông tin của bạn.</p>
             </div>
 
-            @* Error alert *@
             @if (_error)
             {
                 <div class="login-alert">
@@ -96,11 +80,10 @@ else
                 </div>
             }
 
-            @* Form *@
             <div class="login-fields">
 
                 @* Username *@
-                <div class="lf-group @(_focusUser ? "lf-group--focus" : "") @(!string.IsNullOrEmpty(_username) ? "lf-group--filled" : "")">
+                <div class="lf-group @(_focusUser ? "lf-group--focus" : "")">
                     <label class="lf-label">Tên đăng nhập</label>
                     <div class="lf-input-wrap">
                         <span class="lf-icon"><i class="bi bi-person-fill"></i></span>
@@ -119,7 +102,7 @@ else
                 </div>
 
                 @* Password *@
-                <div class="lf-group @(_focusPass ? "lf-group--focus" : "") @(!string.IsNullOrEmpty(_password) ? "lf-group--filled" : "")">
+                <div class="lf-group @(_focusPass ? "lf-group--focus" : "")">
                     <label class="lf-label">Mật khẩu</label>
                     <div class="lf-input-wrap">
                         <span class="lf-icon"><i class="bi bi-lock-fill"></i></span>
@@ -141,7 +124,6 @@ else
                     </div>
                 </div>
 
-                @* Login button *@
                 <button class="lf-submit @(_loading ? "lf-submit--loading" : "")"
                         @onclick="LoginAsync"
                         disabled="@(_loading || string.IsNullOrWhiteSpace(_username) || string.IsNullOrWhiteSpace(_password))">
@@ -159,23 +141,18 @@ else
 
             </div>
 
-            @* Footer *@
             <div class="login-card-footer">
                 <i class="bi bi-shield-lock me-1"></i>
                 Kết nối được mã hoá & bảo mật
             </div>
-
         </div>
 
-        @* Copyright *@
         <div class="login-copyright">
             © @DateTime.Now.Year DMSPRO Reporting — All rights reserved
         </div>
     </div>
 
 </div>
-
-} @* end else (_checking) *@
 
 @code {
     private string _username = "";
@@ -185,27 +162,21 @@ else
     private bool   _showPass;
     private bool   _focusUser;
     private bool   _focusPass;
-    private bool   _checking = true;   // true trong khi chưa kiểm tra xong storage
 
+    // Kiểm tra session ngầm sau khi render — không block UI
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
         if (!firstRender) return;
-
-        // Kiểm tra xem đã có session lưu trong localStorage chưa
         try
         {
             var result = await Store.GetAsync<AuthSession>("dmspro_auth");
             if (result.Success && result.Value is not null)
             {
                 Auth.Restore(result.Value);
-                Nav.NavigateTo("/report");
-                return;
+                Nav.NavigateTo("/map", replace: true);
             }
         }
-        catch { }
-
-        _checking = false;
-        StateHasChanged();
+        catch { /* localStorage chưa sẵn sàng hoặc không có session */ }
     }
 
     private async Task LoginAsync()
@@ -216,22 +187,20 @@ else
         _error   = false;
         StateHasChanged();
 
-        await Task.Delay(500);
+        await Task.Delay(400);
 
         var ok = Auth.Login(_username, _password);
         _loading = false;
 
         if (ok)
         {
-            // Lưu session vào ProtectedLocalStorage (mã hoá phía server)
             try
             {
                 await Store.SetAsync("dmspro_auth",
                     new AuthSession(Auth.UserName, Auth.FullName, Auth.Role));
             }
             catch { }
-
-            Nav.NavigateTo("/report");
+            Nav.NavigateTo("/report", replace: true);
         }
         else
         {

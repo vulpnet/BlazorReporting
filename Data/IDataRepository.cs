@@ -41,4 +41,18 @@ public interface IDataRepository
         DataSourceConfig config,
         Dictionary<string, object?> drillFilters,
         CancellationToken ct = default);
+
+    /// <summary>Vị trí cuối cùng trong ngày của từng salesman.</summary>
+    Task<IReadOnlyList<SalesmanLocation>> GetSalesmanLocationsAsync(
+        DateTime date, CancellationToken ct = default);
+
+    /// <summary>Toàn bộ lộ trình di chuyển của một salesman trong ngày, theo thứ tự thời gian.</summary>
+    Task<IReadOnlyList<SalesmanLocation>> GetSalesmanRouteAsync(
+        string userName, DateTime date, CancellationToken ct = default);
 }
+
+public sealed record SalesmanLocation(
+    string   UserName,
+    DateTime Checktime,
+    double   Lattitude,
+    double   Longtitude);

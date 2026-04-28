@@ -1,13 +1,14 @@
 @using BlazorReporting.Services
-@inject ChatbotService Chatbot
-@inject IJSRuntime JS
+@inject ChatbotService     Chatbot
+@inject ChatHistoryService History
+@inject SurveyService      Survey
+@inject AuthService        Auth
+@inject IJSRuntime         JS
+@inject NavigationManager  Nav
 
-@* ═══════════════════════════════════════
-   FLOATING AI CHAT WIDGET
-═══════════════════════════════════════ *@
 <div class="cw-root">
 
-    @* ── Nút mở / đóng ── *@
+    @* ── FAB toggle ── *@
     <button class="cw-fab @(_open ? "cw-fab--open" : "")"
             title="@(_open ? "Đóng" : "AI Assistant")"
             @onclick="ToggleAsync">
@@ -15,56 +16,45 @@
         <span class="cw-fab-icon cw-fab-icon--close"><i class="bi bi-x-lg"></i></span>
     </button>
 
-    @* ── Cửa sổ chat ── *@
     @if (_open)
     {
         <div class="cw-window">
 
             @* ── HEADER ── *@
             <div class="cw-header">
-                <div class="cw-header-avatar">
-                    <i class="bi bi-robot"></i>
-                </div>
+                <div class="cw-header-avatar"><i class="bi bi-robot"></i></div>
                 <div class="cw-header-info">
                     <div class="cw-header-title">AI Assistant</div>
                     <div class="cw-header-sub">
                         @if (_loadingModels)
                         {
-                            <span class="cw-connecting">
-                                <span class="cw-dot-pulse"></span> Đang kết nối…
-                            </span>
+                            <span class="cw-connecting"><span class="cw-dot-pulse"></span> Kết nối…</span>
                         }
                         else if (_models.Count == 0)
                         {
                             <span class="cw-offline">
-                                <i class="bi bi-circle-fill" style="font-size:.45rem;color:#f87171"></i>
-                                Ollama offline
+                                <i class="bi bi-circle-fill" style="font-size:.45rem;color:#f87171"></i> Offline
                             </span>
                         }
                         else
                         {
                             <span class="cw-online">
-                                <i class="bi bi-circle-fill" style="font-size:.45rem;color:#4ade80"></i>
-                                Online
+                                <i class="bi bi-circle-fill" style="font-size:.45rem;color:#4ade80"></i> Online
                             </span>
                         }
                     </div>
                 </div>
 
-                @* Model selector *@
                 @if (_models.Count > 0)
                 {
                     <select class="cw-model-select" @bind="_selectedModel" title="Chọn model">
                         @foreach (var m in _models)
-                        {
-                            <option value="@m.Name">@ShortName(m.Name)</option>
-                        }
+                        { <option value="@m.Name">@ShortName(m.Name)</option> }
                     </select>
                 }
 
-                @* Action buttons *@
                 <div class="cw-header-actions">
-                    <button class="cw-icon-btn" title="Xoá hội thoại" @onclick="ClearHistory">
+                    <button class="cw-icon-btn" title="Xoá hội thoại" @onclick="ClearHistoryAsync">
                         <i class="bi bi-arrow-counterclockwise"></i>
                     </button>
                     <button class="cw-icon-btn" title="Đóng" @onclick="ToggleAsync">
@@ -73,42 +63,50 @@
                 </div>
             </div>
 
-            @* ── BODY / MESSAGES ── *@
+            @* ── BODY ── *@
             <div class="cw-body" id="cw-body">
 
-                @if (_messages.Count == 0)
+                @* Empty state *@
+                @if (_messages.Count == 0 && !_showSurvey)
                 {
                     <div class="cw-empty">
-                        <div class="cw-empty-avatar">
-                            <i class="bi bi-robot"></i>
-                        </div>
-                        <p class="cw-empty-title">Xin chào! 👋</p>
+                        <div class="cw-empty-avatar"><i class="bi bi-robot"></i></div>
+                        <p class="cw-empty-title">Xin chào, @Auth.FullName! 👋</p>
                         <p class="cw-empty-sub">
-                            Tôi có thể giúp bạn phân tích dữ liệu báo cáo.<br/>
-                            @if (!string.IsNullOrEmpty(ReportSource))
-                            {
-                                <span>Đang xem: <strong>@ReportSource</strong></span>
-                            }
+                            Tôi có thể giúp bạn phân tích dữ liệu, điều hướng báo cáo hoặc bản đồ.
                         </p>
-
-                        @* Gợi ý câu hỏi nhanh *@
-                        @if (Columns?.Count > 0)
-                        {
-                            <div class="cw-suggestions">
-                                <button class="cw-suggestion-chip" @onclick='() => QuickAsk("Tóm tắt dữ liệu báo cáo này cho tôi")'>
+                        <div class="cw-suggestions">
+                            @if (Columns?.Count > 0)
+                            {
+                                <button class="cw-suggestion-chip"
+                                        @onclick='() => QuickAsk("Tóm tắt dữ liệu báo cáo này cho tôi")'>
                                     📊 Tóm tắt dữ liệu
                                 </button>
-                                <button class="cw-suggestion-chip" @onclick='() => QuickAsk("Các cột nào quan trọng nhất?")'>
-                                    🔍 Cột quan trọng
-                                </button>
-                                <button class="cw-suggestion-chip" @onclick='() => QuickAsk("Gợi ý cách lọc dữ liệu hiệu quả")'>
+                                <button class="cw-suggestion-chip"
+                                        @onclick='() => QuickAsk("Gợi ý cách lọc dữ liệu hiệu quả")'>
                                     ⚡ Gợi ý bộ lọc
                                 </button>
-                            </div>
-                        }
+                            }
+                            <button class="cw-suggestion-chip"
+                                    @onclick='() => QuickAsk("Mở bản đồ vị trí salesman hôm nay")'>
+                                🗺️ Bản đồ hôm nay
+                            </button>
+                            <button class="cw-suggestion-chip"
+                                    @onclick='() => QuickAsk("Mở trang hướng dẫn sử dụng")'>
+                                📖 Hướng dẫn
+                            </button>
+                            @if (ReportLinks?.Count > 0)
+                            {
+                                <button class="cw-suggestion-chip"
+                                        @onclick='() => QuickAsk("Liệt kê tất cả báo cáo có sẵn")'>
+                                    📋 Danh sách báo cáo
+                                </button>
+                            }
+                        </div>
                     </div>
                 }
 
+                @* Messages *@
                 @foreach (var msg in _messages)
                 {
                     @if (msg.Role == "user")
@@ -123,13 +121,28 @@
                     {
                         <div class="cw-row cw-row--ai">
                             <div class="cw-ai-avatar"><i class="bi bi-robot"></i></div>
-                            <div class="cw-bubble cw-bubble--ai">
-                                @((MarkupString)FormatText(msg.Content))
+                            <div>
+                                <div class="cw-bubble cw-bubble--ai">
+                                    @((MarkupString)FormatText(msg.Content))
+                                </div>
+                                @if (msg.NavActions.Count > 0)
+                                {
+                                    <div class="cw-nav-actions">
+                                        @foreach (var nav in msg.NavActions)
+                                        {
+                                            var url = nav.Url; var lbl = nav.Label;
+                                            <button class="cw-nav-btn" @onclick="() => NavigateTo(url)">
+                                                <i class="bi bi-box-arrow-up-right me-1"></i>@lbl
+                                            </button>
+                                        }
+                                    </div>
+                                }
                             </div>
                         </div>
                     }
                 }
 
+                @* Typing indicator *@
                 @if (_busy)
                 {
                     <div class="cw-row cw-row--ai">
@@ -140,10 +153,58 @@
                     </div>
                 }
 
+                @* ══ SURVEY CARD ══════════════════════════════════════ *@
+                @if (_showSurvey)
+                {
+                    <div class="cw-row cw-row--ai">
+                        <div class="cw-ai-avatar"><i class="bi bi-robot"></i></div>
+                        <div class="cw-survey-card">
+                            <div class="cw-survey-title">
+                                <i class="bi bi-stars me-1 text-warning"></i>
+                                Trải nghiệm của bạn hôm nay?
+                            </div>
+                            <p class="cw-survey-sub">Đánh giá giúp chúng tôi cải thiện hệ thống 🙏</p>
+
+                            @* Sao *@
+                            <div class="cw-stars">
+                                @for (int s = 1; s <= 5; s++)
+                                {
+                                    var star = s;
+                                    <button class="cw-star @(_surveyScore >= star ? "cw-star--on" : "")"
+                                            @onclick="() => _surveyScore = star"
+                                            title="@StarLabel(star)">
+                                        <i class="bi bi-star-fill"></i>
+                                    </button>
+                                }
+                            </div>
+                            @if (_surveyScore > 0)
+                            {
+                                <div class="cw-survey-label">@StarLabel(_surveyScore)</div>
+                            }
+
+                            @* Feedback text *@
+                            @if (_surveyScore > 0)
+                            {
+                                <textarea class="cw-survey-textarea"
+                                          @bind="_surveyFeedback"
+                                          placeholder="@(_surveyScore <= 2 ? "Bạn gặp vấn đề gì? Chúng tôi sẽ khắc phục ngay…" : "Góp ý thêm (tuỳ chọn)…")"
+                                          rows="2"></textarea>
+                                <button class="cw-survey-submit" @onclick="SubmitSurveyAsync">
+                                    <i class="bi bi-send me-1"></i>Gửi đánh giá
+                                </button>
+                            }
+
+                            <button class="cw-survey-skip" @onclick="SkipSurvey">
+                                Để sau
+                            </button>
+                        </div>
+                    </div>
+                }
+
                 <div id="cw-scroll-anchor"></div>
             </div>
 
-            @* ── FOOTER / INPUT ── *@
+            @* ── FOOTER ── *@
             <div class="cw-footer">
                 <div class="cw-input-wrap @(_busy ? "cw-input-wrap--disabled" : "")">
                     <textarea class="cw-input"
@@ -151,26 +212,18 @@
                               @bind:event="oninput"
                               @onkeydown="OnKeyDown"
                               @onkeydown:preventDefault="@_suppressEnter"
-                              placeholder="@(_models.Count == 0 ? "Ollama chưa kết nối…" : "Nhập câu hỏi…")"
+                              placeholder="@(_models.Count == 0 ? "Ollama chưa kết nối…" : "Nhập câu hỏi… (Enter gửi)")"
                               rows="1"
                               disabled="@(_busy || _models.Count == 0)"></textarea>
                     <button class="cw-send-btn @(!string.IsNullOrWhiteSpace(_input) && !_busy ? "cw-send-btn--active" : "")"
                             @onclick="SendAsync"
                             disabled="@(_busy || string.IsNullOrWhiteSpace(_input) || _models.Count == 0)"
                             title="Gửi (Enter)">
-                        @if (_busy)
-                        {
-                            <span class="cw-send-spinner"></span>
-                        }
-                        else
-                        {
-                            <i class="bi bi-send-fill"></i>
-                        }
+                        @if (_busy) { <span class="cw-send-spinner"></span> }
+                        else        { <i class="bi bi-send-fill"></i> }
                     </button>
                 </div>
-                <div class="cw-footer-hint">
-                    <span>Enter gửi · Shift+Enter xuống dòng</span>
-                </div>
+                <div class="cw-footer-hint">Enter gửi · Shift+Enter xuống dòng</div>
             </div>
 
         </div>
@@ -178,45 +231,119 @@
 </div>
 
 @code {
-    [Parameter] public string? ReportSource { get; set; }
-    [Parameter] public IReadOnlyList<string>? Columns { get; set; }
-    [Parameter] public int RowCount { get; set; }
+    // ── Parameters ────────────────────────────────────────────
+    [Parameter] public string?                     ReportSource { get; set; }
+    [Parameter] public IReadOnlyList<string>?      Columns      { get; set; }
+    [Parameter] public int                         RowCount     { get; set; }
+    [Parameter] public IReadOnlyList<ChatNavLink>? ReportLinks  { get; set; }
 
+    // ── Display message ───────────────────────────────────────
+    private sealed class DisplayMessage
+    {
+        public string            Role       { get; init; } = "";
+        public string            Content    { get; init; } = "";
+        public List<ChatNavLink> NavActions { get; init; } = [];
+        public ChatMessage ToApiMessage()  => new(Role, Content);
+    }
+
+    // ── State ─────────────────────────────────────────────────
     private bool   _open;
     private bool   _busy;
     private bool   _suppressEnter;
     private bool   _loadingModels;
-    private string _input = "";
+    private bool   _historyLoaded;
+    private string _input         = "";
     private string _selectedModel = "";
-    private IReadOnlyList<OllamaModel> _models = [];
-    private readonly List<ChatMessage> _messages = [];
+    private IReadOnlyList<OllamaModel>    _models   = [];
+    private readonly List<DisplayMessage> _messages = [];
 
+    // Survey state
+    private bool   _showSurvey;
+    private int    _surveyScore    = 0;
+    private string _surveyFeedback = "";
+    private int    _userMessageCount = 0;   // đếm lượt user gửi trong session này
+
+    // ── System prompt ─────────────────────────────────────────
     private string SystemPrompt
     {
         get
         {
             var sb = new System.Text.StringBuilder();
-            sb.Append("Bạn là trợ lý phân tích dữ liệu tích hợp trong DMSPRO Reporting — hệ thống báo cáo BI cho DMS.");
+            sb.AppendLine("Bạn là trợ lý AI trong DMSPRO Reporting — hệ thống báo cáo BI cho DMS.");
+            sb.AppendLine("Nhiệm vụ: phân tích dữ liệu, tư vấn báo cáo, ĐIỀU HƯỚNG người dùng, và xử lý khi người dùng không hài lòng.");
+
             if (!string.IsNullOrEmpty(ReportSource))
-                sb.Append($" Người dùng đang xem báo cáo '{ReportSource}'");
-            if (Columns?.Count > 0)
-                sb.Append($" với {RowCount:N0} dòng và các cột: {string.Join(", ", Columns)}.");
-            sb.Append(" Trả lời ngắn gọn, thực tế. Dùng ngôn ngữ người dùng đang viết.");
+            {
+                sb.Append($"[Hiện tại] Báo cáo: '{ReportSource}'");
+                if (Columns?.Count > 0)
+                    sb.Append($" | {RowCount:N0} dòng | Cột: {string.Join(", ", Columns)}");
+                sb.AppendLine();
+            }
+
+            sb.AppendLine();
+            sb.AppendLine("=== CÁC TRANG TRONG HỆ THỐNG ===");
+            sb.AppendLine("[Bản đồ] bản đồ, map, vị trí, salesman, lộ trình");
+            sb.AppendLine($"  Không có ngày → /map | Hôm nay → /map?date={DateTime.Today:yyyy-MM-dd} | Ngày khác → /map?date=yyyy-MM-dd");
+            sb.AppendLine("[Hướng dẫn] hướng dẫn, help, trợ giúp → /help");
+            sb.AppendLine("[Báo cáo trống] → /report");
+
+            if (ReportLinks?.Count > 0)
+            {
+                sb.AppendLine();
+                sb.AppendLine("=== BÁO CÁO CÓ SẴN ===");
+                foreach (var r in ReportLinks)
+                {
+                    sb.Append($"• {r.Label}: {r.Url}");
+                    if (r.SpParams?.Count > 0)
+                    {
+                        var req = r.SpParams.Where(p => p.Required).Select(p => p.Name + "*");
+                        var opt = r.SpParams.Where(p => !p.Required).Select(p => p.Name);
+                        sb.Append($" | Params: {string.Join(", ", req.Concat(opt))}");
+                    }
+                    sb.AppendLine();
+                }
+            }
+
+            sb.AppendLine();
+            sb.AppendLine("=== QUY TẮC ĐIỀU HƯỚNG ===");
+            sb.AppendLine("A) Đủ thông tin → [NAVIGATE|<url kèm filter>|<tên button ngắn>]");
+            sb.AppendLine("B) Thiếu tham số bắt buộc (*) → Hỏi lại (1-2 thông tin quan trọng nhất)");
+            sb.AppendLine("C) Không filter / 'mặc định' / 'tất cả' → Navigate URL gốc");
+            sb.AppendLine("D) Trang tĩnh (map, help) → Navigate ngay");
+
+            sb.AppendLine();
+            sb.AppendLine("=== XỬ LÝ KHI NGƯỜI DÙNG KHÔNG HÀI LÒNG ===");
+            sb.AppendLine("Phát hiện: phàn nàn, lỗi, chậm, sai dữ liệu, không hoạt động, tệ, khó chịu, thất vọng...");
+            sb.AppendLine("Bắt buộc phải:");
+            sb.AppendLine("1. Xin lỗi chân thành, cụ thể (1-2 câu)");
+            sb.AppendLine("2. Thừa nhận vấn đề người dùng đang gặp");
+            sb.AppendLine("3. Đề xuất giải pháp ngay lập tức:");
+            sb.AppendLine("   - Lỗi/chậm tải → [NAVIGATE|/report|Tải lại báo cáo]");
+            sb.AppendLine("   - Dữ liệu sai → gợi ý đổi filter + [NAVIGATE|/report|Chạy lại]");
+            sb.AppendLine("   - Không tìm thấy tính năng → [NAVIGATE|/help|Xem hướng dẫn]");
+            sb.AppendLine("   - Bất kỳ vấn đề khác → hỏi thêm chi tiết và đề xuất bước tiếp theo");
+            sb.AppendLine("4. KHÔNG hỏi thêm nhiều câu khi người dùng đang bực bội");
+
+            sb.AppendLine();
+            sb.AppendLine("Trả lời bằng ngôn ngữ người dùng đang dùng.");
             return sb.ToString();
         }
     }
 
+    // ── Toggle & init ─────────────────────────────────────────
     private async Task ToggleAsync()
     {
         _open = !_open;
-        if (_open && _models.Count == 0)
-            await LoadModelsAsync();
+        if (_open)
+        {
+            if (_models.Count == 0) await LoadModelsAsync();
+            if (!_historyLoaded)   await LoadHistoryAsync();
+        }
     }
 
     private async Task LoadModelsAsync()
     {
-        _loadingModels = true;
-        StateHasChanged();
+        _loadingModels = true; StateHasChanged();
         try
         {
             _models = await Chatbot.GetModelsAsync();
@@ -225,13 +352,45 @@
         finally { _loadingModels = false; StateHasChanged(); }
     }
 
-    private void ClearHistory() => _messages.Clear();
-
-    private async Task QuickAsk(string question)
+    // ── Load lịch sử hôm nay ─────────────────────────────────
+    private async Task LoadHistoryAsync()
     {
-        _input = question;
-        await SendAsync();
+        _historyLoaded = true;
+        var userId = Auth.UserName;
+        if (string.IsNullOrEmpty(userId)) return;
+
+        var history = await History.LoadTodayAsync(userId);
+        if (history.Count > 0)
+        {
+            _messages.Clear();
+            foreach (var h in history)
+                _messages.Add(new DisplayMessage
+                {
+                    Role       = h.Role,
+                    Content    = h.Content,
+                    NavActions = h.NavActions
+                });
+            _userMessageCount = history.Count(h => h.Role == "user");
+            StateHasChanged();
+            await ScrollAsync();
+        }
+
+        // Kiểm tra survey hôm nay
+        await CheckSurveyAsync();
     }
+
+    // ── Xoá lịch sử ──────────────────────────────────────────
+    private async Task ClearHistoryAsync()
+    {
+        _messages.Clear();
+        _userMessageCount = 0;
+        _showSurvey       = false;
+        await History.ClearTodayAsync(Auth.UserName);
+        StateHasChanged();
+    }
+
+    // ── Send ──────────────────────────────────────────────────
+    private async Task QuickAsk(string q) { _input = q; await SendAsync(); }
 
     private async Task OnKeyDown(KeyboardEventArgs e)
     {
@@ -244,45 +403,178 @@
         var text = _input.Trim();
         if (string.IsNullOrEmpty(text) || _busy || string.IsNullOrEmpty(_selectedModel)) return;
 
-        _messages.Add(new ChatMessage("user", text));
+        var userMsg = new DisplayMessage { Role = "user", Content = text };
+        _messages.Add(userMsg);
         _input = "";
         _busy  = true;
+        _userMessageCount++;
+        _showSurvey = false;
         StateHasChanged();
         await ScrollAsync();
 
+        // Lưu tin nhắn user
+        _ = History.SaveAsync(Auth.UserName, "user", text);
+
         try
         {
-            var history = _messages.Take(_messages.Count - 1).ToList();
-            var reply   = await Chatbot.SendAsync(_selectedModel, history, text, SystemPrompt);
-            _messages.Add(new ChatMessage("assistant", reply));
+            var history = _messages.Take(_messages.Count - 1)
+                                   .Select(m => m.ToApiMessage()).ToList();
+            var raw   = await Chatbot.SendAsync(_selectedModel, history, text, SystemPrompt);
+            var (clean, navs) = ParseNavigate(raw);
+
+            var aiMsg = new DisplayMessage { Role = "assistant", Content = clean, NavActions = navs };
+            _messages.Add(aiMsg);
+
+            // Lưu tin nhắn bot
+            _ = History.SaveAsync(Auth.UserName, "assistant", clean, navs);
+
+            // Kiểm tra survey sau 4 lượt user gửi
+            if (_userMessageCount >= 4) await CheckSurveyAsync();
         }
         catch (Exception ex)
         {
-            _messages.Add(new ChatMessage("assistant", $"⚠ {ex.Message}"));
+            var err = new DisplayMessage { Role = "assistant", Content = $"⚠ {ex.Message}" };
+            _messages.Add(err);
         }
         finally
         {
-            _busy = false;
+            _busy = false; StateHasChanged();
+            await ScrollAsync();
+        }
+    }
+
+    // ── Survey ────────────────────────────────────────────────
+    private async Task CheckSurveyAsync()
+    {
+        if (_showSurvey) return;
+        var userId = Auth.UserName;
+        if (string.IsNullOrEmpty(userId)) return;
+
+        var result = await Survey.GetTodayAsync(userId);
+        if (!result.Completed)
+        {
+            _showSurvey = true;
             StateHasChanged();
             await ScrollAsync();
         }
     }
 
-    private async Task ScrollAsync()
+    private async Task SubmitSurveyAsync()
     {
+        if (_surveyScore == 0) return;
+        await Survey.SaveAsync(Auth.UserName, _surveyScore, _surveyFeedback.Trim());
+        _showSurvey = false;
+        StateHasChanged();
+
+        // Tự động xử lý nếu không hài lòng (1-2 sao)
+        if (_surveyScore <= 2)
+        {
+            await AutoApologyAsync(_surveyFeedback.Trim());
+        }
+        else
+        {
+            var thanks = new DisplayMessage
+            {
+                Role    = "assistant",
+                Content = _surveyScore == 5
+                    ? "Cảm ơn bạn rất nhiều! ⭐⭐⭐⭐⭐ Rất vui vì bạn hài lòng với hệ thống. Tôi luôn ở đây nếu bạn cần hỗ trợ!"
+                    : "Cảm ơn bạn đã đánh giá! Chúng tôi sẽ tiếp tục cải thiện hệ thống để phục vụ bạn tốt hơn. 🙏"
+            };
+            _messages.Add(thanks);
+            _ = History.SaveAsync(Auth.UserName, "assistant", thanks.Content);
+            StateHasChanged();
+            await ScrollAsync();
+        }
+
+        _surveyScore    = 0;
+        _surveyFeedback = "";
+    }
+
+    private async Task SkipSurvey()
+    {
+        _showSurvey = false;
+        StateHasChanged();
+    }
+
+    private async Task AutoApologyAsync(string feedback)
+    {
+        _busy = true; StateHasChanged();
         try
         {
-            await JS.InvokeVoidAsync("eval",
-                "var b=document.getElementById('cw-body');if(b)b.scrollTop=b.scrollHeight;");
+            // Gửi đến LLM để sinh câu xin lỗi + đề xuất khắc phục tự động
+            var context = string.IsNullOrEmpty(feedback)
+                ? "Người dùng cho 1-2 sao nhưng không nêu lý do cụ thể."
+                : $"Người dùng cho {_surveyScore} sao và phản hồi: \"{feedback}\"";
+
+            var prompt = $"{context} Hãy: 1) Xin lỗi chân thành, 2) Thừa nhận vấn đề, " +
+                         $"3) Đề xuất giải pháp cụ thể kèm NAVIGATE nếu phù hợp. Trả lời bằng tiếng Việt.";
+
+            var raw = await Chatbot.SendAsync(_selectedModel, [], prompt, SystemPrompt);
+            var (clean, navs) = ParseNavigate(raw);
+
+            var msg = new DisplayMessage { Role = "assistant", Content = clean, NavActions = navs };
+            _messages.Add(msg);
+            _ = History.SaveAsync(Auth.UserName, "assistant", clean, navs);
         }
+        catch
+        {
+            var fallback = new DisplayMessage
+            {
+                Role    = "assistant",
+                Content = "Chúng tôi thành thật xin lỗi vì trải nghiệm chưa tốt của bạn. " +
+                          "Phản hồi của bạn rất quan trọng và chúng tôi sẽ khắc phục sớm nhất. " +
+                          "Bạn có thể thử tải lại trang hoặc liên hệ quản trị viên nếu vấn đề còn tiếp diễn.",
+                NavActions = [new ChatNavLink("Tải lại báo cáo", "/report"),
+                              new ChatNavLink("Xem hướng dẫn",   "/help")]
+            };
+            _messages.Add(fallback);
+        }
+        finally
+        {
+            _busy = false; StateHasChanged();
+            await ScrollAsync();
+        }
+    }
+
+    // ── Navigate ──────────────────────────────────────────────
+    private void NavigateTo(string url)
+    {
+        _open = false;
+        Nav.NavigateTo(url);
+    }
+
+    // ── Helpers ───────────────────────────────────────────────
+    private static string StarLabel(int s) => s switch
+    {
+        1 => "Rất không hài lòng 😞",
+        2 => "Không hài lòng 😕",
+        3 => "Bình thường 😐",
+        4 => "Hài lòng 😊",
+        5 => "Rất hài lòng 🤩",
+        _ => ""
+    };
+
+    private async Task ScrollAsync()
+    {
+        try { await JS.InvokeVoidAsync("eval",
+            "var b=document.getElementById('cw-body');if(b)b.scrollTop=b.scrollHeight;"); }
         catch { }
     }
 
-    private static string ShortName(string name)
+    private static string ShortName(string n) => n.Length > 22 ? n[..22] + "…" : n;
+
+    private static (string text, List<ChatNavLink> navs) ParseNavigate(string raw)
     {
-        // "llama3:8b-instruct" → "llama3:8b"  |  keep max 20 chars
-        var s = name.Length > 22 ? name[..22] + "…" : name;
-        return s;
+        var navs  = new List<ChatNavLink>();
+        var regex = new System.Text.RegularExpressions.Regex(
+            @"\[NAVIGATE\|([^\|]+)\|([^\]]+)\]",
+            System.Text.RegularExpressions.RegexOptions.IgnoreCase);
+        var text = regex.Replace(raw, m =>
+        {
+            navs.Add(new ChatNavLink(m.Groups[2].Value.Trim(), m.Groups[1].Value.Trim()));
+            return string.Empty;
+        }).Trim();
+        return (text, navs);
     }
 
     private static string FormatText(string raw)

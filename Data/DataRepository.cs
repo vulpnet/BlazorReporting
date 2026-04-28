@@ -459,6 +459,99 @@ public sealed class DataRepository : IDataRepository
         AggregationType.Max   => "MAX",
         _                     => "SUM"
     };
+
+    // ══════════════════════════════════════════════════════════════
+    // GetSalesmanRouteAsync — toàn bộ điểm check-in của 1 SM trong ngày
+    // ══════════════════════════════════════════════════════════════
+    public async Task<IReadOnlyList<SalesmanLocation>> GetSalesmanRouteAsync(
+        string userName, DateTime date, CancellationToken ct = default)
+    {
+        const string sql = """
+            SELECT UserName, Checktime, CONVERT(decimal(18,6) , Lattitude ) Lattitude, CONVERT(decimal(18,6) , Longtitude ) Longtitude
+            FROM DMSAimSalesmanLocation
+            WHERE UserName     = @UserName
+              AND CONVERT(date, Checktime) = @Date
+              AND CONVERT(decimal(18,6) , Lattitude )  <> 0
+            AND CONVERT(decimal(18,6) , Lattitude ) <> 0
+            ORDER BY Checktime ASC
+            """;
+
+        await using var conn = new SqlConnection(_cs);
+        await conn.OpenAsync(ct);
+
+        using var cmd = conn.CreateCommand();
+        cmd.CommandText    = sql;
+        cmd.CommandTimeout = 30;
+        cmd.Parameters.AddWithValue("@UserName", userName);
+        cmd.Parameters.AddWithValue("@Date",     date.Date);
+
+        await using var reader = await cmd.ExecuteReaderAsync(ct);
+        var results = new List<SalesmanLocation>();
+
+        while (await reader.ReadAsync(ct))
+        {
+            var lat = Convert.ToDouble(reader["Lattitude"]);
+            var lng = Convert.ToDouble(reader["Longtitude"]);
+            if (lat < -90 || lat > 90 || lng < -180 || lng > 180) continue;
+
+            results.Add(new SalesmanLocation(
+                UserName  : reader["UserName"].ToString()!,
+                Checktime : Convert.ToDateTime(reader["Checktime"]),
+                Lattitude : lat,
+                Longtitude: lng));
+        }
+        return results;
+    }
+
+    // ══════════════════════════════════════════════════════════════
+    // GetSalesmanLocationsAsync
+    //   Vị trí cuối cùng trong ngày của từng salesman
+    // ══════════════════════════════════════════════════════════════
+    public async Task<IReadOnlyList<SalesmanLocation>> GetSalesmanLocationsAsync(
+        DateTime date, CancellationToken ct = default)
+    {
+        const string sql = """
+            SELECT UserName, Checktime, CONVERT(decimal(18,6) , Lattitude ) Lattitude, CONVERT(decimal(18,6) , Longtitude ) Longtitude
+            FROM (
+                SELECT *,
+                    ROW_NUMBER() OVER (PARTITION BY UserName ORDER BY Checktime DESC) AS rn
+                FROM DMSAimSalesmanLocation
+                WHERE CONVERT(date, Checktime) = @Date
+            ) t
+            WHERE rn = 1
+            ORDER BY UserName
+            """;
+
+        await using var conn = new SqlConnection(_cs);
+        await conn.OpenAsync(ct);
+
+        using var cmd = conn.CreateCommand();
+        cmd.CommandText    = sql;
+        cmd.CommandTimeout = 60;
+        cmd.Parameters.AddWithValue("@Date", date.Date);
+
+        await using var reader = await cmd.ExecuteReaderAsync(ct);
+        var results = new List<SalesmanLocation>();
+
+        while (await reader.ReadAsync(ct))
+        {
+            var lat = Convert.ToDouble(reader["Lattitude"]);
+            var lng = Convert.ToDouble(reader["Longtitude"]);
+
+            // Bỏ qua toạ độ không hợp lệ
+            if (lat is 0 && lng is 0) continue;
+            if (lat < -90 || lat > 90 || lng < -180 || lng > 180) continue;
+
+            results.Add(new SalesmanLocation(
+                UserName  : reader["UserName"].ToString()!,
+                Checktime : Convert.ToDateTime(reader["Checktime"]),
+                Lattitude : lat,
+                Longtitude: lng
+            ));
+        }
+
+        return results;
+    }
 }
 
 // ─── Comparer for in-memory sort ────────────────────────────────

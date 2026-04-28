@@ -1,0 +1,453 @@
+@page "/map"
+@using BlazorReporting.Data
+@using System.Text.Json
+@inject IDataRepository Repo
+@inject IJSRuntime JS
+@inject NavigationManager Nav
+@implements IAsyncDisposable
+
+<PageTitle>Bản đồ Salesman – DMSPRO</PageTitle>
+
+@* ══ TOOLBAR ══════════════════════════════════════════ *@
+<div class="map-toolbar">
+    <div class="d-flex align-items-center gap-2 flex-wrap">
+
+        <div class="d-flex align-items-center gap-2 me-2">
+            <div class="map-title-icon"><i class="bi bi-geo-alt-fill"></i></div>
+            <div>
+                <div class="map-title">Bản đồ vị trí Salesman</div>
+                <div class="map-subtitle">DMSAimSalesmanLocation — vị trí cuối cùng trong ngày</div>
+            </div>
+        </div>
+
+        <div class="input-group input-group-sm" style="width:auto">
+            <span class="input-group-text bg-white"><i class="bi bi-calendar3"></i></span>
+            <input type="date" class="form-control" style="width:150px"
+                   @bind="_date" @bind:format="yyyy-MM-dd" disabled="@_loading" />
+        </div>
+
+        <button class="btn btn-primary btn-sm d-flex align-items-center gap-1"
+                @onclick="LoadAsync" disabled="@_loading">
+            @if (_loading)
+            { <span class="spinner-border spinner-border-sm"></span><span>Đang tải…</span> }
+            else
+            { <i class="bi bi-search"></i><span>Xem bản đồ</span> }
+        </button>
+
+        @if (_locations.Count > 0)
+        {
+            <span class="badge map-badge-total">
+                <i class="bi bi-people-fill me-1"></i>@_locations.Count salesman
+            </span>
+            @if (_geocodingStarted && _geocodedCount < _locations.Count)
+            {
+                <span class="badge bg-secondary" style="font-size:.68rem">
+                    <span class="spinner-border spinner-border-sm me-1"
+                          style="width:.6rem;height:.6rem;border-width:1.5px"></span>
+                    Địa chỉ @_geocodedCount/@_locations.Count
+                </span>
+            }
+            <div class="input-group input-group-sm ms-auto" style="width:210px">
+                <span class="input-group-text bg-white"><i class="bi bi-search"></i></span>
+                <input class="form-control" placeholder="Tìm username / địa chỉ…"
+                       @bind="_search" @bind:event="oninput" />
+            </div>
+        }
+    </div>
+
+    @if (!string.IsNullOrEmpty(_error))
+    {
+        <div class="alert alert-danger mt-2 mb-0 py-1 px-2" style="font-size:.82rem">
+            <i class="bi bi-exclamation-triangle me-1"></i>@_error
+        </div>
+    }
+</div>
+
+@* ══ LAYOUT ═══════════════════════════════════════════ *@
+<div class="map-layout">
+
+    @* ── Bản đồ ── *@
+    <div class="map-container">
+        <div id="leaflet-map"></div>
+
+        @if (!_mapReady)
+        {
+            <div class="map-placeholder">
+                <div class="text-center text-muted">
+                    <i class="bi bi-map display-1 opacity-25 d-block mb-3"></i>
+                    <p class="mb-0">Chọn ngày và nhấn <strong>Xem bản đồ</strong></p>
+                </div>
+            </div>
+        }
+
+        @if (_loading)
+        {
+            <div class="map-overlay">
+                <div class="spinner-border text-primary" style="width:2.5rem;height:2.5rem"></div>
+                <div class="mt-2 fw-semibold" style="color:#fff">Đang tải dữ liệu…</div>
+            </div>
+        }
+
+        @* ── Route info panel (floating trên map) ── *@
+        @if (_routeInfo != null)
+        {
+            <div class="map-route-panel">
+                <div class="map-route-panel-header">
+                    <div class="d-flex align-items-center gap-2">
+                        <div class="map-route-avatar" style="background:@IndexColor(_routeColorIdx)">
+                            @AvatarText(_routeInfo.UserName)
+                        </div>
+                        <div>
+                            <div class="map-route-name">@_routeInfo.UserName</div>
+                            <div class="map-route-date">@_date.ToString("dd/MM/yyyy")</div>
+                        </div>
+                    </div>
+                    <button class="map-route-close" @onclick="ClearRouteAsync" title="Đóng lộ trình">
+                        <i class="bi bi-x-lg"></i>
+                    </button>
+                </div>
+                <div class="map-route-stats">
+                    <div class="map-route-stat">
+                        <i class="bi bi-geo-fill text-success"></i>
+                        <span>@_routeInfo.Stops điểm</span>
+                    </div>
+                    <div class="map-route-stat">
+                        <i class="bi bi-clock text-primary"></i>
+                        <span>@_routeInfo.TimeRange</span>
+                    </div>
+                    <div class="map-route-stat">
+                        <i class="bi bi-signpost-2 text-warning"></i>
+                        <span>~@_routeInfo.Km km</span>
+                    </div>
+                </div>
+            </div>
+        }
+
+        @if (_routeLoading)
+        {
+            <div class="map-overlay" style="background:rgba(15,23,42,.35)">
+                <div class="spinner-border text-white"></div>
+                <div class="mt-2 text-white fw-semibold" style="font-size:.85rem">
+                    Đang tải lộ trình…
+                </div>
+            </div>
+        }
+    </div>
+
+    @* ── Sidebar ── *@
+    @if (_locations.Count > 0)
+    {
+        <div class="map-sidebar">
+            <div class="map-sidebar-header">
+                <i class="bi bi-list-ul me-1"></i>Danh sách
+                <span class="badge bg-primary ms-1">@FilteredLocations.Count()</span>
+                @if (_routeInfo != null)
+                {
+                    <button class="btn btn-xs btn-outline-danger ms-auto py-0 px-1"
+                            style="font-size:.65rem" @onclick="ClearRouteAsync">
+                        <i class="bi bi-x"></i> Xoá lộ trình
+                    </button>
+                }
+            </div>
+            <div class="map-sidebar-body">
+                @{ int idx = 0; }
+                @foreach (var loc in FilteredLocations)
+                {
+                    var c       = IndexColor(idx);
+                    var isRoute = _routeInfo?.UserName == loc.UserName;
+                    _addresses.TryGetValue(loc.UserName, out var addr);
+
+                    <div class="map-sidebar-item @(isRoute ? "map-sidebar-item--active" : "")"
+                         @onclick="() => FlyToAsync(loc)">
+                        <div class="map-sidebar-dot" style="background:@c"></div>
+                        <div class="map-sidebar-info">
+                            <div class="d-flex align-items-center gap-1">
+                                <div class="map-sidebar-name">@loc.UserName</div>
+                                @* Nút lộ trình *@
+                                <button class="map-route-btn @(isRoute ? "map-route-btn--active" : "")"
+                                        title="@(isRoute ? "Đang xem lộ trình" : "Xem lộ trình di chuyển")"
+                                        @onclick:stopPropagation="true"
+                                        @onclick="() => ShowRouteAsync(loc, idx)">
+                                    @if (_routeLoading && _routeLoadingUser == loc.UserName)
+                                    {
+                                        <span class="spinner-border spinner-border-sm"
+                                              style="width:.7rem;height:.7rem;border-width:1.5px"></span>
+                                    }
+                                    else
+                                    {
+                                        <i class="bi bi-signpost-2-fill"></i>
+                                    }
+                                </button>
+                            </div>
+                            <div class="map-sidebar-time">
+                                <i class="bi bi-clock me-1"></i>@loc.Checktime.ToString("HH:mm:ss")
+                            </div>
+                            @if (addr != null)
+                            {
+                                <div class="map-sidebar-addr" title="@addr">@addr</div>
+                            }
+                            else if (_geocodingStarted)
+                            {
+                                <div class="map-sidebar-addr map-sidebar-addr--loading">Đang lấy địa chỉ…</div>
+                            }
+                        </div>
+                        <i class="bi bi-chevron-right text-muted" style="font-size:.65rem;flex-shrink:0"></i>
+                    </div>
+                    idx++;
+                }
+            </div>
+        </div>
+    }
+</div>
+
+@code {
+    // ── State ────────────────────────────────────────────
+    private DateTime _date      = DateTime.Today;
+    private bool     _loading;
+    private bool     _mapReady;
+    private bool     _geocodingStarted;
+    private int      _geocodedCount;
+    private string   _error  = "";
+    private string   _search = "";
+    private IReadOnlyList<SalesmanLocation>   _locations = [];
+    private Dictionary<string, string>        _addresses = new(StringComparer.OrdinalIgnoreCase);
+    private DotNetObjectReference<Map>?       _dotNetRef;
+    private bool                              _autoLoad;   // true khi có ?date= trên URL
+
+    // Route state
+    private RouteInfo? _routeInfo;
+    private bool       _routeLoading;
+    private string?    _routeLoadingUser;
+    private int        _routeColorIdx;
+
+    private sealed record RouteInfo(string UserName, int Stops, string TimeRange, double Km);
+
+    private static readonly string[] Colors = [
+        "#2563eb","#dc2626","#16a34a","#d97706","#7c3aed",
+        "#0891b2","#be185d","#15803d","#b45309","#4f46e5"
+    ];
+    private static string IndexColor(int i) => Colors[i % Colors.Length];
+
+    private IEnumerable<SalesmanLocation> FilteredLocations =>
+        string.IsNullOrWhiteSpace(_search)
+            ? _locations
+            : _locations.Where(l =>
+                l.UserName.Contains(_search, StringComparison.OrdinalIgnoreCase) ||
+                (_addresses.TryGetValue(l.UserName, out var a) &&
+                 a.Contains(_search, StringComparison.OrdinalIgnoreCase)));
+
+    // ── Init ─────────────────────────────────────────────
+    protected override void OnInitialized()
+    {
+        _dotNetRef = DotNetObjectReference.Create(this);
+        ParseQueryDate();   // đọc ?date= từ URL ngay lập tức
+    }
+
+    // Đọc ?date=yyyy-MM-dd từ query string
+    private void ParseQueryDate()
+    {
+        var uri = new Uri(Nav.Uri);
+        var qs  = Microsoft.AspNetCore.WebUtilities.QueryHelpers
+                      .ParseQuery(uri.Query);
+
+        if (qs.TryGetValue("date", out var d) &&
+            DateTime.TryParse(d, out var parsed))
+        {
+            _date      = parsed.Date;
+            _autoLoad  = true;   // sẽ tự load sau khi map init xong
+        }
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (!firstRender) return;
+        try
+        {
+            await Task.Delay(60);
+            await JS.InvokeVoidAsync("mapInterop.init", "leaflet-map", 16.0, 106.0, 6);
+            await JS.InvokeVoidAsync("mapInterop.setDotNetRef", _dotNetRef);
+            _mapReady = true;
+            StateHasChanged();
+
+            // Tự động load nếu có date trên URL
+            if (_autoLoad)
+            {
+                _autoLoad = false;
+                await LoadAsync();
+            }
+        }
+        catch (Exception ex)
+        {
+            _error = "Lỗi khởi tạo bản đồ: " + ex.Message;
+            StateHasChanged();
+        }
+    }
+
+    // ── Load markers ─────────────────────────────────────
+    private async Task LoadAsync()
+    {
+        _loading          = true;
+        _error            = "";
+        _geocodingStarted = false;
+        _geocodedCount    = 0;
+        _addresses.Clear();
+        _routeInfo        = null;
+        StateHasChanged();
+
+        try
+        {
+            _locations = await Repo.GetSalesmanLocationsAsync(_date);
+
+            if (_locations.Count == 0)
+            {
+                _error = $"Không có dữ liệu cho ngày {_date:dd/MM/yyyy}";
+                await JS.InvokeVoidAsync("mapInterop.addMarkersJson", "[]");
+            }
+            else
+            {
+                var payload = _locations.Select(l => new
+                {
+                    userName  = l.UserName,
+                    checktime = l.Checktime.ToString("dd/MM/yyyy HH:mm:ss"),
+                    lat       = l.Lattitude,
+                    lng       = l.Longtitude
+                });
+                var json = JsonSerializer.Serialize(payload,
+                    new JsonSerializerOptions { PropertyNamingPolicy = null });
+
+                await JS.InvokeVoidAsync("mapInterop.addMarkersJson", json);
+                await Task.Delay(120);
+                await JS.InvokeVoidAsync("mapInterop.invalidateSize");
+
+                _geocodingStarted = true;
+                _ = JS.InvokeVoidAsync("mapInterop.startGeocoding", json, _dotNetRef);
+            }
+        }
+        catch (Exception ex) { _error = ex.Message; }
+        finally { _loading = false; StateHasChanged(); }
+    }
+
+    // ── Geocoding callback ────────────────────────────────
+    [JSInvokable]
+    public Task UpdateAddressAsync(string userName, string address)
+    {
+        _addresses[userName] = address;
+        _geocodedCount++;
+        if (_geocodedCount % 5 == 0 || _geocodedCount == _locations.Count)
+            return InvokeAsync(StateHasChanged);
+        return Task.CompletedTask;
+    }
+
+    // ── Gọi từ popup button trên bản đồ ─────────────────
+    [JSInvokable]
+    public async Task ShowRouteByNameAsync(string userName)
+    {
+        var loc = _locations.FirstOrDefault(l =>
+            l.UserName.Equals(userName, StringComparison.OrdinalIgnoreCase));
+        if (loc == null) return;
+
+        var idx = _locations
+            .Select((l, i) => (l, i))
+            .FirstOrDefault(x => x.l.UserName.Equals(userName, StringComparison.OrdinalIgnoreCase)).i;
+
+        await ShowRouteAsync(loc, idx);
+    }
+
+    // ── Hiện lộ trình ────────────────────────────────────
+    private async Task ShowRouteAsync(SalesmanLocation loc, int colorIdx)
+    {
+        // Nếu đang xem lộ trình của SM này → toggle tắt
+        if (_routeInfo?.UserName == loc.UserName)
+        {
+            await ClearRouteAsync();
+            return;
+        }
+
+        _routeLoading     = true;
+        _routeLoadingUser = loc.UserName;
+        _routeColorIdx    = colorIdx;
+        StateHasChanged();
+
+        try
+        {
+            var route = await Repo.GetSalesmanRouteAsync(loc.UserName, _date);
+            if (route.Count == 0)
+            {
+                _error = $"Không có dữ liệu lộ trình cho {loc.UserName}";
+                return;
+            }
+
+            var pts = route.Select(r => new
+            {
+                userName  = r.UserName,
+                checktime = r.Checktime.ToString("HH:mm:ss"),
+                lat       = r.Lattitude,
+                lng       = r.Longtitude
+            });
+            var json = JsonSerializer.Serialize(pts,
+                new JsonSerializerOptions { PropertyNamingPolicy = null });
+
+            await JS.InvokeVoidAsync("mapInterop.drawRoute", json);
+
+            // Tính tổng km (Haversine C#)
+            var km = 0.0;
+            for (int i = 1; i < route.Count; i++)
+                km += Haversine(route[i-1].Lattitude, route[i-1].Longtitude,
+                                route[i].Lattitude,   route[i].Longtitude);
+
+            var timeRange = route.Count >= 2
+                ? $"{route[0].Checktime:HH:mm} → {route[^1].Checktime:HH:mm}"
+                : route[0].Checktime.ToString("HH:mm");
+
+            _routeInfo = new RouteInfo(loc.UserName, route.Count, timeRange, Math.Round(km, 1));
+        }
+        catch (Exception ex) { _error = ex.Message; }
+        finally
+        {
+            _routeLoading     = false;
+            _routeLoadingUser = null;
+            StateHasChanged();
+        }
+    }
+
+    // ── Xoá lộ trình ─────────────────────────────────────
+    private async Task ClearRouteAsync()
+    {
+        _routeInfo = null;
+        StateHasChanged();
+        try { await JS.InvokeVoidAsync("mapInterop.clearRoute"); } catch { }
+    }
+
+    // ── Fly to marker ─────────────────────────────────────
+    private async Task FlyToAsync(SalesmanLocation loc)
+    {
+        try { await JS.InvokeVoidAsync("mapInterop.flyTo", loc.Lattitude, loc.Longtitude); }
+        catch { }
+    }
+
+    // ── Haversine (C#) ────────────────────────────────────
+    private static string AvatarText(string name)
+    {
+        if (string.IsNullOrWhiteSpace(name)) return "??";
+        // Lấy 2 ký tự chữ/số cuối (e.g. "SR002285" → "85", "NguyenA" → "NA")
+        var letters = name.Where(char.IsLetterOrDigit).TakeLast(2).ToArray();
+        return letters.Length > 0 ? new string(letters).ToUpper() : name[..Math.Min(2, name.Length)].ToUpper();
+    }
+
+    private static double Haversine(double lat1, double lon1, double lat2, double lon2)
+    {
+        const double R = 6371;
+        var dLat = (lat2 - lat1) * Math.PI / 180;
+        var dLon = (lon2 - lon1) * Math.PI / 180;
+        var a = Math.Sin(dLat/2) * Math.Sin(dLat/2)
+              + Math.Cos(lat1 * Math.PI / 180) * Math.Cos(lat2 * Math.PI / 180)
+              * Math.Sin(dLon/2) * Math.Sin(dLon/2);
+        return R * 2 * Math.Atan2(Math.Sqrt(a), Math.Sqrt(1 - a));
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        _dotNetRef?.Dispose();
+        try { await JS.InvokeVoidAsync("mapInterop.destroy"); } catch { }
+    }
+}

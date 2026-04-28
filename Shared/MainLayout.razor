@@ -1,23 +1,20 @@
 @inherits LayoutComponentBase
 @using BlazorReporting.Services
+@using BlazorReporting.Data
+@using BlazorReporting.Data.Models
 @using Microsoft.AspNetCore.Components.Server.ProtectedBrowserStorage
+@using BlazorReporting.Components
 @inject AuthService Auth
 @inject NavigationManager Nav
 @inject ProtectedLocalStorage Store
+@inject IDataRepository Repo
 
 @if (!Auth.IsInitialized)
 {
-    @* Đang kiểm tra session — hiện màn loading mỏng tránh flash redirect *@
-    <div class="d-flex align-items-center justify-content-center min-vh-100 bg-light">
-        <div class="text-center text-muted">
-            <div class="spinner-border text-primary mb-3" style="width:2rem;height:2rem"></div>
-            <div style="font-size:.8rem">Đang khởi động…</div>
-        </div>
-    </div>
+    <div style="min-height:100vh;background:#f8fafc"></div>
 }
 else if (!Auth.IsLoggedIn)
 {
-    @* Đã xác nhận chưa login → redirect *@
     Nav.NavigateTo("/", forceLoad: false);
 }
 else
@@ -47,6 +44,11 @@ else
                     <li class="nav-item">
                         <a class="nav-link" href="/report">
                             <i class="bi bi-table me-1"></i>Báo cáo
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="/map">
+                            <i class="bi bi-geo-alt me-1"></i>Bản đồ
                         </a>
                     </li>
                     <li class="nav-item">
@@ -85,6 +87,9 @@ else
             DMSPRO Reporting &copy; @DateTime.Now.Year
         </footer>
     </div>
+
+    @* ── AI Chatbox — hiện trên mọi trang đã đăng nhập ── *@
+    <ChatWindow ReportLinks="@_reportLinks" />
 }
 
 <div id="blazor-error-ui" class="alert alert-danger m-2"
@@ -93,11 +98,13 @@ else
 </div>
 
 @code {
+    private IReadOnlyList<ChatNavLink> _reportLinks = [];
+
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
         if (!firstRender) return;
 
-        // Chưa có session trong memory → thử đọc từ localStorage
+        // Restore session
         if (!Auth.IsInitialized)
         {
             try
@@ -108,13 +115,94 @@ else
                 else
                     Auth.MarkInitialized();
             }
-            catch
-            {
-                Auth.MarkInitialized();
-            }
+            catch { Auth.MarkInitialized(); }
 
             StateHasChanged();
         }
+
+        // Load report catalog cho chatbot (non-blocking)
+        _ = LoadReportLinksAsync();
+    }
+
+    private async Task LoadReportLinksAsync()
+    {
+        try
+        {
+            var cfg = new DataSourceConfig
+            {
+                Source     = "DMSViewReportTemplate",
+                SourceType = DataSourceType.View,
+                PageSize   = 1000
+            };
+            var rows = await Repo.FetchAllAsync(cfg);
+
+            var nameKeys   = new[] { "ReportName","Name","Title","DisplayName","RPT_NAME","REPORT_NAME" };
+            var sourceKeys = new[] { "SourceName","Source","ObjectName","SPName","ProcName","ViewName","TableName","RPT_SOURCE" };
+            var typeKeys   = new[] { "SourceType","Type","ObjectType","RPT_TYPE","SourceKind" };
+
+            // Bước 1: build danh sách cơ bản
+            var drafts = new List<(string Name, string Source, string TypeStr)>();
+            foreach (var row in rows)
+            {
+                var name   = Pick(row, nameKeys);
+                var source = Pick(row, sourceKeys);
+                if (string.IsNullOrWhiteSpace(name) || string.IsNullOrWhiteSpace(source)) continue;
+
+                var typeStr = Pick(row, typeKeys)?.Trim().ToLower() switch
+                {
+                    "sp" or "storedprocedure" or "procedure" or "proc" => "SP",
+                    "view" or "vw"                                      => "View",
+                    "table" or "tbl"                                    => "Table",
+                    _                                                   => InferType(source)
+                };
+                drafts.Add((name, source, typeStr));
+            }
+
+            // Bước 2: fetch SP params song song cho tất cả SP
+            var spTasks = drafts
+                .Where(d => d.TypeStr == "SP")
+                .ToDictionary(
+                    d => d.Source,
+                    d => Repo.GetSpParametersAsync(d.Source));
+
+            await Task.WhenAll(spTasks.Values);
+
+            // Bước 3: gộp lại thành ChatNavLink
+            var links = drafts.Select(d =>
+            {
+                var url = $"/report?Source={d.Source}&Type={d.TypeStr}";
+
+                IReadOnlyList<SpParamInfo>? spParams = null;
+                if (d.TypeStr == "SP" && spTasks.TryGetValue(d.Source, out var t) && t.IsCompletedSuccessfully)
+                {
+                    spParams = t.Result
+                        .Select(p => new SpParamInfo(p.Name, p.TypeName, !p.HasDefault))
+                        .ToList();
+                }
+
+                return new ChatNavLink(d.Name, url, spParams);
+            }).ToList();
+
+            _reportLinks = links;
+            await InvokeAsync(StateHasChanged);
+        }
+        catch { /* DMSViewReportTemplate không tồn tại — bỏ qua */ }
+    }
+
+    private static string? Pick(Dictionary<string, object?> row, string[] keys)
+    {
+        foreach (var k in keys)
+            if (row.TryGetValue(k, out var v) && v != null)
+                return v.ToString();
+        return null;
+    }
+
+    private static string InferType(string source)
+    {
+        var s = source.ToLower();
+        if (s.StartsWith("sp_") || s.StartsWith("usp_") || s.StartsWith("proc_")) return "SP";
+        if (s.StartsWith("vw_") || s.StartsWith("view_") || s.StartsWith("v_"))   return "View";
+        return "View";
     }
 
     private async Task LogoutAsync()

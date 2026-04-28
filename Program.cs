@@ -24,6 +24,10 @@ builder.Services.AddScoped<IExportService, ExportService>();
 // Auth (scoped = per Blazor circuit / session)
 builder.Services.AddScoped<AuthService>();
 
+// Chat history & Survey (scoped)
+builder.Services.AddScoped<ChatHistoryService>();
+builder.Services.AddScoped<SurveyService>();
+
 // Chatbot — Ollama local
 builder.Services.AddHttpClient<ChatbotService>();
 
