@@ -571,6 +571,289 @@ html, body { height: 100%; }
    MAP PAGE
 ══════════════════════════════════════════════════════ */
 
+/* ── Custom Calendar Picker ── */
+.cal-wrap { position: relative; display: inline-flex; }
+
+.cal-trigger {
+    display: inline-flex; align-items: center; gap: .4rem;
+    padding: .32rem .65rem;
+    border: 1.5px solid #e2e8f0; border-radius: .55rem;
+    background: #fff; color: #1e293b;
+    font-size: .84rem; font-weight: 500;
+    cursor: pointer; white-space: nowrap;
+    transition: border-color .2s, box-shadow .2s;
+    font-family: inherit;
+}
+.cal-trigger:hover,
+.cal-trigger--open {
+    border-color: #4f46e5;
+    box-shadow: 0 0 0 3px rgba(79,70,229,.12);
+}
+.cal-trigger:disabled { opacity: .55; cursor: not-allowed; }
+.cal-trigger-icon { color: #4f46e5; font-size: .9rem; }
+.cal-trigger-caret { font-size: .65rem; color: #94a3b8; transition: transform .2s; }
+.cal-trigger-caret--up { transform: rotate(-180deg); }
+
+.cal-backdrop { position: fixed; inset: 0; z-index: 900; }
+
+.cal-popup {
+    position: absolute; top: calc(100% + 6px); left: 0; z-index: 901;
+    background: #fff; border-radius: .85rem;
+    box-shadow: 0 8px 32px rgba(0,0,0,.16), 0 2px 8px rgba(0,0,0,.08);
+    padding: .85rem .75rem .6rem;
+    min-width: 252px;
+    animation: calPop .15s cubic-bezier(.34,1.56,.64,1);
+}
+@keyframes calPop {
+    from { opacity: 0; transform: translateY(-8px) scale(.96); }
+    to   { opacity: 1; transform: translateY(0)   scale(1); }
+}
+
+.cal-header {
+    display: flex; align-items: center; justify-content: space-between;
+    margin-bottom: .55rem; padding: 0 .1rem;
+}
+.cal-month-year {
+    font-size: .9rem; font-weight: 700; color: #1e293b;
+    display: flex; align-items: center; gap: .25rem;
+}
+.cal-year { color: #1e293b; }
+.cal-nav {
+    width: 28px; height: 28px; border-radius: 50%;
+    border: none; background: transparent; cursor: pointer;
+    display: flex; align-items: center; justify-content: center;
+    color: #64748b; font-size: .75rem;
+    transition: background .15s, color .15s;
+}
+.cal-nav:hover { background: #f1f5f9; color: #4f46e5; }
+
+.cal-grid {
+    display: grid; grid-template-columns: repeat(7, 1fr);
+    gap: 2px;
+}
+.cal-dow {
+    text-align: center; font-size: .67rem; font-weight: 700;
+    color: #94a3b8; padding: .15rem 0 .3rem;
+    letter-spacing: .02em;
+}
+.cal-cell {
+    text-align: center; font-size: .82rem; color: #1e293b;
+    padding: .28rem .1rem; border-radius: .4rem;
+    cursor: pointer; user-select: none;
+    transition: background .1s, color .1s;
+    line-height: 1.6;
+}
+.cal-cell:hover             { background: #f1f5f9; color: #4f46e5; }
+.cal-cell--other            { color: #c8d0db; }
+.cal-cell--other:hover      { background: #f8fafc; color: #94a3b8; }
+.cal-cell--today {
+    background: #e0e7ff; color: #4f46e5; font-weight: 700; border-radius: 50%;
+}
+.cal-cell--today:hover { background: #c7d2fe; }
+.cal-cell--selected {
+    background: #4f46e5; color: #fff; font-weight: 700; border-radius: 50%;
+    box-shadow: 0 2px 8px rgba(79,70,229,.35);
+}
+.cal-cell--selected:hover { background: #4338ca; }
+
+.cal-footer {
+    margin-top: .5rem; text-align: center; border-top: 1px solid #f1f5f9; padding-top: .45rem;
+}
+.cal-today-btn {
+    border: none; background: transparent; color: #4f46e5;
+    font-size: .78rem; font-weight: 600; cursor: pointer;
+    padding: .15rem .5rem; border-radius: .35rem;
+    transition: background .15s;
+}
+.cal-today-btn:hover { background: #eef2ff; }
+
+/* ══════════════════════════════════════════════════════
+   PRODUCT SALES PAGE  (/product-sales)
+══════════════════════════════════════════════════════ */
+
+/* Toolbar */
+.ps-toolbar {
+    background: #fff; border-bottom: 1px solid #e2e8f0;
+    padding: .6rem 1rem; position: sticky; top: 0; z-index: 500;
+    box-shadow: 0 2px 8px rgba(0,0,0,.06);
+}
+.ps-title-icon {
+    width: 34px; height: 34px; border-radius: 9px;
+    background: linear-gradient(135deg,#d97706,#f59e0b);
+    display: flex; align-items: center; justify-content: center;
+    color: #fff; font-size: 1rem; flex-shrink: 0;
+}
+.ps-title    { font-size: .9rem; font-weight: 700; color: #1e293b; line-height: 1.2; }
+.ps-subtitle { font-size: .7rem; color: #94a3b8; }
+.ps-select   { font-size: .8rem !important; padding-top: .25rem !important; padding-bottom: .25rem !important; width: auto !important; }
+
+/* Metric toggle */
+.ps-metric-toggle {
+    display: flex; border: 1.5px solid #e2e8f0; border-radius: .45rem; overflow: hidden;
+}
+.ps-metric-toggle button {
+    border: none; background: transparent; padding: .25rem .7rem;
+    font-size: .78rem; color: #64748b; cursor: pointer;
+    transition: background .15s, color .15s;
+}
+.ps-metric-toggle button:hover  { background: #f8fafc; color: #4f46e5; }
+.ps-metric-toggle button.active { background: #4f46e5; color: #fff; }
+
+/* Empty state */
+.ps-empty {
+    display: flex; flex-direction: column; align-items: center;
+    justify-content: center; min-height: 60vh;
+    color: #94a3b8; text-align: center;
+}
+
+/* Content grid */
+.ps-content {
+    display: grid;
+    grid-template-columns: 1fr 380px;
+    grid-template-rows: auto auto;
+    gap: 1rem;
+    padding: 1rem;
+    height: calc(100vh - 105px);
+    overflow-y: auto;
+    background: #f8fafc;
+}
+.ps-card--strategy { grid-column: 1 / -1; }
+
+/* Card */
+.ps-card {
+    background: #fff; border-radius: .85rem;
+    box-shadow: 0 2px 10px rgba(0,0,0,.06);
+    display: flex; flex-direction: column; overflow: hidden;
+}
+.ps-card-header {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: .65rem 1rem; border-bottom: 1px solid #f1f5f9;
+    flex-shrink: 0;
+}
+.ps-card-body {
+    flex: 1; overflow: hidden; display: flex;
+    flex-direction: column; padding: .75rem 1rem;
+}
+.ps-period-badge {
+    font-size: .72rem; font-weight: 600; color: #4f46e5;
+    background: #eef2ff; border-radius: .35rem; padding: .15rem .5rem;
+}
+
+/* Chart containers */
+.ps-chart-wrap  { flex: 1; position: relative; min-height: 220px; }
+.ps-chart-wrap canvas { position: absolute; inset: 0; }
+.ps-chart-placeholder {
+    flex: 1; display: flex; flex-direction: column;
+    align-items: center; justify-content: center;
+    color: #94a3b8; min-height: 160px;
+}
+
+/* Prediction cards */
+.ps-pred-cards {
+    display: flex; gap: .6rem; flex-wrap: wrap;
+    margin-top: .75rem; flex-shrink: 0;
+}
+.ps-pred-card {
+    flex: 1; min-width: 90px; border-radius: .65rem;
+    padding: .55rem .7rem; border: 1.5px solid #e2e8f0;
+    background: #fafafa;
+}
+.ps-pred-card--up   { border-color: #86efac; background: #f0fdf4; }
+.ps-pred-card--down { border-color: #fca5a5; background: #fef2f2; }
+.ps-pred-card--flat { border-color: #e2e8f0; background: #f8fafc; }
+.ps-pred-period { font-size: .7rem; font-weight: 600; color: #64748b; margin-bottom: .15rem; }
+.ps-pred-val    { font-size: 1rem; font-weight: 700; color: #1e293b; line-height: 1.2; }
+.ps-pred-unit   { font-size: .65rem; font-weight: 400; color: #64748b; }
+.ps-pred-signal {
+    font-size: .7rem; margin-top: .2rem;
+    color: #16a34a;
+}
+.ps-pred-card--down .ps-pred-signal { color: #dc2626; }
+.ps-pred-card--flat .ps-pred-signal { color: #64748b; }
+
+/* Strategy table */
+.ps-strategy-wrap { overflow-x: auto; }
+.ps-strategy-table {
+    width: 100%; border-collapse: collapse; font-size: .82rem;
+}
+.ps-strategy-table th {
+    background: #1e293b; color: #f1f5f9; padding: .45rem .75rem;
+    font-size: .75rem; font-weight: 600; white-space: nowrap;
+    text-align: left;
+}
+.ps-strategy-table td {
+    padding: .4rem .75rem; border-bottom: 1px solid #f1f5f9;
+    vertical-align: middle;
+}
+.ps-strategy-table tbody tr:hover { background: #f8fafc; }
+.ps-area-badge {
+    display: inline-block; background: #eef2ff; color: #4f46e5;
+    border-radius: .35rem; padding: .1rem .45rem; font-size: .75rem; font-weight: 600;
+}
+.ps-prod-badge {
+    display: inline-block; background: #fef3c7; color: #b45309;
+    border-radius: .35rem; padding: .1rem .45rem; font-size: .75rem; font-weight: 600;
+}
+.ps-trend-badge {
+    display: inline-flex; align-items: center; border-radius: 2rem;
+    padding: .15rem .5rem; font-size: .72rem; font-weight: 600;
+}
+.ps-trend-badge--up   { background: #dcfce7; color: #16a34a; }
+.ps-trend-badge--down { background: #fee2e2; color: #dc2626; }
+.ps-trend-badge--flat { background: #f1f5f9; color: #64748b; }
+.ps-suggest-cell { color: #475569; font-size: .78rem; max-width: 260px; }
+
+@media (max-width: 768px) {
+    .ps-content { grid-template-columns: 1fr; height: auto; }
+    .ps-card--strategy { grid-column: 1; }
+}
+
+/* ── Map product panel (in-map floating) ── */
+.map-ps-panel {
+    position: absolute; bottom: 0; left: 0; right: 0;
+    height: 62%; min-height: 400px;
+    background: #fff; z-index: 415;
+    border-top: 2px solid #f59e0b;
+    box-shadow: 0 -4px 24px rgba(0,0,0,.14);
+    display: flex; flex-direction: column;
+    animation: slideUp .22s cubic-bezier(.34,1.2,.64,1);
+}
+.map-ps-header {
+    display: flex; align-items: center; gap: .4rem; flex-wrap: wrap;
+    padding: .45rem .75rem; border-bottom: 1px solid #f1f5f9;
+    flex-shrink: 0; background: #fffbeb;
+}
+.map-ps-body {
+    flex: 1; display: grid; grid-template-columns: 1fr 300px;
+    gap: 0; overflow: hidden; min-height: 0;
+}
+.map-ps-area-wrap,
+.map-ps-trend-wrap {
+    position: relative; overflow: hidden;
+    display: flex; flex-direction: column; padding: .5rem .75rem;
+}
+.map-ps-area-wrap { border-right: 1px solid #f1f5f9; }
+.map-ps-area-wrap canvas {
+    position: absolute; inset: .5rem .75rem;
+}
+.map-ps-trend-chart {
+    flex: 1; position: relative; min-height: 80px;
+}
+.map-ps-trend-chart canvas { position: absolute; inset: 0; }
+.map-ps-placeholder {
+    flex: 1; display: flex; flex-direction: column;
+    align-items: center; justify-content: center;
+    color: #94a3b8; text-align: center; min-height: 80px;
+}
+.map-ps-strategy {
+    border-top: 1px solid #f1f5f9; max-height: 130px;
+    overflow-y: auto; flex-shrink: 0;
+}
+@media (max-width: 680px) {
+    .map-ps-body { grid-template-columns: 1fr; }
+    .map-ps-trend-wrap { display: none; }
+}
+
 /* Toolbar */
 .map-toolbar {
     background: #fff;

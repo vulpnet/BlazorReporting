@@ -1,0 +1,596 @@
+@page "/product-sales"
+@using BlazorReporting.Data
+@using System.Text.Json
+@inject IDataRepository Repo
+@inject IJSRuntime JS
+@implements IAsyncDisposable
+
+<PageTitle>Phân tích sản phẩm – DMSPRO</PageTitle>
+
+@* ══ TOOLBAR ══════════════════════════════════════════════ *@
+<div class="ps-toolbar">
+    <div class="d-flex align-items-center gap-2 flex-wrap">
+
+        @* Tiêu đề *@
+        <div class="d-flex align-items-center gap-2 me-2">
+            <div class="ps-title-icon"><i class="bi bi-box-seam-fill"></i></div>
+            <div>
+                <div class="ps-title">Phân tích sản phẩm</div>
+                <div class="ps-subtitle">Sản phẩm bán chạy theo khu vực · Xu hướng &amp; Dự đoán</div>
+            </div>
+        </div>
+
+        @* Năm *@
+        <select class="form-select form-select-sm ps-select" @bind="_year" disabled="@_loading">
+            @for (int y = DateTime.Today.Year; y >= DateTime.Today.Year - 4; y--)
+            {
+                var yy = y;
+                <option value="@yy">@yy</option>
+            }
+        </select>
+
+        @* Kiểu kỳ *@
+        <select class="form-select form-select-sm ps-select" @bind="_periodType"
+                @bind:after="OnPeriodTypeChanged" disabled="@_loading">
+            <option value="year">Cả năm</option>
+            <option value="quarter">Theo quý</option>
+            <option value="month">Theo tháng</option>
+        </select>
+
+        @* Giá trị kỳ *@
+        @if (_periodType == "quarter")
+        {
+            <select class="form-select form-select-sm ps-select" @bind="_periodValue" disabled="@_loading">
+                <option value="1">Q1 (T1–T3)</option>
+                <option value="2">Q2 (T4–T6)</option>
+                <option value="3">Q3 (T7–T9)</option>
+                <option value="4">Q4 (T10–T12)</option>
+            </select>
+        }
+        else if (_periodType == "month")
+        {
+            <select class="form-select form-select-sm ps-select" @bind="_periodValue" disabled="@_loading">
+                @for (int m = 1; m <= 12; m++)
+                {
+                    var mm = m;
+                    <option value="@mm">Tháng @mm</option>
+                }
+            </select>
+        }
+
+        @* Nhóm theo *@
+        <select class="form-select form-select-sm ps-select" @bind="_groupBy" disabled="@_loading">
+            <option value="route">🗺 Tuyến</option>
+            <option value="province">🏙 Tỉnh/TP</option>
+            <option value="sm">👤 Salesman</option>
+        </select>
+
+        @* Top N *@
+        <select class="form-select form-select-sm ps-select" @bind="_topN" disabled="@_loading">
+            <option value="5">Top 5 SP</option>
+            <option value="10">Top 10 SP</option>
+            <option value="15">Top 15 SP</option>
+            <option value="20">Top 20 SP</option>
+        </select>
+
+        <button class="btn btn-primary btn-sm d-flex align-items-center gap-1"
+                @onclick="LoadAsync" disabled="@_loading">
+            @if (_loading)
+            { <span class="spinner-border spinner-border-sm"></span><span>Đang tải…</span> }
+            else
+            { <i class="bi bi-search"></i><span>Phân tích</span> }
+        </button>
+
+        @* Metric toggle *@
+        @if (_areaData.Count > 0)
+        {
+            <div class="ps-metric-toggle ms-auto">
+                <button class="@(_metric=="qty" ? "active" : "")"
+                        @onclick='() => SwitchMetricAsync("qty")'>
+                    <i class="bi bi-boxes me-1"></i>Số lượng
+                </button>
+                <button class="@(_metric=="amount" ? "active" : "")"
+                        @onclick='() => SwitchMetricAsync("amount")'>
+                    <i class="bi bi-currency-dollar me-1"></i>Doanh số
+                </button>
+            </div>
+        }
+    </div>
+
+    @if (!string.IsNullOrEmpty(_error))
+    {
+        <div class="alert alert-danger mt-2 mb-0 py-1 px-2" style="font-size:.82rem">
+            <i class="bi bi-exclamation-triangle me-1"></i>@_error
+        </div>
+    }
+</div>
+
+@* ══ CONTENT ══════════════════════════════════════════════ *@
+@if (_areaData.Count == 0 && !_loading)
+{
+    <div class="ps-empty">
+        <i class="bi bi-box-seam display-1 opacity-20 d-block mb-3"></i>
+        <p class="mb-1 fw-semibold">Chọn kỳ và nhấn <strong>Phân tích</strong></p>
+        <p class="text-muted" style="font-size:.85rem">
+            Biểu đồ sẽ hiển thị top sản phẩm bán chạy theo từng khu vực
+        </p>
+    </div>
+}
+else
+{
+    <div class="ps-content">
+
+        @* ── Panel trái: grouped bar chart ──────────────── *@
+        <div class="ps-card ps-card--area">
+            <div class="ps-card-header">
+                <div class="d-flex align-items-center gap-2">
+                    <i class="bi bi-bar-chart-line-fill text-primary"></i>
+                    <span class="fw-bold">Sản phẩm bán chạy theo khu vực</span>
+                    @if (_areaData.Count > 0)
+                    {
+                        <span class="badge bg-primary" style="font-size:.7rem">
+                            @TopProducts.Count SP · @TopAreasCount khu vực
+                        </span>
+                    }
+                </div>
+                <span class="ps-period-badge">@PeriodLabel</span>
+            </div>
+            <div class="ps-card-body">
+                @if (_loading)
+                {
+                    <div class="ps-chart-placeholder">
+                        <div class="spinner-border text-primary"></div>
+                        <div class="mt-2 text-muted">Đang tải dữ liệu…</div>
+                    </div>
+                }
+                else
+                {
+                    <div class="ps-chart-wrap">
+                        <canvas id="ps-area-chart"></canvas>
+                    </div>
+                }
+            </div>
+        </div>
+
+        @* ── Panel phải: trend + prediction ──────────────── *@
+        <div class="ps-card ps-card--trend">
+            <div class="ps-card-header">
+                <div class="d-flex align-items-center gap-2">
+                    <i class="bi bi-graph-up-arrow text-warning"></i>
+                    <span class="fw-bold">Xu hướng &amp; Dự đoán</span>
+                </div>
+                @if (TopProducts.Count > 0)
+                {
+                    <select class="form-select form-select-sm ps-select"
+                            style="width:auto;min-width:130px;max-width:220px"
+                            @bind="_selectedProduct"
+                            @bind:after="LoadTrendAsync">
+                        @{ var pnames = _productNamesCache; }
+                        @foreach (var cd in TopProducts)
+                        {
+                            var lbl = pnames.TryGetValue(cd, out var n) && n != cd
+                                ? $"{cd} – {n}" : cd;
+                            <option value="@cd">@lbl</option>
+                        }
+                    </select>
+                }
+            </div>
+            <div class="ps-card-body">
+                @if (_trendLoading)
+                {
+                    <div class="ps-chart-placeholder">
+                        <div class="spinner-border text-warning"></div>
+                        <div class="mt-2 text-muted">Đang tính xu hướng…</div>
+                    </div>
+                }
+                else if (_trendNeedsDraw && _trendPoints.Count > 0)
+                {
+                    <div class="ps-chart-wrap">
+                        <canvas id="ps-trend-chart"></canvas>
+                    </div>
+                }
+                else if (!string.IsNullOrEmpty(_selectedProduct))
+                {
+                    <div class="ps-chart-wrap">
+                        <canvas id="ps-trend-chart"></canvas>
+                    </div>
+                }
+                else
+                {
+                    <div class="ps-chart-placeholder text-muted">
+                        <i class="bi bi-arrow-left-circle me-1"></i>Chọn sản phẩm để xem xu hướng
+                    </div>
+                }
+
+                @* Prediction cards *@
+                @if (_predictions.Count > 0)
+                {
+                    <div class="ps-pred-cards">
+                        @foreach (var pred in _predictions)
+                        {
+                            <div class="ps-pred-card ps-pred-card--@pred.Signal">
+                                <div class="ps-pred-period">@pred.Label</div>
+                                <div class="ps-pred-val">
+                                    @(_metric == "amount"
+                                        ? FormatMoney(pred.Amount)
+                                        : pred.Qty.ToString("N0"))
+                                    <span class="ps-pred-unit">@(_metric == "amount" ? "đ" : "SP")</span>
+                                </div>
+                                <div class="ps-pred-signal">
+                                    <i class="bi @pred.SignalIcon me-1"></i>@pred.SignalText
+                                </div>
+                            </div>
+                        }
+                    </div>
+                }
+            </div>
+        </div>
+
+        @* ── Strategy table ──────────────────────────────── *@
+        @if (_strategyRowsCache.Count > 0)
+        {
+            <div class="ps-card ps-card--strategy">
+                <div class="ps-card-header">
+                    <div class="d-flex align-items-center gap-2">
+                        <i class="bi bi-lightbulb-fill text-warning"></i>
+                        <span class="fw-bold">Gợi ý chiến lược bán hàng</span>
+                    </div>
+                </div>
+                <div class="ps-strategy-wrap">
+                    <table class="ps-strategy-table">
+                        <thead>
+                            <tr>
+                                <th>Khu vực</th>
+                                <th>SP bán chạy nhất</th>
+                                <th class="text-end">Số lượng</th>
+                                <th class="text-end">Doanh số</th>
+                                <th>Xu hướng</th>
+                                <th>Gợi ý</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach (var row in _strategyRowsCache)
+                            {
+                                <tr>
+                                    <td><span class="ps-area-badge">@row.Area</span></td>
+                                    <td>
+                                        <span class="ps-prod-badge" title="@row.TopCD">
+                                            @row.TopName
+                                        </span>
+                                    </td>
+                                    <td class="text-end fw-semibold">@row.Qty.ToString("N0")</td>
+                                    <td class="text-end">@FormatMoney(row.Amount)</td>
+                                    <td>
+                                        <span class="ps-trend-badge ps-trend-badge--@row.TrendClass">
+                                            <i class="bi @row.TrendIcon me-1"></i>@row.TrendText
+                                        </span>
+                                    </td>
+                                    <td class="ps-suggest-cell">@row.Suggestion</td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        }
+
+    </div>
+}
+
+@code {
+    // ── State ─────────────────────────────────────────────
+    private int    _year        = DateTime.Today.Year;
+    private string _periodType  = "month";
+    private int    _periodValue = DateTime.Today.Month;
+    private string _groupBy     = "route";
+    private int    _topN        = 10;
+    private string _metric      = "qty";   // qty | amount
+
+    private bool   _loading;
+    private bool   _trendLoading;
+    private bool   _areaNeedsDraw;
+    private bool   _trendNeedsDraw;
+    private string _error = "";
+
+    private IReadOnlyList<ProductAreaItem>   _areaData   = [];
+    private IReadOnlyList<ProductTrendPoint> _trendPoints = [];
+    private string  _selectedProduct = "";
+    private List<PredictionItem> _predictions = [];
+
+    private sealed record PredictionItem(
+        string  Label,
+        long    Qty,
+        decimal Amount,
+        string  Signal,       // up | down | flat
+        string  SignalIcon,
+        string  SignalText);
+
+    // ── Computed ──────────────────────────────────────────
+    private List<string>               _topProductsCache = [];
+    private Dictionary<string, string> _productNamesCache = new();
+
+    private List<string> TopProducts => _topProductsCache;
+
+    private void RebuildProductCache()
+    {
+        _topProductsCache = _areaData.Select(d => d.InventoryCD).Distinct().ToList();
+        _productNamesCache = _areaData
+            .GroupBy(d => d.InventoryCD)
+            .ToDictionary(g => g.Key, g => g.First().InventoryName);
+        RebuildStrategyCache();
+    }
+
+    private int TopAreasCount => _strategyRowsCache.Count;
+
+    private string PeriodLabel => _periodType switch
+    {
+        "quarter" => $"Q{_periodValue}/{_year}",
+        "month"   => $"T{_periodValue}/{_year}",
+        _         => $"Năm {_year}"
+    };
+
+    private List<StrategyRow> _strategyRowsCache = [];
+
+    private sealed record StrategyRow(
+        string  Area, string TopCD, string TopName,
+        long    Qty, decimal Amount,
+        string  TrendClass, string TrendIcon, string TrendText,
+        string  Suggestion);
+
+    private void RebuildStrategyCache()
+    {
+        if (_areaData.Count == 0) { _strategyRowsCache = []; return; }
+        bool byAmount = _metric == "amount";
+
+        var areaRank = _areaData
+            .GroupBy(d => d.AreaLabel)
+            .OrderByDescending(g => g.Sum(d => byAmount ? (double)d.TotalAmount : d.TotalQty))
+            .Select((g, i) => (g.Key, i))
+            .ToDictionary(x => x.Key, x => x.i);
+        int total = areaRank.Count;
+
+        _strategyRowsCache = _areaData
+            .GroupBy(d => d.AreaLabel)
+            .Select(g =>
+            {
+                var top  = g.OrderByDescending(d => byAmount ? (double)d.TotalAmount : d.TotalQty).First();
+                var rank = areaRank.TryGetValue(g.Key, out var r) ? r : 0;
+                var name = top.InventoryName;
+                var (tc, ti, tt, sg) = rank switch
+                {
+                    0 or 1 => ("up",   "bi-arrow-up-circle-fill",   "Tăng trưởng",
+                               $"Đẩy mạnh {name}, duy trì chiến lược hiện tại"),
+                    _ when rank >= total - 2
+                          => ("down", "bi-arrow-down-circle-fill", "Cần chú ý",
+                               $"Xem xét khuyến mãi {name} tại khu vực này"),
+                    _     => ("flat", "bi-dash-circle-fill",       "Ổn định",
+                               $"Cơ hội mở rộng {name} sang khu vực lân cận")
+                };
+                return new StrategyRow(g.Key, top.InventoryCD, top.InventoryName,
+                    g.Sum(d => d.TotalQty), g.Sum(d => d.TotalAmount), tc, ti, tt, sg);
+            })
+            .OrderByDescending(r => byAmount ? (double)r.Amount : r.Qty)
+            .ToList();
+    }
+
+    // ── Lifecycle ─────────────────────────────────────────
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (_areaNeedsDraw && _areaData.Count > 0)
+        {
+            _areaNeedsDraw = false;
+            await RenderAreaChartAsync();
+            return;
+        }
+        if (_trendNeedsDraw && _trendPoints.Count > 0)
+        {
+            _trendNeedsDraw = false;
+            await RenderTrendChartAsync();
+        }
+    }
+
+    private void OnPeriodTypeChanged()
+    {
+        _periodValue = _periodType == "quarter" ? 1 : DateTime.Today.Month;
+    }
+
+    // ── Load area data ─────────────────────────────────────
+    private async Task LoadAsync()
+    {
+        _loading       = true;
+        _error         = "";
+        _areaData      = [];
+        _trendPoints   = [];
+        _predictions   = [];
+        _areaNeedsDraw = false;
+        _trendNeedsDraw= false;
+        try { await JS.InvokeVoidAsync("productChartInterop.destroyAll"); } catch { }
+        StateHasChanged();
+
+        try
+        {
+            int? q = _periodType == "quarter" ? _periodValue : null;
+            int? m = _periodType == "month"   ? _periodValue : null;
+
+            _areaData = await Repo.GetProductSalesByAreaAsync(_year, q, m, _groupBy, _topN);
+
+            if (_areaData.Count == 0)
+            {
+                _error = "Không có dữ liệu cho kỳ đã chọn.";
+                return;
+            }
+
+            // Build cache + auto-select first product
+            RebuildProductCache();
+            _selectedProduct = _topProductsCache.FirstOrDefault() ?? "";
+            _areaNeedsDraw   = true;
+        }
+        catch (Exception ex) { _error = ex.Message; }
+        finally
+        {
+            _loading = false;
+            StateHasChanged();
+
+            // Load trend for first product
+            if (!string.IsNullOrEmpty(_selectedProduct))
+                await LoadTrendAsync();
+        }
+    }
+
+    // ── Render area chart ──────────────────────────────────
+    private async Task RenderAreaChartAsync()
+    {
+        try
+        {
+            var json = JsonSerializer.Serialize(_areaData,
+                new JsonSerializerOptions { PropertyNamingPolicy = JsonNamingPolicy.CamelCase });
+            await JS.InvokeVoidAsync("productChartInterop.renderAreaChart",
+                "ps-area-chart", json, _metric);
+        }
+        catch { /* ignore */ }
+    }
+
+    // ── Switch metric (qty ↔ amount) ───────────────────────
+    private async Task SwitchMetricAsync(string metric)
+    {
+        _metric = metric;
+        if (_areaData.Count > 0)
+        {
+            RebuildStrategyCache();
+            _areaNeedsDraw  = true;
+            _trendNeedsDraw = _trendPoints.Count > 0;
+        }
+        StateHasChanged();
+    }
+
+    // ── Load trend + compute prediction ───────────────────
+    private async Task LoadTrendAsync()
+    {
+        if (string.IsNullOrEmpty(_selectedProduct)) return;
+
+        _trendLoading   = true;
+        _trendNeedsDraw = false;
+        _predictions    = [];
+        StateHasChanged();
+
+        try
+        {
+            _trendPoints = await Repo.GetProductTrendAsync(
+                [_selectedProduct], historyMonths: 13);
+
+            if (_trendPoints.Count > 0)
+            {
+                _predictions    = ComputePredictions(_trendPoints);
+                _trendNeedsDraw = true;
+            }
+        }
+        catch (Exception ex) { _error = ex.Message; }
+        finally
+        {
+            _trendLoading = false;
+            StateHasChanged();
+        }
+    }
+
+    // ── Render trend chart ─────────────────────────────────
+    private async Task RenderTrendChartAsync()
+    {
+        if (_trendPoints.Count == 0) return;
+        try
+        {
+            var actual = _trendPoints.Select(p => new
+            {
+                label  = $"T{p.Month}/{p.Year}",
+                qty    = p.TotalQty,
+                amount = p.TotalAmount
+            }).ToList();
+
+            var predicted = _predictions.Select(p => new
+            {
+                label  = p.Label,
+                qty    = p.Qty,
+                amount = p.Amount
+            }).ToList();
+
+            var invName = _trendPoints.FirstOrDefault()?.InventoryName ?? _selectedProduct;
+            var payload = new { inventoryCD = _selectedProduct, inventoryName = invName, actual, predicted };
+            var json = JsonSerializer.Serialize(payload,
+                new JsonSerializerOptions { PropertyNamingPolicy = JsonNamingPolicy.CamelCase });
+
+            await JS.InvokeVoidAsync("productChartInterop.renderTrendChart",
+                "ps-trend-chart", json, _metric);
+        }
+        catch { /* ignore */ }
+    }
+
+    // ── Linear-regression prediction (3 tháng tới) ────────
+    private List<PredictionItem> ComputePredictions(IReadOnlyList<ProductTrendPoint> points)
+    {
+        var sorted = points.OrderBy(p => p.Year).ThenBy(p => p.Month).ToList();
+        var qtyVals    = sorted.Select(p => (double)p.TotalQty).ToList();
+        var amountVals = sorted.Select(p => (double)p.TotalAmount).ToList();
+
+        var (slopeQ, interceptQ) = LinearRegression(qtyVals);
+        var (slopeA, interceptA) = LinearRegression(amountVals);
+
+        int n         = sorted.Count;
+        var lastYear  = sorted[^1].Year;
+        var lastMonth = sorted[^1].Month;
+
+        var result = new List<PredictionItem>();
+        for (int step = 1; step <= 3; step++)
+        {
+            var m = lastMonth + step;
+            var y = lastYear + (m - 1) / 12;
+            m = ((m - 1) % 12) + 1;
+
+            var predQty    = Math.Max(0, interceptQ + slopeQ * (n - 1 + step));
+            var predAmount = Math.Max(0, interceptA + slopeA * (n - 1 + step));
+
+            // So sánh với điểm cuối thực tế
+            double refQ = qtyVals[^1];
+            double refA = amountVals[^1];
+            var signal = predQty > refQ * 1.05 ? "up"
+                       : predQty < refQ * 0.95 ? "down"
+                       : "flat";
+            var (icon, txt) = signal switch
+            {
+                "up"   => ("bi-arrow-up-right-circle-fill", "Tăng"),
+                "down" => ("bi-arrow-down-right-circle-fill","Giảm"),
+                _      => ("bi-dash-circle-fill",            "Ổn định")
+            };
+
+            result.Add(new PredictionItem(
+                $"T{m}/{y}", (long)predQty, (decimal)predAmount,
+                signal, icon, txt));
+        }
+        return result;
+    }
+
+    private static (double slope, double intercept) LinearRegression(IList<double> y)
+    {
+        int n = y.Count;
+        if (n < 2) return (0, y.Count > 0 ? y[0] : 0);
+
+        double sumX  = 0, sumY  = 0, sumXY = 0, sumX2 = 0;
+        for (int i = 0; i < n; i++)
+        {
+            sumX  += i;
+            sumY  += y[i];
+            sumXY += i * y[i];
+            sumX2 += (double)i * i;
+        }
+        double denom    = n * sumX2 - sumX * sumX;
+        double slope    = denom == 0 ? 0 : (n * sumXY - sumX * sumY) / denom;
+        double intercept= (sumY - slope * sumX) / n;
+        return (slope, intercept);
+    }
+
+    private static string FormatMoney(decimal v) =>
+        v.ToString("N0", System.Globalization.CultureInfo.GetCultureInfo("vi-VN"));
+
+    public async ValueTask DisposeAsync()
+    {
+        try { await JS.InvokeVoidAsync("productChartInterop.destroyAll"); } catch { }
+    }
+}

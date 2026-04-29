@@ -68,6 +68,20 @@ public interface IDataRepository
     /// <summary>Danh sách UserName thuộc một nhóm cụ thể (để fly-to trên map).</summary>
     Task<IReadOnlyList<string>> GetSmsByGroupAsync(
         DateTime date, string groupBy, string groupLabel, CancellationToken ct = default);
+
+    /// <summary>
+    /// Top N sản phẩm × khu vực — dùng cho biểu đồ phân tích sản phẩm.
+    /// groupBy: "route" | "province" | "sm"
+    /// </summary>
+    Task<IReadOnlyList<ProductAreaItem>> GetProductSalesByAreaAsync(
+        int year, int? quarter, int? month,
+        string groupBy = "route", int topN = 10,
+        CancellationToken ct = default);
+
+    /// <summary>Dữ liệu xu hướng theo tháng cho các sản phẩm đã chọn (để dự đoán).</summary>
+    Task<IReadOnlyList<ProductTrendPoint>> GetProductTrendAsync(
+        IReadOnlyList<string> products, int historyMonths = 12,
+        CancellationToken ct = default);
 }
 
 public sealed record SalesAreaItem(
@@ -75,6 +89,22 @@ public sealed record SalesAreaItem(
     decimal TotalAmount,  // Tổng doanh số
     int     OrderCount,   // Số đơn hàng
     int     SmCount);     // Số SM
+
+public sealed record ProductAreaItem(
+    string  InventoryCD,    // Mã sản phẩm
+    string  InventoryName,  // Tên sản phẩm
+    string  AreaLabel,      // Tên khu vực / tuyến / tỉnh
+    long    TotalQty,       // Tổng số lượng bán
+    decimal TotalAmount,    // Tổng doanh số (qty × đơn giá)
+    int     OrderCount);    // Số đơn hàng
+
+public sealed record ProductTrendPoint(
+    string  InventoryCD,
+    string  InventoryName,
+    int     Year,
+    int     Month,
+    long    TotalQty,
+    decimal TotalAmount);
 
 public sealed record SalesmanLocation(
     string   UserName,

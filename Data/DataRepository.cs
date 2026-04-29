@@ -783,6 +783,169 @@ public sealed class DataRepository : IDataRepository
         return result;
     }
 
+    // ══════════════════════════════════════════════════════════════
+    // GetProductSalesByAreaAsync
+    //   Top N sản phẩm (theo qty) × khu vực trong kỳ chọn
+    // ══════════════════════════════════════════════════════════════
+    public async Task<IReadOnlyList<ProductAreaItem>> GetProductSalesByAreaAsync(
+        int year, int? quarter, int? month,
+        string groupBy = "route", int topN = 10,
+        CancellationToken ct = default)
+    {
+        var areaCol = groupBy switch
+        {
+            "sm"       => "h.UserName",
+            "province" => "ISNULL(p.ProvinceCode,'(Khác)')",
+            _          => "ISNULL(h.RouteCode,'(Khác)')"
+        };
+
+        // Tính ngày đầu / cuối kỳ ở C# → tránh hàm YEAR()/MONTH() không dùng index
+        var (dateFrom, dateTo) = BuildDateRange(year, quarter, month);
+
+        var sql = $"""
+            ;WITH TopProds AS (
+                SELECT TOP (@TopN) d.InventoryCD
+                FROM DMSAimOrderDetail  d WITH (NOLOCK)
+                INNER JOIN DMSAimOrderHeader h WITH (NOLOCK)
+                       ON  d.UserName       = h.UserName
+                       AND d.OrderCode      = h.OrderCode
+                       AND d.DistributorCode= h.DistributorCD
+                WHERE h.OrderDate >= @DateFrom AND h.OrderDate < @DateTo
+                GROUP BY d.InventoryCD
+                ORDER BY SUM(d.OrderQty) DESC
+            )
+            SELECT
+                d.InventoryCD,
+                MAX(ISNULL(inv.InventoryName, d.InventoryCD)) AS InventoryName,
+                {areaCol}                                                  AS AreaLabel,
+                SUM(d.OrderQty)                                            AS TotalQty,
+                SUM(CAST(d.OrderQty AS DECIMAL(18,4)) * d.UnitPrice)      AS TotalAmount,
+                COUNT(DISTINCT h.OrderCode)                                AS OrderCount
+            FROM DMSAimOrderDetail  d WITH (NOLOCK)
+            INNER JOIN DMSAimOrderHeader h WITH (NOLOCK)
+                   ON  d.UserName       = h.UserName
+                   AND d.OrderCode      = h.OrderCode
+                   AND d.DistributorCode= h.DistributorCD
+            INNER JOIN TopProds tp ON d.InventoryCD = tp.InventoryCD
+            LEFT  JOIN DMSAimInventoryItem inv WITH (NOLOCK)
+                   ON  inv.InventoryCD  = d.InventoryCD
+            LEFT  JOIN DMSAimCustomer c WITH (NOLOCK)
+                   ON  c.UserName   = h.UserName
+                   AND c.CustomerCD = h.CustomerCD
+            LEFT  JOIN (SELECT DISTINCT ProvinceID, Descr ProvinceCode
+                        FROM DMSAimProvince WITH (NOLOCK)) p
+                   ON  p.ProvinceID = c.ProvinceID
+            WHERE h.OrderDate >= @DateFrom AND h.OrderDate < @DateTo
+            GROUP BY d.InventoryCD, {areaCol}
+            ORDER BY TotalQty DESC
+            """;
+
+        await using var conn = new SqlConnection(_cs);
+        await conn.OpenAsync(ct);
+
+        using var cmd = conn.CreateCommand();
+        cmd.CommandText    = sql;
+        cmd.CommandTimeout = 60;
+        cmd.Parameters.AddWithValue("@DateFrom", dateFrom);
+        cmd.Parameters.AddWithValue("@DateTo",  dateTo);
+        cmd.Parameters.AddWithValue("@TopN",    topN);
+
+        var result = new List<ProductAreaItem>();
+        await using var r = await cmd.ExecuteReaderAsync(ct);
+        while (await r.ReadAsync(ct))
+            result.Add(new ProductAreaItem(
+                InventoryCD  : r["InventoryCD"].ToString()!,
+                InventoryName: r["InventoryName"]?.ToString() ?? r["InventoryCD"].ToString()!,
+                AreaLabel    : r["AreaLabel"]?.ToString() ?? "(Khác)",
+                TotalQty     : Convert.ToInt64(r["TotalQty"]),
+                TotalAmount  : Convert.ToDecimal(r["TotalAmount"]),
+                OrderCount   : Convert.ToInt32(r["OrderCount"])));
+
+        return result;
+    }
+
+    // ══════════════════════════════════════════════════════════════
+    // GetProductTrendAsync
+    //   Dữ liệu theo tháng của các sản phẩm chọn (để vẽ xu hướng)
+    // ══════════════════════════════════════════════════════════════
+    public async Task<IReadOnlyList<ProductTrendPoint>> GetProductTrendAsync(
+        IReadOnlyList<string> products, int historyMonths = 12,
+        CancellationToken ct = default)
+    {
+        if (products.Count == 0) return [];
+
+        // Build IN clause động
+        var paramNames = products.Select((_, i) => $"@p{i}").ToList();
+        var inClause   = string.Join(",", paramNames);
+
+        var trendFrom = DateTime.Today.AddMonths(-historyMonths);
+
+        var sql = $"""
+            SELECT
+                d.InventoryCD,
+                MAX(ISNULL(inv.InventoryName, d.InventoryCD))         AS InventoryName,
+                YEAR(h.OrderDate)                                      AS Yr,
+                MONTH(h.OrderDate)                                     AS Mo,
+                SUM(d.OrderQty)                                        AS TotalQty,
+                SUM(CAST(d.OrderQty AS DECIMAL(18,4)) * d.UnitPrice)  AS TotalAmount
+            FROM DMSAimOrderDetail  d WITH (NOLOCK)
+            INNER JOIN DMSAimOrderHeader h WITH (NOLOCK)
+                   ON  d.UserName       = h.UserName
+                   AND d.OrderCode      = h.OrderCode
+                   AND d.DistributorCode= h.DistributorCD
+            LEFT  JOIN DMSAimInventoryItem inv WITH (NOLOCK)
+                   ON  inv.InventoryCD  = d.InventoryCD
+            WHERE d.InventoryCD IN ({inClause})
+              AND h.OrderDate >= @TrendFrom
+            GROUP BY d.InventoryCD, YEAR(h.OrderDate), MONTH(h.OrderDate)
+            ORDER BY d.InventoryCD, Yr, Mo
+            """;
+
+        await using var conn = new SqlConnection(_cs);
+        await conn.OpenAsync(ct);
+
+        using var cmd = conn.CreateCommand();
+        cmd.CommandText    = sql;
+        cmd.CommandTimeout = 30;
+        cmd.Parameters.AddWithValue("@TrendFrom", trendFrom.Date);
+        for (int i = 0; i < products.Count; i++)
+            cmd.Parameters.AddWithValue($"@p{i}", products[i]);
+
+        var result = new List<ProductTrendPoint>();
+        await using var r = await cmd.ExecuteReaderAsync(ct);
+        while (await r.ReadAsync(ct))
+            result.Add(new ProductTrendPoint(
+                InventoryCD  : r["InventoryCD"].ToString()!,
+                InventoryName: r["InventoryName"]?.ToString() ?? r["InventoryCD"].ToString()!,
+                Year         : Convert.ToInt32(r["Yr"]),
+                Month        : Convert.ToInt32(r["Mo"]),
+                TotalQty     : Convert.ToInt64(r["TotalQty"]),
+                TotalAmount  : Convert.ToDecimal(r["TotalAmount"])));
+
+        return result;
+    }
+
+    /// <summary>
+    /// Tính ngày bắt đầu / ngày kết thúc (exclusive) của kỳ báo cáo.
+    /// Dùng range thay vì YEAR()/MONTH() để tận dụng index trên OrderDate.
+    /// </summary>
+    private static (DateTime From, DateTime To) BuildDateRange(int year, int? quarter, int? month)
+    {
+        if (month.HasValue)
+        {
+            var from = new DateTime(year, month.Value, 1);
+            return (from, from.AddMonths(1));
+        }
+        if (quarter.HasValue)
+        {
+            int startMonth = (quarter.Value - 1) * 3 + 1;
+            var from = new DateTime(year, startMonth, 1);
+            return (from, from.AddMonths(3));
+        }
+        // Cả năm
+        return (new DateTime(year, 1, 1), new DateTime(year + 1, 1, 1));
+    }
+
     private static double HaversineKm(double lat1, double lon1, double lat2, double lon2)
     {
         const double R = 6371;
