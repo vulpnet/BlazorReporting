@@ -49,10 +49,51 @@ public interface IDataRepository
     /// <summary>Toàn bộ lộ trình di chuyển của một salesman trong ngày, theo thứ tự thời gian.</summary>
     Task<IReadOnlyList<SalesmanLocation>> GetSalesmanRouteAsync(
         string userName, DateTime date, CancellationToken ct = default);
+
+    /// <summary>
+    /// Lộ trình GPS + kết hợp đơn hàng bán tại tọa độ gần nhất (≤ 200m).
+    /// Các điểm trùng tọa độ KH sẽ được gán thêm thông tin KH + doanh số.
+    /// </summary>
+    Task<IReadOnlyList<SalesmanRoutePoint>> GetSalesmanRouteWithSalesAsync(
+        string userName, DateTime date, CancellationToken ct = default);
+
+    /// <summary>Tổng doanh số bán theo từng SM trong ngày.</summary>
+    Task<IReadOnlyDictionary<string, decimal>> GetDailySalesBySmAsync(
+        DateTime date, CancellationToken ct = default);
+
+    /// <summary>Doanh số theo khu vực (tuyến, thành phố...) trong ngày.</summary>
+    Task<IReadOnlyList<SalesAreaItem>> GetSalesByAreaAsync(
+        DateTime date, string groupBy = "route", CancellationToken ct = default);
+
+    /// <summary>Danh sách UserName thuộc một nhóm cụ thể (để fly-to trên map).</summary>
+    Task<IReadOnlyList<string>> GetSmsByGroupAsync(
+        DateTime date, string groupBy, string groupLabel, CancellationToken ct = default);
 }
+
+public sealed record SalesAreaItem(
+    string  Label,        // Tên khu vực / tuyến
+    decimal TotalAmount,  // Tổng doanh số
+    int     OrderCount,   // Số đơn hàng
+    int     SmCount);     // Số SM
 
 public sealed record SalesmanLocation(
     string   UserName,
     DateTime Checktime,
     double   Lattitude,
     double   Longtitude);
+
+/// <summary>Đơn hàng tại một điểm khách hàng.</summary>
+public sealed record CustomerVisit(
+    string   CustomerCD,
+    string   LocationName,
+    string   RouteCode,
+    decimal  OrderAmount,
+    DateTime OrderDate);
+
+/// <summary>Điểm GPS trên lộ trình, có thể kèm thông tin KH nếu tọa độ trùng nhau.</summary>
+public sealed record SalesmanRoutePoint(
+    string        UserName,
+    DateTime      Checktime,
+    double        Lattitude,
+    double        Longtitude,
+    CustomerVisit? Visit = null);

@@ -47,6 +47,14 @@
                     Địa chỉ @_geocodedCount/@_locations.Count
                 </span>
             }
+
+            @* ── Nút chart doanh số ── *@
+            <button class="btn btn-sm @(_showChart ? "btn-primary" : "btn-outline-primary") d-flex align-items-center gap-1"
+                    @onclick="ToggleChartAsync" title="Biểu đồ doanh số theo khu vực">
+                <i class="bi bi-bar-chart-fill"></i>
+                <span class="d-none d-sm-inline">Doanh số</span>
+            </button>
+
             <div class="input-group input-group-sm ms-auto" style="width:210px">
                 <span class="input-group-text bg-white"><i class="bi bi-search"></i></span>
                 <input class="form-control" placeholder="Tìm username / địa chỉ…"
@@ -109,16 +117,27 @@
                 <div class="map-route-stats">
                     <div class="map-route-stat">
                         <i class="bi bi-geo-fill text-success"></i>
-                        <span>@_routeInfo.Stops điểm</span>
+                        <span>@_routeInfo.Stops điểm GPS</span>
+                    </div>
+                    <div class="map-route-stat">
+                        <i class="bi bi-shop text-warning"></i>
+                        <span>@_routeInfo.CustomerStops KH</span>
                     </div>
                     <div class="map-route-stat">
                         <i class="bi bi-clock text-primary"></i>
                         <span>@_routeInfo.TimeRange</span>
                     </div>
                     <div class="map-route-stat">
-                        <i class="bi bi-signpost-2 text-warning"></i>
+                        <i class="bi bi-signpost-2 text-secondary"></i>
                         <span>~@_routeInfo.Km km</span>
                     </div>
+                    @if (_routeInfo.TotalSales > 0)
+                    {
+                        <div class="map-route-stat map-route-stat--sales">
+                            <i class="bi bi-currency-dollar"></i>
+                            <span>@FormatMoney(_routeInfo.TotalSales)</span>
+                        </div>
+                    }
                 </div>
             </div>
         }
@@ -129,6 +148,90 @@
                 <div class="spinner-border text-white"></div>
                 <div class="mt-2 text-white fw-semibold" style="font-size:.85rem">
                     Đang tải lộ trình…
+                </div>
+            </div>
+        }
+
+        @* ── Chart panel trượt lên từ dưới ── *@
+        @if (_showChart)
+        {
+            <div class="map-chart-panel">
+
+                @* Header *@
+                <div class="map-chart-header">
+                    @* Trái: tiêu đề + tổng *@
+                    <div class="d-flex align-items-center gap-2 flex-wrap">
+                        <i class="bi bi-bar-chart-fill text-primary"></i>
+                        <span class="fw-bold" style="font-size:.88rem">
+                            Doanh số @_date.ToString("dd/MM/yyyy")
+                        </span>
+                        @if (_chartTotal > 0)
+                        {
+                            <span class="badge bg-success" style="font-size:.7rem">
+                                Tổng: @FormatMoney(_chartTotal)
+                            </span>
+                            <span class="badge bg-secondary" style="font-size:.7rem">
+                                @_chartData.Count mục
+                            </span>
+                        }
+                    </div>
+
+                    @* Phải: controls *@
+                    <div class="d-flex align-items-center gap-2 flex-wrap">
+
+                        @* Loại nhóm *@
+                        <select class="form-select form-select-sm chart-ctrl-select"
+                                @bind="_chartGroupBy" @bind:after="RefreshChartAsync">
+                            <option value="route">🗺 Tuyến</option>
+                            <option value="sm">👤 Salesman</option>
+                            <option value="province">🏙 Tỉnh/TP</option>
+                            <option value="channel">📦 Kênh</option>
+                        </select>
+
+                        @* Loại biểu đồ *@
+                        <div class="chart-type-group">
+                            @foreach (var (typ, ico, lbl) in ChartTypes)
+                            {
+                                var t = typ;
+                                <button class="chart-type-btn @(_chartType == t ? "active" : "")"
+                                        title="@lbl" @onclick="() => SwitchChartType(t)">
+                                    <i class="bi @ico"></i>
+                                </button>
+                            }
+                        </div>
+
+                        @if (_chartLoading)
+                        {
+                            <span class="spinner-border spinner-border-sm text-primary"></span>
+                        }
+                        <button class="btn btn-sm btn-outline-secondary p-1"
+                                @onclick="() => _showChart = false" title="Đóng">
+                            <i class="bi bi-x-lg"></i>
+                        </button>
+                    </div>
+                </div>
+
+                @* Body *@
+                <div class="map-chart-body">
+                    @if (_chartLoading)
+                    {
+                        <div class="d-flex align-items-center justify-content-center h-100 text-muted">
+                            <div class="spinner-border me-2"></div>Đang tải…
+                        </div>
+                    }
+                    else if (_chartData.Count == 0)
+                    {
+                        <div class="d-flex align-items-center justify-content-center h-100 text-muted">
+                            <i class="bi bi-inbox me-2"></i>Không có dữ liệu
+                        </div>
+                    }
+                    else
+                    {
+                        @* Scroll wrapper cho bar ngang nhiều item *@
+                        <div class="chart-scroll-wrap">
+                            <canvas id="sales-chart"></canvas>
+                        </div>
+                    }
                 </div>
             </div>
         }
@@ -190,6 +293,12 @@
                             {
                                 <div class="map-sidebar-addr map-sidebar-addr--loading">Đang lấy địa chỉ…</div>
                             }
+                            @if (_sales.TryGetValue(loc.UserName, out var sale) && sale > 0)
+                            {
+                                <div class="map-sidebar-sales">
+                                    <i class="bi bi-graph-up-arrow me-1"></i>@FormatMoney(sale)
+                                </div>
+                            }
                         </div>
                         <i class="bi bi-chevron-right text-muted" style="font-size:.65rem;flex-shrink:0"></i>
                     </div>
@@ -209,10 +318,11 @@
     private int      _geocodedCount;
     private string   _error  = "";
     private string   _search = "";
-    private IReadOnlyList<SalesmanLocation>   _locations = [];
-    private Dictionary<string, string>        _addresses = new(StringComparer.OrdinalIgnoreCase);
-    private DotNetObjectReference<Map>?       _dotNetRef;
-    private bool                              _autoLoad;   // true khi có ?date= trên URL
+    private IReadOnlyList<SalesmanLocation>        _locations = [];
+    private Dictionary<string, string>             _addresses = new(StringComparer.OrdinalIgnoreCase);
+    private Dictionary<string, decimal>            _sales     = new(StringComparer.OrdinalIgnoreCase);
+    private DotNetObjectReference<Map>?            _dotNetRef;
+    private bool                                   _autoLoad;
 
     // Route state
     private RouteInfo? _routeInfo;
@@ -220,7 +330,26 @@
     private string?    _routeLoadingUser;
     private int        _routeColorIdx;
 
-    private sealed record RouteInfo(string UserName, int Stops, string TimeRange, double Km);
+    private sealed record RouteInfo(string UserName, int Stops, string TimeRange, double Km, int CustomerStops, decimal TotalSales);
+
+    // Chart state
+    private bool   _showChart       = false;
+    private bool   _chartLoading    = false;
+    private bool   _chartNeedsDraw  = false;
+    private string _chartGroupBy    = "route";
+    private string _chartType       = "bar-h";   // bar-h | bar-v | pie | doughnut
+    private decimal _chartTotal     = 0;
+    private IReadOnlyList<SalesAreaItem> _chartData = [];
+
+    // Loại chart + icon + label (bỏ bar-h)
+    private static readonly (string Type, string Icon, string Label)[] ChartTypes =
+    [
+        ("bar-v",    "bi-bar-chart-fill",  "Cột dọc"),
+        ("pie",      "bi-pie-chart-fill",  "Biểu đồ tròn"),
+        ("doughnut", "bi-circle-half",     "Donut"),
+    ];
+
+    private string ChartScrollHeight => "100%";
 
     private static readonly string[] Colors = [
         "#2563eb","#dc2626","#16a34a","#d97706","#7c3aed",
@@ -260,12 +389,36 @@
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
+        // ── Vẽ chart sau khi canvas đã có trong DOM ───────
+        if (_chartNeedsDraw && _chartData.Count > 0)
+        {
+            _chartNeedsDraw = false;
+            try
+            {
+                var json  = System.Text.Json.JsonSerializer.Serialize(_chartData,
+                    new System.Text.Json.JsonSerializerOptions
+                    { PropertyNamingPolicy = System.Text.Json.JsonNamingPolicy.CamelCase });
+                var title = _chartGroupBy switch
+                {
+                    "sm"       => "Doanh số theo Salesman",
+                    "province" => "Doanh số theo Tỉnh/Thành phố",
+                    "channel"  => "Doanh số theo Kênh",
+                    _          => "Doanh số theo Tuyến"
+                };
+                await JS.InvokeVoidAsync("chartInterop.render",
+                    "sales-chart", json, title, _chartType);
+            }
+            catch { /* ignore */ }
+            return;
+        }
+
         if (!firstRender) return;
         try
         {
             await Task.Delay(60);
             await JS.InvokeVoidAsync("mapInterop.init", "leaflet-map", 16.0, 106.0, 6);
             await JS.InvokeVoidAsync("mapInterop.setDotNetRef", _dotNetRef);
+            await JS.InvokeVoidAsync("chartInterop.setDotNetRef", _dotNetRef);
             _mapReady = true;
             StateHasChanged();
 
@@ -283,7 +436,7 @@
         }
     }
 
-    // ── Load markers ─────────────────────────────────────
+    // ── Load markers + doanh số ──────────────────────────
     private async Task LoadAsync()
     {
         _loading          = true;
@@ -291,12 +444,20 @@
         _geocodingStarted = false;
         _geocodedCount    = 0;
         _addresses.Clear();
+        _sales.Clear();
         _routeInfo        = null;
         StateHasChanged();
 
         try
         {
-            _locations = await Repo.GetSalesmanLocationsAsync(_date);
+            // Load song song: vị trí SM + doanh số ngày
+            var locTask   = Repo.GetSalesmanLocationsAsync(_date);
+            var salesTask = Repo.GetDailySalesBySmAsync(_date);
+            await Task.WhenAll(locTask, salesTask);
+
+            _locations = locTask.Result;
+            _sales     = new Dictionary<string, decimal>(
+                             salesTask.Result, StringComparer.OrdinalIgnoreCase);
 
             if (_locations.Count == 0)
             {
@@ -305,12 +466,17 @@
             }
             else
             {
-                var payload = _locations.Select(l => new
+                var payload = _locations.Select(l =>
                 {
-                    userName  = l.UserName,
-                    checktime = l.Checktime.ToString("dd/MM/yyyy HH:mm:ss"),
-                    lat       = l.Lattitude,
-                    lng       = l.Longtitude
+                    _sales.TryGetValue(l.UserName, out var sale);
+                    return new
+                    {
+                        userName  = l.UserName,
+                        checktime = l.Checktime.ToString("dd/MM/yyyy HH:mm:ss"),
+                        lat       = l.Lattitude,
+                        lng       = l.Longtitude,
+                        totalSales = sale
+                    };
                 });
                 var json = JsonSerializer.Serialize(payload,
                     new JsonSerializerOptions { PropertyNamingPolicy = null });
@@ -370,36 +536,50 @@
 
         try
         {
-            var route = await Repo.GetSalesmanRouteAsync(loc.UserName, _date);
+            // Dùng route có kèm thông tin KH
+            var route = await Repo.GetSalesmanRouteWithSalesAsync(loc.UserName, _date);
             if (route.Count == 0)
             {
                 _error = $"Không có dữ liệu lộ trình cho {loc.UserName}";
                 return;
             }
 
+            // Serialize kèm visit data
             var pts = route.Select(r => new
             {
                 userName  = r.UserName,
                 checktime = r.Checktime.ToString("HH:mm:ss"),
                 lat       = r.Lattitude,
-                lng       = r.Longtitude
+                lng       = r.Longtitude,
+                visit     = r.Visit == null ? null : new
+                {
+                    customerCD   = r.Visit.CustomerCD,
+                    locationName = r.Visit.LocationName,
+                    routeCode    = r.Visit.RouteCode,
+                    orderAmount  = r.Visit.OrderAmount,
+                    orderDate    = r.Visit.OrderDate.ToString("HH:mm:ss")
+                }
             });
             var json = JsonSerializer.Serialize(pts,
                 new JsonSerializerOptions { PropertyNamingPolicy = null });
 
             await JS.InvokeVoidAsync("mapInterop.drawRoute", json);
 
-            // Tính tổng km (Haversine C#)
+            // Tính km + đếm điểm KH
             var km = 0.0;
             for (int i = 1; i < route.Count; i++)
                 km += Haversine(route[i-1].Lattitude, route[i-1].Longtitude,
                                 route[i].Lattitude,   route[i].Longtitude);
 
-            var timeRange = route.Count >= 2
+            var custStops  = route.Count(r => r.Visit != null);
+            var totalSales = route.Where(r => r.Visit != null)
+                                  .Sum(r => r.Visit!.OrderAmount);
+            var timeRange  = route.Count >= 2
                 ? $"{route[0].Checktime:HH:mm} → {route[^1].Checktime:HH:mm}"
                 : route[0].Checktime.ToString("HH:mm");
 
-            _routeInfo = new RouteInfo(loc.UserName, route.Count, timeRange, Math.Round(km, 1));
+            _routeInfo = new RouteInfo(loc.UserName, route.Count, timeRange,
+                                       Math.Round(km, 1), custStops, totalSales);
         }
         catch (Exception ex) { _error = ex.Message; }
         finally
@@ -426,6 +606,82 @@
     }
 
     // ── Haversine (C#) ────────────────────────────────────
+    // ── Click chart → fly map đến vị trí ────────────────
+    [JSInvokable]
+    public async Task FlyToChartItemAsync(string label)
+    {
+        try
+        {
+            List<double[]> points;
+
+            if (_chartGroupBy == "sm")
+            {
+                // SM: fly thẳng đến vị trí cuối của SM đó
+                var loc = _locations.FirstOrDefault(l =>
+                    l.UserName.Equals(label, StringComparison.OrdinalIgnoreCase));
+                if (loc == null) return;
+                points = [[loc.Lattitude, loc.Longtitude]];
+            }
+            else
+            {
+                // Tuyến / Tỉnh / Kênh: lấy danh sách SM thuộc nhóm → lấy toạ độ
+                var smList = await Repo.GetSmsByGroupAsync(_date, _chartGroupBy, label);
+                points = _locations
+                    .Where(l => smList.Contains(l.UserName,
+                                StringComparer.OrdinalIgnoreCase))
+                    .Select(l => new double[] { l.Lattitude, l.Longtitude })
+                    .ToList();
+            }
+
+            if (points.Count == 0) return;
+
+            var json = System.Text.Json.JsonSerializer.Serialize(points);
+            await JS.InvokeVoidAsync("mapInterop.fitBoundsToPoints", json);
+        }
+        catch { /* ignore lỗi khi map chưa sẵn sàng */ }
+    }
+
+    // ── Chart doanh số ───────────────────────────────────
+    private async Task SwitchChartType(string type)
+    {
+        _chartType = type;
+        if (_chartData.Count > 0)
+        {
+            _chartNeedsDraw = true;
+            StateHasChanged();
+        }
+    }
+
+    private async Task ToggleChartAsync()
+    {
+        _showChart = !_showChart;
+        if (_showChart && _chartData.Count == 0)
+            await RefreshChartAsync();
+    }
+
+    private async Task RefreshChartAsync()
+    {
+        _chartLoading   = true;
+        _chartNeedsDraw = false;
+        StateHasChanged();
+        try
+        {
+            _chartData  = await Repo.GetSalesByAreaAsync(_date, _chartGroupBy);
+            _chartTotal = _chartData.Sum(d => d.TotalAmount);
+        }
+        catch (Exception ex) { _error = ex.Message; _chartData = []; }
+        finally
+        {
+            _chartLoading = false;
+            // Đặt cờ TRƯỚC StateHasChanged để OnAfterRenderAsync bắt được sau khi canvas render
+            if (_chartData.Count > 0) _chartNeedsDraw = true;
+            StateHasChanged();
+        }
+    }
+
+    private static string FormatMoney(decimal amount) =>
+        amount.ToString("N0", System.Globalization.CultureInfo.GetCultureInfo("vi-VN"));
+
     private static string AvatarText(string name)
     {
         if (string.IsNullOrWhiteSpace(name)) return "??";

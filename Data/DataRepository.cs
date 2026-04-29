@@ -552,6 +552,247 @@ public sealed class DataRepository : IDataRepository
 
         return results;
     }
+
+    // ══════════════════════════════════════════════════════════════
+    // GetSalesmanRouteWithSalesAsync
+    //   GPS route + kết hợp đơn hàng KH (match tọa độ ≤ 200m)
+    // ══════════════════════════════════════════════════════════════
+    public async Task<IReadOnlyList<SalesmanRoutePoint>> GetSalesmanRouteWithSalesAsync(
+        string userName, DateTime date, CancellationToken ct = default)
+    {
+        const string gpsSql = """
+            SELECT CONVERT(decimal(18,6), Lattitude)  AS Lat,
+                   CONVERT(decimal(18,6), Longtitude) AS Lng,
+                   Checktime
+            FROM   DMSAimSalesmanLocation
+            WHERE  UserName = @User
+              AND  CONVERT(date, Checktime) = @Date
+              AND  CONVERT(decimal(18,6), Lattitude)  <> 0
+              AND  CONVERT(decimal(18,6), Longtitude) <> 0
+            ORDER BY Checktime ASC
+            """;
+
+        const string orderSql = """
+            SELECT h.OrderDate,
+                   h.CustomerCD,
+                   c.LocationName,
+                   h.RouteCode,
+                   h.OrderAmount,
+                   CONVERT(decimal(18,6), c.Latitude)  AS Lat,
+                   CONVERT(decimal(18,6), c.Longitude) AS Lng
+            FROM   DMSAimOrderHeader  h
+            INNER JOIN DMSAimCustomer c
+                   ON  h.UserName   = c.UserName
+                   AND h.CustomerCD = c.CustomerCD
+            WHERE  h.UserName = @User
+              AND  CONVERT(date, h.OrderDate) = @Date
+              AND  c.Latitude  <> 0
+              AND  c.Longitude <> 0
+            ORDER BY h.OrderDate ASC
+            """;
+
+        await using var conn = new SqlConnection(_cs);
+        await conn.OpenAsync(ct);
+
+        // Fetch GPS points
+        var gpsPoints = new List<(double Lat, double Lng, DateTime Time)>();
+        using (var cmd = conn.CreateCommand())
+        {
+            cmd.CommandText = gpsSql;
+            cmd.CommandTimeout = 30;
+            cmd.Parameters.AddWithValue("@User", userName);
+            cmd.Parameters.AddWithValue("@Date", date.Date);
+            await using var r = await cmd.ExecuteReaderAsync(ct);
+            while (await r.ReadAsync(ct))
+                gpsPoints.Add((Convert.ToDouble(r["Lat"]),
+                               Convert.ToDouble(r["Lng"]),
+                               Convert.ToDateTime(r["Checktime"])));
+        }
+
+        // Fetch customer orders
+        var orders = new List<(double Lat, double Lng, CustomerVisit Visit)>();
+        using (var cmd = conn.CreateCommand())
+        {
+            cmd.CommandText = orderSql;
+            cmd.CommandTimeout = 30;
+            cmd.Parameters.AddWithValue("@User", userName);
+            cmd.Parameters.AddWithValue("@Date", date.Date);
+            await using var r = await cmd.ExecuteReaderAsync(ct);
+            while (await r.ReadAsync(ct))
+            {
+                var oLat = Convert.ToDouble(r["Lat"]);
+                var oLng = Convert.ToDouble(r["Lng"]);
+                if (oLat == 0 && oLng == 0) continue;
+
+                var visit = new CustomerVisit(
+                    CustomerCD  : r["CustomerCD"].ToString()!,
+                    LocationName: r["LocationName"]?.ToString() ?? "",
+                    RouteCode   : r["RouteCode"]?.ToString()    ?? "",
+                    OrderAmount : Convert.ToDecimal(r["OrderAmount"]),
+                    OrderDate   : Convert.ToDateTime(r["OrderDate"]));
+
+                orders.Add((oLat, oLng, visit));
+            }
+        }
+
+        // Kết hợp: mỗi GPS point tìm order gần nhất ≤ 200m
+        const double ThresholdKm = 0.2;
+
+        var result = gpsPoints.Select(gps =>
+        {
+            CustomerVisit? best = null;
+            double bestDist = double.MaxValue;
+
+            foreach (var (oLat, oLng, visit) in orders)
+            {
+                var dist = HaversineKm(gps.Lat, gps.Lng, oLat, oLng);
+                if (dist <= ThresholdKm && dist < bestDist)
+                {
+                    bestDist = dist;
+                    best     = visit;
+                }
+            }
+
+            return new SalesmanRoutePoint(userName, gps.Time, gps.Lat, gps.Lng, best);
+        }).ToList();
+
+        return result;
+    }
+
+    // ══════════════════════════════════════════════════════════════
+    // GetDailySalesBySmAsync — tổng doanh số theo SM trong ngày
+    // ══════════════════════════════════════════════════════════════
+    public async Task<IReadOnlyDictionary<string, decimal>> GetDailySalesBySmAsync(
+        DateTime date, CancellationToken ct = default)
+    {
+        const string sql = """
+            SELECT UserName, SUM(OrderAmount) AS TotalAmount
+            FROM   DMSAimOrderHeader
+            WHERE  CONVERT(date, OrderDate) = @Date
+            GROUP  BY UserName
+            """;
+
+        await using var conn = new SqlConnection(_cs);
+        await conn.OpenAsync(ct);
+
+        using var cmd = conn.CreateCommand();
+        cmd.CommandText    = sql;
+        cmd.CommandTimeout = 30;
+        cmd.Parameters.AddWithValue("@Date", date.Date);
+
+        var result = new Dictionary<string, decimal>(StringComparer.OrdinalIgnoreCase);
+        await using var r = await cmd.ExecuteReaderAsync(ct);
+        while (await r.ReadAsync(ct))
+            result[r["UserName"].ToString()!] = Convert.ToDecimal(r["TotalAmount"]);
+
+        return result;
+    }
+
+    // ══════════════════════════════════════════════════════════════
+    // GetSalesByAreaAsync — doanh số nhóm theo tuyến / khu vực
+    // ══════════════════════════════════════════════════════════════
+    public async Task<IReadOnlyList<SalesAreaItem>> GetSalesByAreaAsync(
+        DateTime date, string groupBy = "route", CancellationToken ct = default)
+    {
+        // groupBy: "route" | "sm" | "channel" | "province"
+        var (groupCol, labelAlias) = groupBy switch
+        {
+            "sm"       => ("h.UserName",                        "Salesman"),
+            //"channel"  => ("ISNULL(h.ChannelCode,'(Khác)')",   "Kênh"),
+            "province" => ("ISNULL(p.ProvinceCode,'(Khác)')",  "Tỉnh/TP"),
+            _          => ("ISNULL(h.RouteCode,'(Khác)')",     "Tuyến")
+        };
+
+        var sql = $"""
+            SELECT
+                {groupCol}                     AS Label,
+                SUM(h.OrderAmount)             AS TotalAmount,
+                COUNT(*)                       AS OrderCount,
+                COUNT(DISTINCT h.UserName)     AS SmCount
+            FROM  DMSAimOrderHeader h
+            LEFT JOIN DMSAimCustomer c
+                   ON h.UserName   = c.UserName
+                  AND h.CustomerCD = c.CustomerCD
+            LEFT JOIN (
+                       select distinct ProvinceID, Descr ProvinceCode from DMSAimProvince
+            )  p ON c.ProvinceID = p.ProvinceID
+            WHERE CONVERT(date, h.OrderDate) = @Date
+            GROUP BY {groupCol}
+            ORDER BY TotalAmount DESC
+            """;
+
+        await using var conn = new SqlConnection(_cs);
+        await conn.OpenAsync(ct);
+
+        using var cmd = conn.CreateCommand();
+        cmd.CommandText    = sql;
+        cmd.CommandTimeout = 30;
+        cmd.Parameters.AddWithValue("@Date", date.Date);
+
+        var result = new List<SalesAreaItem>();
+        await using var r = await cmd.ExecuteReaderAsync(ct);
+        while (await r.ReadAsync(ct))
+            result.Add(new SalesAreaItem(
+                Label      : r["Label"]?.ToString() ?? "(Khác)",
+                TotalAmount: Convert.ToDecimal(r["TotalAmount"]),
+                OrderCount : Convert.ToInt32(r["OrderCount"]),
+                SmCount    : Convert.ToInt32(r["SmCount"])));
+
+        return result;
+    }
+
+    // ══════════════════════════════════════════════════════════════
+    // GetSmsByGroupAsync — UserNames thuộc nhóm cụ thể
+    // ══════════════════════════════════════════════════════════════
+    public async Task<IReadOnlyList<string>> GetSmsByGroupAsync(
+        DateTime date, string groupBy, string groupLabel, CancellationToken ct = default)
+    {
+        var (groupCol, _) = groupBy switch
+        {
+            "sm"       => ("h.UserName",                              ""),
+            "channel"  => ("ISNULL(h.ChannelCode,'(Khác)')",         ""),
+            "province" => ("ISNULL(p.ProvinceCode,'(Khác)')",        ""),
+            _          => ("ISNULL(h.RouteCode,'(Khác)')",           "")
+        };
+
+        var sql = $"""
+            SELECT DISTINCT h.UserName
+            FROM  DMSAimOrderHeader h
+            LEFT JOIN DMSAimCustomer c
+                   ON h.UserName   = c.UserName
+                  AND h.CustomerCD = c.CustomerCD
+            LEFT JOIN (SELECT DISTINCT ProvinceID, Descr ProvinceCode FROM DMSAimProvince) p
+                   ON c.ProvinceID = p.ProvinceID
+            WHERE CONVERT(date, h.OrderDate) = @Date
+              AND {groupCol} = @Label
+            """;
+
+        await using var conn = new SqlConnection(_cs);
+        await conn.OpenAsync(ct);
+
+        using var cmd = conn.CreateCommand();
+        cmd.CommandText    = sql;
+        cmd.CommandTimeout = 15;
+        cmd.Parameters.AddWithValue("@Date",  date.Date);
+        cmd.Parameters.AddWithValue("@Label", groupLabel);
+
+        var result = new List<string>();
+        await using var r = await cmd.ExecuteReaderAsync(ct);
+        while (await r.ReadAsync(ct))
+            result.Add(r.GetString(0));
+        return result;
+    }
+
+    private static double HaversineKm(double lat1, double lon1, double lat2, double lon2)
+    {
+        const double R = 6371;
+        var dLat = (lat2 - lat1) * Math.PI / 180;
+        var dLon = (lon2 - lon1) * Math.PI / 180;
+        var a = Math.Sin(dLat / 2) * Math.Sin(dLat / 2)
+              + Math.Cos(lat1 * Math.PI / 180) * Math.Cos(lat2 * Math.PI / 180)
+              * Math.Sin(dLon / 2) * Math.Sin(dLon / 2);
+        return R * 2 * Math.Atan2(Math.Sqrt(a), Math.Sqrt(1 - a));
+    }
 }
 
 // ─── Comparer for in-memory sort ────────────────────────────────

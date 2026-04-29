@@ -59,7 +59,7 @@ window.mapInterop = (() => {
     }
 
     // ── Tạo nội dung popup ───────────────────────────────
-    function makePopup(color, userName, timeStr, lat, lng, addrObj) {
+    function makePopup(color, userName, timeStr, lat, lng, addrObj, loc) {
         let addrHtml;
         if (addrObj && addrObj.formatted) {
             addrHtml =
@@ -75,6 +75,12 @@ window.mapInterop = (() => {
 
         // Escape userName để dùng trong onclick attribute
         const safeUser = userName.replace(/'/g, "\\'");
+
+        // Doanh số tổng nếu có
+        const salesHtml = (loc && loc.totalSales && Number(loc.totalSales) > 0)
+            ? '<div style="margin-top:4px;font-weight:700;color:#16a34a;font-size:.8rem">' +
+              '💰 ' + formatMoney(Number(loc.totalSales)) + '</div>'
+            : '';
 
         const routeBtn =
             '<div style="margin-top:8px;padding-top:8px;border-top:1px solid #f1f5f9">' +
@@ -97,6 +103,7 @@ window.mapInterop = (() => {
             '<div style="font-size:.78rem;color:#475569;line-height:1.85">' +
             '<div>&#128336; ' + timeStr + '</div>' +
             addrHtml +
+            salesHtml +
             '<div style="color:#d1d5db;font-size:.66rem;margin-top:4px">&#128205; ' +
                 lat.toFixed(6) + ', ' + lng.toFixed(6) + '</div>' +
             '</div>' +
@@ -166,13 +173,13 @@ window.mapInterop = (() => {
             const timeStr  = loc.checktime || '—';
 
             const popup = L.popup({ maxWidth: 300 })
-                .setContent(makePopup(color, name, timeStr, lat, lng, null));
+                .setContent(makePopup(color, name, timeStr, lat, lng, null, loc));
 
             const marker = L.marker([lat, lng], { icon: makeIcon(color, initials) })
                 .bindPopup(popup);
 
             _markerGroup.addLayer(marker);
-            _markers.push({ marker, userName: name, lat, lng, color, timeStr, idx });
+            _markers.push({ marker, userName: name, lat, lng, color, timeStr, idx, loc });
             bounds.push([lat, lng]);
         });
 
@@ -250,7 +257,7 @@ window.mapInterop = (() => {
                     entry.marker.getPopup()
                         ?.setContent(makePopup(
                             entry.color, entry.userName,
-                            entry.timeStr, entry.lat, entry.lng, addrObj));
+                            entry.timeStr, entry.lat, entry.lng, addrObj, entry.loc));
                 }
 
                 // Callback Blazor → cập nhật sidebar
@@ -302,48 +309,61 @@ window.mapInterop = (() => {
 
         // ── Vẽ các điểm dừng ──
         pts.forEach((p, i) => {
-            const lat = Number(p.lat), lng = Number(p.lng);
+            const lat     = Number(p.lat), lng = Number(p.lng);
             const isFirst = i === 0, isLast = i === n - 1;
             const stopNum = i + 1;
+            const visit   = p.visit || null;   // thông tin KH nếu tọa độ khớp
 
-            let bg, border, txtColor, size;
-            if (isFirst)      { bg = '#16a34a'; border = '#fff'; txtColor = '#fff'; size = 28; }
-            else if (isLast)  { bg = '#dc2626'; border = '#fff'; txtColor = '#fff'; size = 28; }
-            else               { bg = '#fff';    border = '#4f46e5'; txtColor = '#4f46e5'; size = 22; }
+            // Màu: Start=xanh lá, End=đỏ, KH=cam, GPS thường=tím
+            let bg, border, txtColor, size, label;
+            if (isFirst)       { bg='#16a34a'; border='#fff'; txtColor='#fff'; size=28; label='▶'; }
+            else if (isLast)   { bg='#dc2626'; border='#fff'; txtColor='#fff'; size=28; label='■'; }
+            else if (visit)    { bg='#f59e0b'; border='#fff'; txtColor='#fff'; size=26; label='🏪'; }
+            else               { bg='#fff';    border='#4f46e5'; txtColor='#4f46e5'; size=22; label=String(stopNum); }
 
             const icon = L.divIcon({
-                html: `<div style="
-                    width:${size}px;height:${size}px;border-radius:50%;
-                    background:${bg};border:2px solid ${border};
-                    color:${txtColor};font-size:${size < 26 ? 9 : 11}px;
-                    font-weight:700;font-family:Arial,sans-serif;
+                html: `<div style="width:${size}px;height:${size}px;border-radius:50%;
+                    background:${bg};border:2.5px solid ${border};color:${txtColor};
+                    font-size:${size<26?9:11}px;font-weight:700;font-family:Arial,sans-serif;
                     display:flex;align-items:center;justify-content:center;
-                    box-shadow:0 2px 6px rgba(0,0,0,.35);
-                    cursor:pointer;">${isFirst ? '▶' : isLast ? '■' : stopNum}</div>`,
-                className: '',
-                iconSize: [size, size],
-                iconAnchor: [size/2, size/2],
-                popupAnchor: [0, -size/2 - 2]
+                    box-shadow:0 2px 8px rgba(0,0,0,.35);cursor:pointer;">${label}</div>`,
+                className:'', iconSize:[size,size],
+                iconAnchor:[size/2,size/2], popupAnchor:[0,-size/2-2]
             });
 
-            const timeStr = p.checktime || '—';
-            const label   = isFirst ? 'Bắt đầu' : isLast ? 'Kết thúc' : `Điểm ${stopNum}`;
+            const timeStr  = p.checktime || '—';
+            const stopLabel = isFirst ? 'Xuất phát' : isLast ? 'Kết thúc'
+                            : visit ? `Điểm ${stopNum} — Khách hàng` : `Điểm ${stopNum}`;
+
+            // Popup: thêm block thông tin KH nếu có
+            const visitHtml = visit ? `
+                <div style="margin-top:6px;padding-top:6px;border-top:1px dashed #f59e0b">
+                  <div style="font-weight:700;color:#92400e;font-size:.8rem">🏪 ${visit.locationName || visit.customerCD}</div>
+                  <div style="font-size:.75rem;color:#78350f;line-height:1.75">
+                    <div>📋 Mã KH: <b>${visit.customerCD}</b></div>
+                    <div>🗺 Tuyến: ${visit.routeCode || '—'}</div>
+                    <div>💰 Doanh số: <b style="color:#16a34a">${formatMoney(visit.orderAmount)}</b></div>
+                    <div style="color:#a3a3a3;font-size:.68rem">🕐 ${visit.orderDate}</div>
+                  </div>
+                </div>` : '';
+
             const popHtml =
-                `<div style="font-family:sans-serif;min-width:160px">
+                `<div style="font-family:sans-serif;min-width:180px">
                   <div style="font-weight:700;font-size:.85rem;color:#1e293b;
                               border-bottom:2px solid ${bg};padding-bottom:3px;margin-bottom:5px">
-                    ${label}
+                    ${stopLabel}
                   </div>
                   <div style="font-size:.76rem;color:#475569;line-height:1.8">
                     <div>⏰ ${timeStr}</div>
-                    <div style="color:#cbd5e1;font-size:.66rem">
+                    ${visitHtml}
+                    <div style="color:#cbd5e1;font-size:.65rem;margin-top:4px">
                       📍 ${lat.toFixed(6)}, ${lng.toFixed(6)}
                     </div>
                   </div>
                 </div>`;
 
             L.marker([lat, lng], { icon })
-                .bindPopup(popHtml, { maxWidth: 220 })
+                .bindPopup(popHtml, { maxWidth: 260 })
                 .addTo(_routeGroup);
         });
 
@@ -357,6 +377,12 @@ window.mapInterop = (() => {
     // ── Xoá lộ trình ─────────────────────────────────────
     function clearRoute() {
         if (_routeGroup) _routeGroup.clearLayers();
+    }
+
+    // ── Format tiền VND — số đầy đủ, không làm tròn ──────
+    function formatMoney(amount) {
+        if (!amount && amount !== 0) return '—';
+        return Number(amount).toLocaleString('vi-VN');
     }
 
     // ── Haversine distance (km) ───────────────────────────
@@ -385,10 +411,32 @@ window.mapInterop = (() => {
 
     function invalidateSize() { if (_map) _map.invalidateSize(); }
 
+    // ── Fit map đến tập hợp toạ độ [[lat,lng],...] ───────
+    function fitBoundsToPoints(pointsJson) {
+        if (!_map) return;
+        let pts;
+        try { pts = JSON.parse(pointsJson); } catch(e) { return; }
+        if (!pts || pts.length === 0) return;
+
+        if (pts.length === 1) {
+            _map.setView([pts[0][0], pts[0][1]], 14, { animate: true });
+            // Tìm và mở popup marker gần nhất
+            let closest = null, minD = Infinity;
+            _markers.forEach(m => {
+                const ll = m.marker.getLatLng();
+                const d  = Math.hypot(ll.lat - pts[0][0], ll.lng - pts[0][1]);
+                if (d < minD) { minD = d; closest = m.marker; }
+            });
+            if (closest) setTimeout(() => closest.openPopup(), 450);
+        } else {
+            _map.fitBounds(pts, { padding: [60, 60], maxZoom: 12, animate: true });
+        }
+    }
+
     function destroy() {
         if (_map) { _map.remove(); _map = null; }
         _markers = []; _markerGroup = null; _routeGroup = null;
     }
 
-    return { init, setDotNetRef, addMarkersJson, startGeocoding, drawRoute, clearRoute, requestRoute, flyTo, invalidateSize, destroy };
+    return { init, setDotNetRef, addMarkersJson, startGeocoding, drawRoute, clearRoute, requestRoute, flyTo, fitBoundsToPoints, invalidateSize, destroy };
 })();
