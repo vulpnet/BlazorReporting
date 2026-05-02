@@ -1,7 +1,9 @@
 @page "/map"
 @using BlazorReporting.Data
+@using BlazorReporting.Services
 @using System.Text.Json
 @inject IDataRepository Repo
+@inject SalesForecastService Forecaster
 @inject IJSRuntime JS
 @inject NavigationManager Nav
 @implements IAsyncDisposable
@@ -462,6 +464,16 @@
                                 </div>
                             }
 
+                            @if (_psForecast != null)
+                            {
+                                <div class="d-flex align-items-center gap-1 mb-1 flex-shrink-0">
+                                    <span class="algo-badge @_psForecast.AlgorithmBadgeClass">
+                                        <i class="bi @_psForecast.AlgorithmIcon"></i>
+                                        @(_psForecast.IsSSA ? "ML.NET SSA" : "Linear Regression")
+                                    </span>
+                                    <span class="algo-detail">@_psForecast.AlgorithmLabel</span>
+                                </div>
+                            }
                             @if (_psPredictions.Count > 0)
                             {
                                 <div class="ps-pred-cards mt-1">
@@ -792,14 +804,21 @@
                     qty    = p.TotalQty,
                     amount = p.TotalAmount
                 });
-                var predicted = _psPredictions.Select(p => new
-                {
-                    label  = p.Label,
-                    qty    = p.Qty,
-                    amount = p.Amount
-                });
+                var predicted = _psForecast != null
+                    ? _psForecast.Labels.Select((lbl, i) => new
+                    {
+                        label       = lbl,
+                        qty         = (long)_psForecast.Qty.Predicted[i],
+                        amount      = (decimal)_psForecast.Amount.Predicted[i],
+                        qtyLower    = (long)_psForecast.Qty.Lower[i],
+                        qtyUpper    = (long)_psForecast.Qty.Upper[i],
+                        amountLower = (decimal)_psForecast.Amount.Lower[i],
+                        amountUpper = (decimal)_psForecast.Amount.Upper[i]
+                    })
+                    : Enumerable.Empty<object>();
                 var psName  = _psTrendPoints.FirstOrDefault()?.InventoryName ?? _psSelectedProd;
-                var payload = new { inventoryCD = _psSelectedProd, inventoryName = psName, actual, predicted };
+                var payload = new { inventoryCD = _psSelectedProd, inventoryName = psName,
+                                    isSSA = _psForecast?.IsSSA, actual, predicted };
                 var json = System.Text.Json.JsonSerializer.Serialize(payload,
                     new System.Text.Json.JsonSerializerOptions
                     { PropertyNamingPolicy = System.Text.Json.JsonNamingPolicy.CamelCase });
@@ -1194,7 +1213,9 @@
             _psTrendPoints = await Repo.GetProductTrendAsync([_psSelectedProd], 13);
             if (_psTrendPoints.Count > 0)
             {
-                _psPredictions    = ComputePsPredictions(_psTrendPoints);
+                // ML.NET SSA forecasting (singleton service, thread-safe)
+                _psForecast       = await Task.Run(() => Forecaster.Forecast(_psTrendPoints, 3));
+                _psPredictions    = BuildPsPredictions(_psForecast);
                 _psTrendNeedsDraw = true;
             }
         }
@@ -1202,45 +1223,39 @@
         finally { _psTrendLoading = false; StateHasChanged(); }
     }
 
-    private List<PsPrediction> ComputePsPredictions(IReadOnlyList<ProductTrendPoint> pts)
+    private ForecastResult? _psForecast;
+
+    private static List<PsPrediction> BuildPsPredictions(ForecastResult fc)
     {
-        var sorted  = pts.OrderBy(p => p.Year).ThenBy(p => p.Month).ToList();
-        var qVals   = sorted.Select(p => (double)p.TotalQty).ToList();
-        var aVals   = sorted.Select(p => (double)p.TotalAmount).ToList();
-        var (sQ, iQ) = PsLinReg(qVals);
-        var (sA, iA) = PsLinReg(aVals);
-        int n = sorted.Count;
-        var lastY = sorted[^1].Year; var lastM = sorted[^1].Month;
         var result = new List<PsPrediction>();
-        for (int step = 1; step <= 3; step++)
+        for (int i = 0; i < fc.Labels.Count; i++)
         {
-            var mo = lastM + step;
-            var yr = lastY + (mo - 1) / 12;
-            mo = ((mo - 1) % 12) + 1;
-            var predQ = Math.Max(0, iQ + sQ * (n - 1 + step));
-            var predA = Math.Max(0, iA + sA * (n - 1 + step));
-            var sig   = predQ > qVals[^1] * 1.05 ? "up"
-                      : predQ < qVals[^1] * 0.95 ? "down" : "flat";
+            var predQ = (long)fc.Qty.Predicted[i];
+            var predA = (decimal)fc.Amount.Predicted[i];
+            var loQ   = (long)fc.Qty.Lower[i];
+            var hiQ   = (long)fc.Qty.Upper[i];
+
+            // So sánh dự đoán với lower bound để xác định tín hiệu
+            var sig = predQ > hiQ * 0.9f ? "up"
+                    : predQ < loQ * 1.1f ? "down" : "flat";
+
+            // So sánh với điểm trước trong chuỗi dự đoán
+            if (i > 0)
+            {
+                var prev = (long)fc.Qty.Predicted[i - 1];
+                sig = predQ > prev * 1.03f ? "up"
+                    : predQ < prev * 0.97f ? "down" : "flat";
+            }
+
             var (icon, txt) = sig switch
             {
                 "up"   => ("bi-arrow-up-right-circle-fill",   "Tăng"),
                 "down" => ("bi-arrow-down-right-circle-fill", "Giảm"),
                 _      => ("bi-dash-circle-fill",              "Ổn định")
             };
-            result.Add(new PsPrediction($"T{mo}/{yr}", (long)predQ, (decimal)predA, sig, icon, txt));
+            result.Add(new PsPrediction(fc.Labels[i], predQ, predA, sig, icon, txt));
         }
         return result;
-    }
-
-    private static (double slope, double intercept) PsLinReg(IList<double> y)
-    {
-        int n = y.Count;
-        if (n < 2) return (0, n > 0 ? y[0] : 0);
-        double sx = 0, sy = 0, sxy = 0, sx2 = 0;
-        for (int i = 0; i < n; i++) { sx += i; sy += y[i]; sxy += i*y[i]; sx2 += (double)i*i; }
-        double d = n*sx2 - sx*sx;
-        double s = d == 0 ? 0 : (n*sxy - sx*sy) / d;
-        return (s, (sy - s*sx) / n);
     }
 
     // ── Calendar Picker ──────────────────────────────────

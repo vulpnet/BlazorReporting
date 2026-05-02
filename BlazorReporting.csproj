@@ -16,13 +16,15 @@
   </ItemGroup>
 
   <ItemGroup>
-    <PackageReference Include="Dapper"                                           Version="2.1.35" />
-    <PackageReference Include="Microsoft.Data.SqlClient"                          Version="5.2.1" />
-    <PackageReference Include="ClosedXML"                                         Version="0.102.3" />
-    <PackageReference Include="QuestPDF"                                          Version="2024.10.0" />
-    <PackageReference Include="Microsoft.Extensions.Caching.Memory"              Version="8.0.0" />
+    <PackageReference Include="Dapper" Version="2.1.35" />
+    <PackageReference Include="Microsoft.Data.SqlClient" Version="5.2.1" />
+    <PackageReference Include="ClosedXML" Version="0.102.3" />
+    <PackageReference Include="Microsoft.ML" Version="3.0.1" />
+    <PackageReference Include="Microsoft.ML.TimeSeries" Version="3.0.1" />
+    <PackageReference Include="QuestPDF" Version="2024.10.0" />
+    <PackageReference Include="Microsoft.Extensions.Caching.Memory" Version="8.0.0" />
     <PackageReference Include="Microsoft.Extensions.Caching.StackExchangeRedis" Version="8.0.0" />
-    <PackageReference Include="System.Text.Json"                                  Version="8.0.4" />
+    <PackageReference Include="System.Text.Json" Version="8.0.4" />
   </ItemGroup>
 
 </Project>

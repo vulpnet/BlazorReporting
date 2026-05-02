@@ -1,0 +1,413 @@
+@page "/sales-strategy"
+@using BlazorReporting.Data
+@using BlazorReporting.Services
+@using System.Text.Json
+@inject IDataRepository Repo
+@inject SalesStrategyService Strategist
+@inject IJSRuntime JS
+@implements IAsyncDisposable
+
+<PageTitle>Chiến lược kinh doanh – DMSPRO</PageTitle>
+
+@* ══ TOOLBAR ══════════════════════════════════════════════ *@
+<div class="ps-toolbar">
+    <div class="d-flex align-items-center gap-2 flex-wrap">
+
+        <div class="d-flex align-items-center gap-2 me-2">
+            <div class="strat-title-icon"><i class="bi bi-robot"></i></div>
+            <div>
+                <div class="ps-title">Chiến lược kinh doanh</div>
+                <div class="ps-subtitle">ML.NET SSA · Dự đoán nhu cầu nhập/xuất hàng theo Tỉnh/TP</div>
+            </div>
+        </div>
+
+        <select class="form-select form-select-sm ps-select" @bind="_historyMonths" disabled="@_training">
+            <option value="6">6 tháng lịch sử</option>
+            <option value="12">12 tháng lịch sử</option>
+            <option value="18">18 tháng lịch sử</option>
+            <option value="24">24 tháng lịch sử</option>
+        </select>
+
+        <select class="form-select form-select-sm ps-select" @bind="_topProducts" disabled="@_training">
+            <option value="10">Top 10 sản phẩm</option>
+            <option value="20">Top 20 sản phẩm</option>
+            <option value="30">Top 30 sản phẩm</option>
+            <option value="50">Top 50 sản phẩm</option>
+        </select>
+
+        <select class="form-select form-select-sm ps-select" @bind="_filterAction" disabled="@_training">
+            <option value="all">Tất cả hành động</option>
+            <option value="import">📈 Nhập thêm</option>
+            <option value="export">📉 Xuất bớt</option>
+            <option value="maintain">➡ Duy trì</option>
+        </select>
+
+        <button class="btn btn-sm btn-primary d-flex align-items-center gap-1"
+                @onclick="TrainAsync" disabled="@_training">
+            @if (_training)
+            { <span class="spinner-border spinner-border-sm"></span><span>Đang huấn luyện…</span> }
+            else
+            { <i class="bi bi-robot me-1"></i><span>Huấn luyện &amp; Phân tích</span> }
+        </button>
+
+        @if (_result != null && _result.All.Count > 0)
+        {
+            <span class="badge bg-secondary ms-1" style="font-size:.7rem">
+                @_result.TotalProvinces tỉnh · @_result.TotalProducts SP · @_result.All.Count cặp
+            </span>
+        }
+    </div>
+
+    @* Progress *@
+    @if (_training && _totalPairs > 0)
+    {
+        var pct = (int)(_donePairs * 100.0 / _totalPairs);
+        <div class="mt-2">
+            <div class="d-flex justify-content-between small text-muted mb-1">
+                <span><i class="bi bi-cpu me-1"></i>Đang train @_donePairs / @_totalPairs cặp Tỉnh×SP…</span>
+                <span>@pct%</span>
+            </div>
+            <div class="progress" style="height:6px">
+                <div class="progress-bar progress-bar-striped progress-bar-animated bg-primary"
+                     style="width:@pct%"></div>
+            </div>
+        </div>
+    }
+
+    @if (!string.IsNullOrEmpty(_error))
+    {
+        <div class="alert alert-danger mt-2 mb-0 py-1 px-2" style="font-size:.82rem">
+            <i class="bi bi-exclamation-triangle me-1"></i>@_error
+        </div>
+    }
+</div>
+
+@* ══ CONTENT ══════════════════════════════════════════════ *@
+@if (_result == null && !_training)
+{
+    <div class="ps-empty">
+        <i class="bi bi-robot display-1 opacity-20 d-block mb-3"></i>
+        <p class="fw-semibold mb-1">Nhấn <strong>Huấn luyện &amp; Phân tích</strong> để bắt đầu</p>
+        <p class="text-muted" style="font-size:.85rem">
+            ML.NET SSA sẽ train cho từng cặp Tỉnh/TP × Sản phẩm và đưa ra khuyến nghị nhập/xuất hàng
+        </p>
+    </div>
+}
+else if (_training && _result == null)
+{
+    <div class="ps-empty">
+        <div class="spinner-border text-primary mb-3" style="width:3rem;height:3rem"></div>
+        <p class="fw-semibold">Đang huấn luyện mô hình ML.NET…</p>
+        <p class="text-muted small">Sử dụng Singular Spectrum Analysis (SSA) cho từng cặp Tỉnh × Sản phẩm</p>
+    </div>
+}
+else if (_result != null)
+{
+    @* ── Summary cards ── *@
+    <div class="strat-summary">
+        <div class="strat-summary-card strat-summary-card--primary">
+            <i class="bi bi-map-fill"></i>
+            <div class="strat-summary-val">@_result.TotalProvinces</div>
+            <div class="strat-summary-lbl">Tỉnh / TP</div>
+        </div>
+        <div class="strat-summary-card strat-summary-card--info">
+            <i class="bi bi-box-seam-fill"></i>
+            <div class="strat-summary-val">@_result.TotalProducts</div>
+            <div class="strat-summary-lbl">Sản phẩm</div>
+        </div>
+        <div class="strat-summary-card strat-summary-card--import">
+            <i class="bi bi-arrow-up-circle-fill"></i>
+            <div class="strat-summary-val">@_result.ImportCount</div>
+            <div class="strat-summary-lbl">Cần Nhập thêm</div>
+        </div>
+        <div class="strat-summary-card strat-summary-card--export">
+            <i class="bi bi-arrow-down-circle-fill"></i>
+            <div class="strat-summary-val">@_result.ExportCount</div>
+            <div class="strat-summary-lbl">Cần Xuất bớt</div>
+        </div>
+        <div class="strat-summary-card strat-summary-card--maintain">
+            <i class="bi bi-dash-circle-fill"></i>
+            <div class="strat-summary-val">@_result.MaintainCount</div>
+            <div class="strat-summary-lbl">Duy trì</div>
+        </div>
+    </div>
+
+    @* ── Main layout ── *@
+    <div class="strat-layout">
+
+        @* Province sidebar *@
+        <div class="strat-province-sidebar">
+            <div class="strat-sidebar-hdr">
+                <i class="bi bi-geo-alt-fill me-1 text-primary"></i>Tỉnh / TP
+            </div>
+            <div class="strat-sidebar-body">
+                <div class="strat-province-item @(_selectedProvince == "" ? "strat-province-item--active" : "")"
+                     @onclick='() => SelectProvince("")'>
+                    <span class="fw-semibold">🌐 Toàn quốc</span>
+                    <span class="badge bg-primary ms-auto">@_result.All.Count</span>
+                </div>
+                @foreach (var ps in _result.ProvinceSummaries)
+                {
+                    var dominant = ps.ImportCount >= ps.ExportCount && ps.ImportCount >= ps.MaintainCount
+                        ? "import" : ps.ExportCount >= ps.MaintainCount ? "export" : "maintain";
+                    <div class="strat-province-item @(_selectedProvince == ps.ProvinceCode ? "strat-province-item--active" : "")"
+                         @onclick="() => SelectProvince(ps.ProvinceCode)">
+                        <div>
+                            <div class="strat-province-name">@ps.ProvinceCode</div>
+                            <div class="strat-province-chips">
+                                @if (ps.ImportCount > 0)
+                                { <span class="strat-chip strat-chip--import">↑@ps.ImportCount</span> }
+                                @if (ps.ExportCount > 0)
+                                { <span class="strat-chip strat-chip--export">↓@ps.ExportCount</span> }
+                                @if (ps.MaintainCount > 0)
+                                { <span class="strat-chip strat-chip--maintain">→@ps.MaintainCount</span> }
+                            </div>
+                        </div>
+                        <span class="strat-province-amt">@FormatM(ps.PredAmount3M)</span>
+                    </div>
+                }
+            </div>
+        </div>
+
+        @* Recommendation table *@
+        <div class="strat-main">
+            <div class="strat-main-hdr">
+                <div class="d-flex align-items-center gap-2">
+                    <i class="bi bi-lightbulb-fill text-warning"></i>
+                    <span class="fw-bold">
+                        @(string.IsNullOrEmpty(_selectedProvince) ? "Toàn quốc" : _selectedProvince)
+                        — Khuyến nghị nhập/xuất hàng
+                    </span>
+                    <span class="badge bg-secondary" style="font-size:.68rem">@FilteredRows.Count dòng</span>
+                </div>
+                <div class="d-flex gap-2 align-items-center">
+                    <input class="form-control form-control-sm" style="width:160px"
+                           placeholder="Tìm sản phẩm…"
+                           @bind="_search" @bind:event="oninput" />
+                    <div class="algo-badge badge-ssa">
+                        <i class="bi bi-robot me-1"></i>ML.NET SSA
+                    </div>
+                </div>
+            </div>
+
+            <div class="strat-table-wrap">
+                <table class="strat-table">
+                    <thead>
+                        <tr>
+                            <th>Tỉnh / TP</th>
+                            <th>Mã SP</th>
+                            <th>Tên sản phẩm</th>
+                            <th class="text-end">TB 3T thực (SP)</th>
+                            <th class="text-end">Dự đoán 3T (SP)</th>
+                            <th class="text-end">Tăng trưởng</th>
+                            <th>Khuyến nghị</th>
+                            <th>Lý do</th>
+                            <th class="text-center">Tin cậy</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var row in FilteredRows)
+                        {
+                            <tr class="strat-row strat-row--@row.Action">
+                                <td><span class="ps-area-badge">@row.ProvinceCode</span></td>
+                                <td><code style="font-size:.75rem">@row.InventoryCD</code></td>
+                                <td class="strat-prod-name" title="@row.InventoryName">@row.InventoryName</td>
+                                <td class="text-end fw-semibold">@row.AvgQty3M.ToString("N0")</td>
+                                <td class="text-end fw-semibold">@row.PredQty3M.ToString("N0")</td>
+                                <td class="text-end">
+                                    <span class="strat-growth strat-growth--@(row.GrowthRate > 0 ? "up" : row.GrowthRate < 0 ? "down" : "flat")">
+                                        @row.GrowthRate.ToString("+0.0%;-0.0%;0%")
+                                    </span>
+                                </td>
+                                <td>
+                                    <span class="strat-badge @row.BadgeClass">
+                                        <i class="bi @row.ActionIcon me-1"></i>@row.ActionLabel
+                                    </span>
+                                </td>
+                                <td class="strat-reason">
+                                    @row.Reason
+                                    @if (!string.IsNullOrEmpty(row.SeasonNote))
+                                    {
+                                        <span class="strat-season">· @row.SeasonNote</span>
+                                    }
+                                </td>
+                                <td class="text-center">
+                                    <div class="strat-conf-bar">
+                                        <div class="strat-conf-fill" style="width:@((int)(row.Confidence*100))%"></div>
+                                    </div>
+                                    <div style="font-size:.65rem;color:#94a3b8">
+                                        @((int)(row.Confidence*100))%
+                                        @(row.UsedSSA ? "·SSA" : "·LR")
+                                    </div>
+                                </td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+
+            @* Charts *@
+            @if (_result.TopImport.Count > 0 || _result.TopExport.Count > 0)
+            {
+                <div class="strat-charts">
+                    <div class="strat-chart-card">
+                        <div class="strat-chart-hdr strat-chart-hdr--import">
+                            <i class="bi bi-arrow-up-circle-fill me-1"></i>Top SP nên Nhập thêm
+                        </div>
+                        <div class="strat-chart-body">
+                            <canvas id="strat-import-chart"></canvas>
+                        </div>
+                    </div>
+                    <div class="strat-chart-card">
+                        <div class="strat-chart-hdr strat-chart-hdr--export">
+                            <i class="bi bi-arrow-down-circle-fill me-1"></i>Top SP nên Xuất bớt
+                        </div>
+                        <div class="strat-chart-body">
+                            <canvas id="strat-export-chart"></canvas>
+                        </div>
+                    </div>
+                </div>
+            }
+        </div>
+    </div>
+}
+
+@code {
+    private int    _historyMonths = 12;
+    private int    _topProducts   = 20;
+    private string _filterAction  = "all";
+    private string _selectedProvince = "";
+    private string _search        = "";
+    private bool   _training      = false;
+    private string _error         = "";
+    private int    _donePairs, _totalPairs;
+    private StrategyResult? _result;
+
+    private List<ProvinceProductStrategy> FilteredRows
+    {
+        get
+        {
+            if (_result == null) return [];
+            var q = _result.All.AsEnumerable();
+            if (!string.IsNullOrEmpty(_selectedProvince))
+                q = q.Where(r => r.ProvinceCode == _selectedProvince);
+            if (_filterAction != "all")
+                q = q.Where(r => r.Action == _filterAction);
+            if (!string.IsNullOrWhiteSpace(_search))
+                q = q.Where(r =>
+                    r.InventoryCD.Contains(_search, StringComparison.OrdinalIgnoreCase) ||
+                    r.InventoryName.Contains(_search, StringComparison.OrdinalIgnoreCase));
+            return q.ToList();
+        }
+    }
+
+    private void SelectProvince(string code)
+    {
+        _selectedProvince = code;
+        _ = RenderChartsAsync();
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (_chartsNeedDraw && _result != null)
+        {
+            _chartsNeedDraw = false;
+            await RenderChartsAsync();
+        }
+    }
+
+    private bool _chartsNeedDraw;
+
+    private async Task TrainAsync()
+    {
+        _training    = true;
+        _error       = "";
+        _donePairs   = 0;
+        _totalPairs  = 0;
+        _result      = null;
+        StateHasChanged();
+
+        try
+        {
+            // 1. Tải lịch sử từ DB
+            var history = await Repo.GetProvinceSalesHistoryAsync(_historyMonths, _topProducts);
+            if (history.Count == 0)
+            {
+                _error = "Không có dữ liệu lịch sử để huấn luyện.";
+                return;
+            }
+
+            _totalPairs = history
+                .GroupBy(h => (h.ProvinceCode, h.InventoryCD)).Count();
+            StateHasChanged();
+
+            // 2. Train ML.NET (chạy trên thread pool, không block UI)
+            var progress = new Progress<(int Done, int Total)>(p =>
+            {
+                _donePairs  = p.Done;
+                _totalPairs = p.Total;
+                InvokeAsync(StateHasChanged);
+            });
+
+            _result = await Task.Run(() =>
+                Strategist.AnalyzeAsync(history, progress));
+
+            _chartsNeedDraw = true;
+        }
+        catch (Exception ex) { _error = ex.Message; }
+        finally
+        {
+            _training = false;
+            StateHasChanged();
+        }
+    }
+
+    private async Task RenderChartsAsync()
+    {
+        if (_result == null) return;
+        try
+        {
+            var src = string.IsNullOrEmpty(_selectedProvince)
+                ? _result.All
+                : _result.All.Where(r => r.ProvinceCode == _selectedProvince).ToList();
+
+            // Import chart: top SP nhập theo tỉnh
+            var importData = src
+                .Where(r => r.Action == "import")
+                .OrderByDescending(r => r.GrowthRate)
+                .Take(12)
+                .Select(r => new { label = $"{r.InventoryName} ({r.ProvinceCode})", value = (double)(r.GrowthRate * 100) })
+                .ToList();
+
+            // Export chart: top SP xuất theo tỉnh
+            var exportData = src
+                .Where(r => r.Action == "export")
+                .OrderBy(r => r.GrowthRate)
+                .Take(12)
+                .Select(r => new { label = $"{r.InventoryName} ({r.ProvinceCode})", value = (double)(Math.Abs(r.GrowthRate) * 100) })
+                .ToList();
+
+            await JS.InvokeVoidAsync("strategyChartInterop.renderImport",
+                "strat-import-chart",
+                JsonSerializer.Serialize(importData, new JsonSerializerOptions { PropertyNamingPolicy = JsonNamingPolicy.CamelCase }));
+
+            await JS.InvokeVoidAsync("strategyChartInterop.renderExport",
+                "strat-export-chart",
+                JsonSerializer.Serialize(exportData, new JsonSerializerOptions { PropertyNamingPolicy = JsonNamingPolicy.CamelCase }));
+        }
+        catch { /* ignore */ }
+    }
+
+    private static string FormatM(decimal v)
+    {
+        if (v >= 1_000_000_000) return $"{v/1_000_000_000:0.#}B";
+        if (v >= 1_000_000)     return $"{v/1_000_000:0.#}M";
+        if (v >= 1_000)         return $"{v/1_000:0.#}k";
+        return v.ToString("N0");
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        try { await JS.InvokeVoidAsync("strategyChartInterop.destroyAll"); } catch { }
+    }
+}

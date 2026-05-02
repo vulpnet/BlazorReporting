@@ -82,7 +82,26 @@ public interface IDataRepository
     Task<IReadOnlyList<ProductTrendPoint>> GetProductTrendAsync(
         IReadOnlyList<string> products, int historyMonths = 12,
         CancellationToken ct = default);
+
+    /// <summary>
+    /// Lịch sử doanh số theo tháng nhóm theo Tỉnh/TP × Sản phẩm.
+    /// Dùng để train ML.NET chiến lược nhập/xuất hàng theo khu vực.
+    /// topProducts: giới hạn N sản phẩm bán chạy nhất toàn quốc.
+    /// </summary>
+    Task<IReadOnlyList<ProvinceSalesHistory>> GetProvinceSalesHistoryAsync(
+        int historyMonths = 18, int topProducts = 20,
+        CancellationToken ct = default);
 }
+
+public sealed record ProvinceSalesHistory(
+    string  ProvinceCode,
+    string  InventoryCD,
+    string  InventoryName,
+    int     Year,
+    int     Month,
+    long    TotalQty,
+    decimal TotalAmount,
+    int     OrderCount);
 
 public sealed record SalesAreaItem(
     string  Label,        // Tên khu vực / tuyến

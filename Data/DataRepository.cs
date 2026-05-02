@@ -929,6 +929,82 @@ public sealed class DataRepository : IDataRepository
     /// Tính ngày bắt đầu / ngày kết thúc (exclusive) của kỳ báo cáo.
     /// Dùng range thay vì YEAR()/MONTH() để tận dụng index trên OrderDate.
     /// </summary>
+    // ══════════════════════════════════════════════════════════════
+    // GetProvinceSalesHistoryAsync
+    //   Lịch sử tháng × Tỉnh/TP × Sản phẩm — dữ liệu train ML.NET
+    // ══════════════════════════════════════════════════════════════
+    public async Task<IReadOnlyList<ProvinceSalesHistory>> GetProvinceSalesHistoryAsync(
+        int historyMonths = 18, int topProducts = 20,
+        CancellationToken ct = default)
+    {
+        var fromDate = DateTime.Today.AddMonths(-historyMonths).Date;
+
+        var sql = $"""
+            ;WITH TopProds AS (
+                SELECT TOP (@TopProducts) d.InventoryCD
+                FROM   DMSAimOrderDetail  d WITH (NOLOCK)
+                INNER  JOIN DMSAimOrderHeader h WITH (NOLOCK)
+                       ON  d.UserName        = h.UserName
+                       AND d.OrderCode       = h.OrderCode
+                       AND d.DistributorCode = h.DistributorCD
+                WHERE  h.OrderDate >= @FromDate
+                GROUP  BY d.InventoryCD
+                ORDER  BY SUM(d.OrderQty) DESC
+            )
+            SELECT
+                ISNULL(pr.ProvinceCode, N'(Khác)')              AS ProvinceCode,
+                d.InventoryCD,
+                MAX(ISNULL(inv.InventoryName, d.InventoryCD))   AS InventoryName,
+                YEAR(h.OrderDate)                               AS Yr,
+                MONTH(h.OrderDate)                              AS Mo,
+                SUM(d.OrderQty)                                 AS TotalQty,
+                SUM(CAST(d.OrderQty AS DECIMAL(18,4)) * d.UnitPrice) AS TotalAmount,
+                COUNT(DISTINCT h.OrderCode)                     AS OrderCount
+            FROM   DMSAimOrderDetail  d WITH (NOLOCK)
+            INNER  JOIN DMSAimOrderHeader h WITH (NOLOCK)
+                   ON  d.UserName        = h.UserName
+                   AND d.OrderCode       = h.OrderCode
+                   AND d.DistributorCode = h.DistributorCD
+            INNER  JOIN TopProds tp ON d.InventoryCD = tp.InventoryCD
+            LEFT   JOIN DMSAimInventoryItem inv WITH (NOLOCK)
+                   ON  inv.InventoryCD = d.InventoryCD
+            LEFT   JOIN DMSAimCustomer c WITH (NOLOCK)
+                   ON  c.UserName   = h.UserName
+                   AND c.CustomerCD = h.CustomerCD
+            LEFT   JOIN (SELECT DISTINCT ProvinceID, Descr ProvinceCode
+                         FROM DMSAimProvince WITH (NOLOCK)) pr
+                   ON  pr.ProvinceID = c.ProvinceID
+            WHERE  h.OrderDate >= @FromDate
+            GROUP  BY ISNULL(pr.ProvinceCode, N'(Khác)'), d.InventoryCD,
+                      YEAR(h.OrderDate), MONTH(h.OrderDate)
+            ORDER  BY ProvinceCode, d.InventoryCD, Yr, Mo
+            """;
+
+        await using var conn = new SqlConnection(_cs);
+        await conn.OpenAsync(ct);
+
+        using var cmd = conn.CreateCommand();
+        cmd.CommandText    = sql;
+        cmd.CommandTimeout = 120;
+        cmd.Parameters.AddWithValue("@FromDate",    fromDate);
+        cmd.Parameters.AddWithValue("@TopProducts", topProducts);
+
+        var result = new List<ProvinceSalesHistory>();
+        await using var r = await cmd.ExecuteReaderAsync(ct);
+        while (await r.ReadAsync(ct))
+            result.Add(new ProvinceSalesHistory(
+                ProvinceCode : r["ProvinceCode"]?.ToString() ?? "(Khác)",
+                InventoryCD  : r["InventoryCD"].ToString()!,
+                InventoryName: r["InventoryName"]?.ToString() ?? r["InventoryCD"].ToString()!,
+                Year         : Convert.ToInt32(r["Yr"]),
+                Month        : Convert.ToInt32(r["Mo"]),
+                TotalQty     : Convert.ToInt64(r["TotalQty"]),
+                TotalAmount  : Convert.ToDecimal(r["TotalAmount"]),
+                OrderCount   : Convert.ToInt32(r["OrderCount"])));
+
+        return result;
+    }
+
     private static (DateTime From, DateTime To) BuildDateRange(int year, int? quarter, int? month)
     {
         if (month.HasValue)

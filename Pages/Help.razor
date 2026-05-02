@@ -1,358 +1,374 @@
 @page "/help"
-<PageTitle>User Guide – DMSPRO Reporting</PageTitle>
+<PageTitle>Hướng dẫn sử dụng – DMSPRO Reporting</PageTitle>
 
 <div class="container-lg py-4">
 
     @* ══ Hero ══════════════════════════════════════════════════════ *@
     <div class="d-flex align-items-center gap-3 mb-4 pb-3 border-bottom">
-        <i class="bi bi-book-half display-5 text-primary"></i>
-        <div>
-            <h2 class="mb-0 fw-bold">User Guide</h2>
-            <p class="text-muted mb-0 small">DMSPRO Reporting — complete feature reference</p>
+        <div style="width:52px;height:52px;border-radius:14px;background:linear-gradient(135deg,#4f46e5,#7c3aed);
+                    display:flex;align-items:center;justify-content:center;font-size:1.6rem;flex-shrink:0">
+            <i class="bi bi-book-half text-white"></i>
         </div>
-        <a class="btn btn-primary btn-sm ms-auto" href="/report">
-            <i class="bi bi-play-fill me-1"></i>Open Report
-        </a>
+        <div>
+            <h2 class="mb-0 fw-bold">Hướng dẫn sử dụng</h2>
+            <p class="text-muted mb-0 small">DMSPRO Reporting — Tài liệu đầy đủ tất cả tính năng</p>
+        </div>
+        <div class="ms-auto d-flex gap-2 flex-wrap">
+            <a class="btn btn-outline-secondary btn-sm" href="/map"><i class="bi bi-geo-alt me-1"></i>Bản đồ</a>
+            <a class="btn btn-outline-warning btn-sm"   href="/product-sales"><i class="bi bi-box-seam me-1"></i>Sản phẩm</a>
+            <a class="btn btn-primary btn-sm"           href="/report"><i class="bi bi-table me-1"></i>Báo cáo</a>
+        </div>
     </div>
 
-    @* ══ Quick-navigation pills ════════════════════════════════════ *@
-    <div class="d-flex flex-wrap gap-2 mb-4">
-        @foreach (var (label, anchor, icon) in _sections)
+    @* ══ Quick-nav pills ═══════════════════════════════════════════ *@
+    <div class="d-flex flex-wrap gap-2 mb-5">
+        @foreach (var (label, anchor, icon, color) in _sections)
         {
-            <a href="#@anchor" class="btn btn-outline-secondary btn-sm">
+            <a href="#@anchor" class="btn btn-sm" style="background:@color;color:#fff;border:none;opacity:.88">
                 <i class="bi @icon me-1"></i>@label
             </a>
         }
     </div>
 
-    @* ══ 1. Overview ══════════════════════════════════════════════ *@
+    @* ══ 1. Tổng quan ══════════════════════════════════════════════ *@
     <section id="overview" class="mb-5">
-        <h4 class="section-heading"><i class="bi bi-info-circle-fill me-2 text-primary"></i>Overview</h4>
+        <h4 class="section-heading"><i class="bi bi-info-circle-fill me-2 text-primary"></i>Tổng quan hệ thống</h4>
         <div class="card shadow-sm border-0">
             <div class="card-body">
                 <p>
-                    <strong>DMSPRO Reporting</strong> is a browser-based reporting tool that connects directly
-                    to SQL Server. You can query <em>Stored Procedures</em>, <em>Views</em>, or <em>Tables</em>,
-                    explore data in an interactive grid, build pivot cross-tabs, and export results — all without
-                    writing any SQL.
+                    <strong>DMSPRO Reporting</strong> là hệ thống báo cáo thời gian thực kết nối trực tiếp SQL Server,
+                    tích hợp bản đồ số, phân tích sản phẩm bằng ML.NET và AI Chatbot chạy local (Ollama).
                 </p>
                 <div class="row g-3 mt-1">
-                    <div class="col-sm-6 col-lg-3">
-                        <div class="d-flex gap-2 align-items-start p-3 rounded bg-light h-100">
-                            <i class="bi bi-database-fill text-primary fs-5 flex-shrink-0"></i>
-                            <div><strong>Flexible Sources</strong><br /><span class="small text-muted">SP · View · Table</span></div>
+                    @foreach (var (ico, title, sub, bg) in _overviewCards)
+                    {
+                        <div class="col-6 col-lg-3">
+                            <div class="d-flex gap-2 align-items-start p-3 rounded h-100" style="background:@bg">
+                                <i class="bi @ico fs-5 flex-shrink-0" style="color:#4f46e5"></i>
+                                <div><strong>@title</strong><br /><span class="small text-muted">@sub</span></div>
+                            </div>
                         </div>
-                    </div>
-                    <div class="col-sm-6 col-lg-3">
-                        <div class="d-flex gap-2 align-items-start p-3 rounded bg-light h-100">
-                            <i class="bi bi-table text-success fs-5 flex-shrink-0"></i>
-                            <div><strong>Interactive Grid</strong><br /><span class="small text-muted">Sort · Filter · Reorder · Alias</span></div>
-                        </div>
-                    </div>
-                    <div class="col-sm-6 col-lg-3">
-                        <div class="d-flex gap-2 align-items-start p-3 rounded bg-light h-100">
-                            <i class="bi bi-grid-3x3-gap-fill text-purple fs-5 flex-shrink-0" style="color:#7c3aed"></i>
-                            <div><strong>Pivot Analysis</strong><br /><span class="small text-muted">Zone builder · Drill-down</span></div>
-                        </div>
-                    </div>
-                    <div class="col-sm-6 col-lg-3">
-                        <div class="d-flex gap-2 align-items-start p-3 rounded bg-light h-100">
-                            <i class="bi bi-download text-danger fs-5 flex-shrink-0"></i>
-                            <div><strong>Export</strong><br /><span class="small text-muted">Excel · CSV · PDF</span></div>
-                        </div>
-                    </div>
+                    }
                 </div>
             </div>
         </div>
     </section>
 
-    @* ══ 2. Getting Started ════════════════════════════════════════ *@
-    <section id="getting-started" class="mb-5">
-        <h4 class="section-heading"><i class="bi bi-rocket-takeoff-fill me-2 text-success"></i>Getting Started</h4>
+    @* ══ 2. Đăng nhập ══════════════════════════════════════════════ *@
+    <section id="login" class="mb-5">
+        <h4 class="section-heading"><i class="bi bi-shield-lock-fill me-2 text-success"></i>Đăng nhập</h4>
         <div class="card shadow-sm border-0">
             <div class="card-body">
-                <ol class="guide-steps">
-                    <li>
-                        <strong>Navigate to the Report page</strong> — click <em>Reports</em> in the top
-                        navigation bar, or use a direct link from the Home page.
-                    </li>
-                    <li>
-                        <strong>Choose a Source Type</strong> — select <code>StoredProcedure</code>,
-                        <code>View</code>, or <code>Table</code> from the first dropdown.
-                    </li>
-                    <li>
-                        <strong>Enter the Source Name</strong> — type the exact name of the SP, view, or
-                        table (e.g. <code>sp_DMS_RPT_ReportMasterDistributor</code>).
-                    </li>
-                    <li>
-                        <strong>Fill in parameters</strong> — for stored procedures, parameter inputs appear
-                        automatically below the source name. Required params are marked <span class="text-danger">*</span>.
-                        Typing a value triggers auto-execution after 600 ms.
-                    </li>
-                    <li>
-                        <strong>Click Run</strong> (or wait for auto-execute) — data loads into the grid.
-                    </li>
-                </ol>
-
+                <ul class="guide-steps mb-3">
+                    <li>Truy cập hệ thống → màn hình đăng nhập xuất hiện tự động.</li>
+                    <li>Nhập <strong>Tên đăng nhập</strong> và <strong>Mật khẩu</strong> được cấp bởi quản trị viên.</li>
+                    <li>Nhấn <kbd>Enter</kbd> hoặc nút <strong>Đăng nhập</strong>.</li>
+                    <li>Phiên làm việc được lưu trên trình duyệt — mở lại tab không cần đăng nhập lại.</li>
+                </ul>
                 <div class="alert alert-info d-flex gap-2 mb-0">
-                    <i class="bi bi-lightbulb-fill flex-shrink-0 mt-1"></i>
+                    <i class="bi bi-info-circle-fill flex-shrink-0 mt-1"></i>
                     <span>
-                        Use the <strong>📋 Reports…</strong> dropdown (if configured) to instantly load a
-                        pre-defined report from the <code>DMSViewReportTemplate</code> catalog —
-                        source, type, and default parameters are filled automatically.
+                        Nhấn <strong>Đăng xuất</strong> (góc phải trên) để kết thúc phiên làm việc và xoá cookie lưu trữ.
+                        Hệ thống tự chuyển về trang đăng nhập.
                     </span>
                 </div>
             </div>
         </div>
     </section>
 
-    @* ══ 3. Config Bar ════════════════════════════════════════════ *@
-    <section id="config-bar" class="mb-5">
-        <h4 class="section-heading"><i class="bi bi-sliders me-2 text-info"></i>Config Bar</h4>
-        <div class="card shadow-sm border-0">
+    @* ══ 3. Báo cáo ════════════════════════════════════════════════ *@
+    <section id="report" class="mb-5">
+        <h4 class="section-heading"><i class="bi bi-table me-2 text-primary"></i>Trang Báo cáo <code class="small">/report</code></h4>
+
+        <div class="card shadow-sm border-0 mb-3">
+            <div class="card-header fw-semibold bg-primary text-white">
+                <i class="bi bi-sliders me-1"></i>Thanh cấu hình (Config Bar)
+            </div>
             <div class="card-body">
-                <p class="text-muted small mb-3">
-                    The sticky bar at the top of the report page contains all data-source controls.
-                    It stays visible as you scroll.
-                </p>
-                <table class="table table-sm table-hover align-middle">
-                    <thead class="table-dark">
-                        <tr><th>Control</th><th>Purpose</th><th>Behaviour</th></tr>
-                    </thead>
+                <table class="table table-sm table-hover align-middle mb-0">
+                    <thead class="table-dark"><tr><th>Điều khiển</th><th>Chức năng</th><th>Ghi chú</th></tr></thead>
+                    <tbody class="small">
+                        <tr><td><strong>📋 Chọn báo cáo</strong></td><td>Danh mục báo cáo định sẵn</td><td>Tải từ <code>DMSViewReportTemplate</code>, chọn → tự điền và chạy</td></tr>
+                        <tr><td><strong>Loại nguồn</strong></td><td>SP / View / Table</td><td>Đổi loại → xoá tên nguồn và kết quả cũ</td></tr>
+                        <tr><td><strong>Tên nguồn</strong></td><td>Tên SP, View hoặc Table trong SQL Server</td><td>Rời khỏi ô → tự phát hiện tham số SP qua <code>sys.parameters</code></td></tr>
+                        <tr><td><strong>Tham số SP</strong></td><td>Input cho stored procedure</td><td>Gõ giá trị → debounce 600ms → tự chạy. Tham số bắt buộc đánh dấu <span class="text-danger">*</span></td></tr>
+                        <tr><td><strong>Số dòng/trang</strong></td><td>Page size</td><td>Đổi → cắt dữ liệu cache ngay, không gọi DB lại</td></tr>
+                        <tr><td><i class="bi bi-play-fill text-primary"></i> <strong>Chạy</strong></td><td>Thực thi truy vấn</td><td>Huỷ query đang chạy (nếu có) và tải mới</td></tr>
+                        <tr><td><i class="bi bi-stop-fill text-danger"></i> <strong>Huỷ</strong></td><td>Dừng query</td><td>Hiện khi đang tải — dữ liệu cache (nếu có) được giữ lại</td></tr>
+                        <tr><td><i class="bi bi-x-circle"></i> <strong>Xoá</strong></td><td>Reset toàn bộ</td><td>Xoá tên nguồn, tham số, alias và kết quả</td></tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <div class="row g-3 mb-3">
+            <div class="col-md-6">
+                <div class="card h-100 shadow-sm border-0">
+                    <div class="card-header fw-semibold bg-success text-white"><i class="bi bi-table me-1"></i>Lưới dữ liệu</div>
+                    <div class="card-body small">
+                        <ul class="ps-3 mb-0">
+                            <li><strong>Sắp xếp:</strong> click tiêu đề cột → ASC / DESC</li>
+                            <li><strong>Lọc:</strong> gõ vào hàng filter bên dưới tiêu đề — khớp chuỗi con, không phân biệt hoa thường</li>
+                            <li><strong>Ẩn/hiện cột:</strong> nút <strong>Cột</strong> → tick/untick; All / None</li>
+                            <li><strong>Kéo thả:</strong> kéo tiêu đề cột để đổi thứ tự</li>
+                            <li><strong>Đổi tên cột:</strong> double-click tiêu đề → gõ alias → <kbd>Enter</kbd> lưu, <kbd>Esc</kbd> huỷ</li>
+                            <li><strong>Phân trang:</strong> điều hướng bên dưới lưới, đổi page size trên config bar</li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-6">
+                <div class="card h-100 shadow-sm border-0">
+                    <div class="card-header fw-semibold" style="background:#7c3aed;color:#fff"><i class="bi bi-grid-3x3-gap me-1"></i>Pivot Analysis</div>
+                    <div class="card-body small">
+                        <p>Chuyển sang tab <strong>Pivot</strong> sau khi dữ liệu đã tải.</p>
+                        <ul class="ps-3 mb-0">
+                            <li>Kéo trường vào <strong>Hàng / Cột / Giá trị</strong> hoặc click <kbd>R</kbd> <kbd>C</kbd> <kbd>V</kbd></li>
+                            <li>Mỗi giá trị có hàm tổng hợp riêng: Sum / Count / Avg / Min / Max</li>
+                            <li>Bật/tắt <strong>Tổng hàng, Tổng cột, Tổng lớn</strong></li>
+                            <li>Click ô data → mở <strong>drill-down</strong> xem chi tiết (≤ 500 dòng)</li>
+                            <li><strong>Lưu layout:</strong> đặt tên → tự áp dụng lần sau nếu đặt tên "Default"</li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="card shadow-sm border-0">
+            <div class="card-header fw-semibold bg-danger text-white"><i class="bi bi-download me-1"></i>Xuất dữ liệu</div>
+            <div class="card-body">
+                <table class="table table-sm table-hover small mb-0">
+                    <thead class="table-secondary"><tr><th>Định dạng</th><th>Lưới dữ liệu</th><th>Pivot</th></tr></thead>
                     <tbody>
-                        <tr>
-                            <td><strong>📋 Reports…</strong></td>
-                            <td>Report catalog picker</td>
-                            <td>Populated from <code>DMSViewReportTemplate</code> view. Selecting a report fills all fields and auto-runs.</td>
-                        </tr>
-                        <tr>
-                            <td><strong>Source Type</strong></td>
-                            <td>SP / View / Table</td>
-                            <td>Changing type clears the source name and resets all results.</td>
-                        </tr>
-                        <tr>
-                            <td><strong>Source Name</strong></td>
-                            <td>Object name in SQL Server</td>
-                            <td>For SPs, blurring the field auto-discovers parameters via <code>sys.parameters</code>.</td>
-                        </tr>
-                        <tr>
-                            <td><strong>@@PageSize&nbsp;…</strong> <span class="text-muted small">(SP params)</span></td>
-                            <td>SP input parameters</td>
-                            <td>Typing triggers a 600 ms debounce then auto-executes. Required params shown with <span class="text-danger">*</span>.</td>
-                        </tr>
-                        <tr>
-                            <td><strong>Page Size</strong></td>
-                            <td>Rows per page</td>
-                            <td>Changing instantly re-slices cached data — no new DB call.</td>
-                        </tr>
-                        <tr>
-                            <td><i class="bi bi-play-fill text-primary"></i> <strong>Run</strong></td>
-                            <td>Execute the query</td>
-                            <td>Cancels any in-flight query, then loads fresh data. Shows spinner while loading.</td>
-                        </tr>
-                        <tr>
-                            <td><i class="bi bi-stop-fill text-danger"></i> <strong>Cancel</strong></td>
-                            <td>Abort current query</td>
-                            <td>Appears during loading. Stops the DB read; cached data (if any) is preserved.</td>
-                        </tr>
-                        <tr>
-                            <td><i class="bi bi-x-circle"></i> <strong>Clear</strong></td>
-                            <td>Reset everything</td>
-                            <td>Clears source name, parameters, aliases, and all results.</td>
-                        </tr>
+                        <tr><td><i class="bi bi-file-earmark-excel text-success me-1"></i><strong>Excel (.xlsx)</strong></td><td>Toàn bộ dòng + tiêu đề</td><td>Header nhóm merged, tổng hàng/cột/grand total</td></tr>
+                        <tr><td><i class="bi bi-filetype-csv text-secondary me-1"></i><strong>CSV</strong></td><td>Toàn bộ dòng, dấu phẩy</td><td>Phẳng hoá: ColKey·ValueLabel</td></tr>
+                        <tr><td><i class="bi bi-file-earmark-pdf text-danger me-1"></i><strong>PDF</strong></td><td>Bảng định dạng đầy đủ</td><td>Landscape, header 2 dòng</td></tr>
                     </tbody>
                 </table>
             </div>
         </div>
     </section>
 
-    @* ══ 4. Data Grid ═════════════════════════════════════════════ *@
-    <section id="data-grid" class="mb-5">
-        <h4 class="section-heading"><i class="bi bi-table me-2 text-success"></i>Data Grid</h4>
-        <div class="row g-3">
+    @* ══ 4. Bản đồ Salesman ════════════════════════════════════════ *@
+    <section id="map" class="mb-5">
+        <h4 class="section-heading"><i class="bi bi-geo-alt-fill me-2 text-success"></i>Bản đồ Salesman <code class="small">/map</code></h4>
 
-            <div class="col-md-6">
-                <div class="card h-100 shadow-sm border-0">
-                    <div class="card-header fw-semibold bg-success text-white">
-                        <i class="bi bi-sort-alpha-down me-1"></i>Sorting
-                    </div>
-                    <div class="card-body small">
-                        <p>Click any <strong>column header</strong> to sort ascending. Click again to sort descending. A sort icon appears on the active column.</p>
-                        <p class="mb-0 text-muted">Only one sort column is active at a time.</p>
-                    </div>
-                </div>
+        <div class="card shadow-sm border-0 mb-3">
+            <div class="card-header fw-semibold bg-success text-white">
+                <i class="bi bi-map me-1"></i>Tính năng bản đồ
             </div>
-
-            <div class="col-md-6">
-                <div class="card h-100 shadow-sm border-0">
-                    <div class="card-header fw-semibold bg-info text-white">
-                        <i class="bi bi-funnel-fill me-1"></i>Filtering
+            <div class="card-body">
+                <div class="row g-3">
+                    <div class="col-md-6">
+                        <h6 class="fw-bold">📅 Chọn ngày</h6>
+                        <p class="small mb-2">
+                            Click vào nút ngày → calendar popup xuất hiện với animation.<br />
+                            Điều hướng tháng bằng nút <strong>&lt;</strong> / <strong>&gt;</strong>.<br />
+                            Click <strong>Today</strong> (footer) để về hôm nay nhanh.<br />
+                            Click ngoài popup để đóng.
+                        </p>
+                        <h6 class="fw-bold">📍 Vị trí Salesman</h6>
+                        <p class="small mb-2">
+                            Nhấn <strong>Xem bản đồ</strong> → hệ thống tải vị trí cuối cùng trong ngày của từng SM (<em>DMSAimSalesmanLocation</em>).<br />
+                            Mỗi SM = 1 marker màu trên bản đồ. Hover/click marker → popup thông tin + nút xem lộ trình.
+                        </p>
+                        <h6 class="fw-bold">🏠 Địa chỉ tự động</h6>
+                        <p class="small mb-0">
+                            Sau khi load xong, hệ thống tự động dịch toạ độ → địa chỉ cụ thể (Nominatim / OpenStreetMap, 1 req/giây để tuân thủ giới hạn API).
+                            Địa chỉ hiện dần trong sidebar.
+                        </p>
                     </div>
-                    <div class="card-body small">
-                        <p>Type in the <strong>filter row</strong> (the row of text inputs directly below the column headers). Filters are case-insensitive substring matches applied to all data in memory.</p>
-                        <p class="mb-0">Use the <strong>Clear filters</strong> button in the toolbar (appears only when filters are active) to remove all at once.</p>
-                    </div>
-                </div>
-            </div>
-
-            <div class="col-md-6">
-                <div class="card h-100 shadow-sm border-0">
-                    <div class="card-header fw-semibold bg-secondary text-white">
-                        <i class="bi bi-layout-three-columns me-1"></i>Column Management
-                    </div>
-                    <div class="card-body small">
-                        <ul class="ps-3 mb-0">
-                            <li>Click the <strong>Columns</strong> button (above the grid) to open the column panel.</li>
-                            <li>Check / uncheck columns to <strong>show or hide</strong> them.</li>
-                            <li>Use <strong>All</strong> / <strong>None</strong> buttons to show or hide everything at once.</li>
-                            <li><strong>Drag column headers</strong> left or right to reorder them. A blue highlight shows the drop target.</li>
-                        </ul>
-                    </div>
-                </div>
-            </div>
-
-            <div class="col-md-6">
-                <div class="card h-100 shadow-sm border-0">
-                    <div class="card-header fw-semibold bg-dark text-white">
-                        <i class="bi bi-pencil-fill me-1"></i>Column Renaming (Alias)
-                    </div>
-                    <div class="card-body small">
-                        <ul class="ps-3 mb-0">
-                            <li><strong>Double-click</strong> any column header to enter rename mode.</li>
-                            <li>Type the display name you want, then press <kbd>Enter</kbd> to save or <kbd>Esc</kbd> to cancel.</li>
-                            <li>A small <i class="bi bi-pencil-fill" style="font-size:.75rem"></i> icon appears on renamed columns; hovering shows the original DB name.</li>
-                            <li>Aliases are shown in the Columns panel with the DB name in parentheses.</li>
-                            <li>Double-click and clear the input to remove an alias.</li>
-                        </ul>
-                    </div>
-                </div>
-            </div>
-
-            <div class="col-12">
-                <div class="card shadow-sm border-0">
-                    <div class="card-header fw-semibold">
-                        <i class="bi bi-skip-forward-fill me-1"></i>Pagination
-                    </div>
-                    <div class="card-body small">
-                        <p class="mb-1">Use the <strong>page navigation</strong> below the grid or change <strong>Page Size</strong> in the config bar. All data is held in memory after the initial load — page changes and filter changes are instant.</p>
-                        <p class="mb-0 text-muted">The toolbar shows total row and column counts. Filters that reduce the row count are reflected immediately.</p>
+                    <div class="col-md-6">
+                        <h6 class="fw-bold">🗺 Lộ trình di chuyển</h6>
+                        <p class="small mb-2">
+                            Click nút <i class="bi bi-signpost-2-fill text-primary"></i> trên thẻ SM (sidebar hoặc popup bản đồ) →
+                            vẽ polyline toàn bộ lộ trình trong ngày theo thứ tự thời gian.<br />
+                            Điểm khách hàng được highlight bằng marker khác màu (kết hợp GPS + đơn hàng, ngưỡng ≤ 200m).<br />
+                            Panel lộ trình nổi hiển thị: Số điểm GPS · Số KH · Giờ đi-về · Km · Doanh số.
+                        </p>
+                        <h6 class="fw-bold">🔍 Tìm kiếm</h6>
+                        <p class="small mb-0">
+                            Gõ vào ô tìm kiếm trên toolbar → lọc danh sách sidebar theo tên SM hoặc địa chỉ.
+                            Bản đồ không bị ảnh hưởng — click vào sidebar item để fly-to.
+                        </p>
                     </div>
                 </div>
             </div>
         </div>
+
+        <div class="row g-3 mb-3">
+            <div class="col-md-6">
+                <div class="card h-100 shadow-sm border-0">
+                    <div class="card-header fw-semibold bg-primary text-white">
+                        <i class="bi bi-bar-chart-fill me-1"></i>Biểu đồ Doanh số
+                    </div>
+                    <div class="card-body small">
+                        <p>Nhấn nút <strong>📊 Doanh số</strong> → panel trượt lên từ dưới bản đồ.</p>
+                        <ul class="ps-3 mb-0">
+                            <li><strong>Nhóm theo:</strong> Tuyến · Salesman · Tỉnh/TP · Kênh</li>
+                            <li><strong>Loại biểu đồ:</strong> Cột dọc · Tròn (Pie) · Donut</li>
+                            <li><strong>Click vào slice/cột</strong> → bản đồ tự bay đến khu vực tương ứng</li>
+                            <li>Tooltip hiển thị: doanh số · % tổng · số đơn · số SM</li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-6">
+                <div class="card h-100 shadow-sm border-0">
+                    <div class="card-header fw-semibold bg-warning text-dark">
+                        <i class="bi bi-box-seam-fill me-1"></i>Phân tích Sản phẩm (trong Map)
+                    </div>
+                    <div class="card-body small">
+                        <p>Nhấn nút <strong>📦 Sản phẩm</strong> → panel vàng trượt lên (62% chiều cao).</p>
+                        <ul class="ps-3 mb-0">
+                            <li><strong>Filter:</strong> Năm · Cả năm / Quý / Tháng · Nhóm theo · Top N</li>
+                            <li><strong>Grouped bar:</strong> khu vực trên trục X, mỗi màu = 1 sản phẩm</li>
+                            <li><strong>Xu hướng:</strong> chọn SP → line chart 13 tháng + dự đoán</li>
+                            <li><strong>Bảng chiến lược:</strong> SP bán chạy, xu hướng ↑↓→, gợi ý hành động</li>
+                            <li>Toggle <strong>Số lượng ↔ Doanh số</strong> cho cả 2 chart</li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="alert alert-light border d-flex gap-2">
+            <i class="bi bi-link-45deg text-primary fs-5 flex-shrink-0"></i>
+            <span class="small">
+                <strong>Deep link:</strong> <code>/map?date=yyyy-MM-dd</code> — mở bản đồ và tự động tải dữ liệu ngày chỉ định.
+                AI Chatbot có thể mở link này khi bạn yêu cầu xem bản đồ theo ngày cụ thể.
+            </span>
+        </div>
     </section>
 
-    @* ══ 5. Pivot Analysis ════════════════════════════════════════ *@
-    <section id="pivot" class="mb-5">
-        <h4 class="section-heading"><i class="bi bi-grid-3x3-gap-fill me-2" style="color:#7c3aed"></i>Pivot Analysis</h4>
+    @* ══ 5. Phân tích Sản phẩm ════════════════════════════════════ *@
+    <section id="product-sales" class="mb-5">
+        <h4 class="section-heading"><i class="bi bi-box-seam-fill me-2 text-warning"></i>Phân tích Sản phẩm <code class="small">/product-sales</code></h4>
         <div class="card shadow-sm border-0 mb-3">
             <div class="card-body">
-                <p>Switch to the <strong>Pivot</strong> tab (after data has loaded) to access the zone-based pivot builder.</p>
-
-                <h6 class="fw-bold mt-3">Zone Builder</h6>
-                <div class="row g-2 mb-3">
-                    <div class="col-sm-4">
-                        <div class="p-2 rounded" style="background:#e0f2fe;border:2px solid #bae6fd">
-                            <strong style="color:#0369a1"><i class="bi bi-arrow-down me-1"></i>Row Field</strong>
-                            <p class="small mb-0 mt-1 text-muted">The column whose distinct values become <strong>row labels</strong> (left axis).</p>
-                        </div>
-                    </div>
-                    <div class="col-sm-4">
-                        <div class="p-2 rounded" style="background:#ede9fe;border:2px solid #ddd6fe">
-                            <strong style="color:#7c3aed"><i class="bi bi-arrow-right me-1"></i>Column Field</strong>
-                            <p class="small mb-0 mt-1 text-muted">The column whose distinct values become <strong>column headers</strong> (top axis).</p>
-                        </div>
-                    </div>
-                    <div class="col-sm-4">
-                        <div class="p-2 rounded" style="background:#d1fae5;border:2px solid #a7f3d0">
-                            <strong style="color:#065f46"><i class="bi bi-calculator me-1"></i>Value Field(s)</strong>
-                            <p class="small mb-0 mt-1 text-muted">One or more columns to <strong>aggregate</strong>. Each can have its own function (Sum, Count, Avg, Min, Max).</p>
-                        </div>
-                    </div>
-                </div>
-
-                <h6 class="fw-bold">Assigning Fields</h6>
-                <ul class="small">
-                    <li>Drag a chip from the <strong>Available Fields</strong> zone into Row, Column, or Values.</li>
-                    <li>Or click the <strong>R / C / V</strong> quick-assign buttons on each chip.</li>
-                    <li>Dropping a field into Row or Column <strong>displaces</strong> the previous occupant back to Available.</li>
-                    <li>Click the <span class="text-danger fw-bold">×</span> on a placed chip to return it to Available.</li>
-                </ul>
-
-                <h6 class="fw-bold">Multiple Value Fields</h6>
-                <p class="small">Add more than one value field to the Values zone. Each gets its own sub-column per pivot column key, with a two-row header (column group on top, aggregation/field below).</p>
-
-                <h6 class="fw-bold">Totals</h6>
-                <p class="small mb-0">Use the <strong>Row Totals</strong>, <strong>Col Totals</strong>, and <strong>Grand Total</strong> toggles to show or hide subtotal rows and columns.</p>
-            </div>
-        </div>
-
-        <div class="row g-3">
-            <div class="col-md-6">
-                <div class="card h-100 shadow-sm border-0">
-                    <div class="card-header fw-semibold">
-                        <i class="bi bi-zoom-in me-1"></i>Drill-Down
-                    </div>
-                    <div class="card-body small">
-                        <p>Click any <strong>data cell</strong> in the pivot table to open the drill-down modal.</p>
-                        <ul class="ps-3 mb-0">
-                            <li>Shows the raw detail rows that produced that cell's value.</li>
-                            <li>Filtered to the exact Row × Column intersection.</li>
-                            <li>Up to 500 rows shown; count is displayed in the modal footer.</li>
-                            <li>Click the backdrop or <strong>Close</strong> to dismiss.</li>
+                <div class="row g-3">
+                    <div class="col-md-4">
+                        <h6 class="fw-bold">⚙️ Bộ lọc</h6>
+                        <ul class="small ps-3 mb-0">
+                            <li><strong>Năm:</strong> năm hiện tại ± 4 năm</li>
+                            <li><strong>Kỳ:</strong> Cả năm / Quý (Q1–Q4) / Tháng (T1–T12)</li>
+                            <li><strong>Nhóm theo:</strong> Tuyến · Tỉnh/TP · Salesman</li>
+                            <li><strong>Top N sản phẩm:</strong> 5 / 10 / 15 / 20</li>
+                            <li><strong>Metric:</strong> Số lượng (SP) ↔ Doanh số (đ)</li>
                         </ul>
                     </div>
-                </div>
-            </div>
-            <div class="col-md-6">
-                <div class="card h-100 shadow-sm border-0">
-                    <div class="card-header fw-semibold">
-                        <i class="bi bi-cloud-arrow-up me-1"></i>Save &amp; Load Layouts
+                    <div class="col-md-4">
+                        <h6 class="fw-bold">📊 Biểu đồ Khu vực</h6>
+                        <p class="small mb-0">
+                            Grouped bar chart: trục X = khu vực, mỗi màu = 1 mã sản phẩm (hiển thị tên SP).<br />
+                            Thấy ngay khu vực nào đang bán sản phẩm nào nhiều nhất.<br />
+                            Dữ liệu lấy từ <em>DMSAimOrderDetail + DMSAimOrderHeader + DMSAimInventoryItem</em>.
+                        </p>
                     </div>
-                    <div class="card-body small">
-                        <ul class="ps-3 mb-0">
-                            <li>Click <strong>Save Layout</strong> and enter a name to persist your pivot configuration per-user per-report.</li>
-                            <li>A layout named <strong>"Default"</strong> is applied automatically whenever the same report is opened.</li>
-                            <li>Click a saved layout name to restore it instantly.</li>
-                            <li>Click the <span class="text-danger">🗑</span> trash icon to delete a layout.</li>
-                        </ul>
+                    <div class="col-md-4">
+                        <h6 class="fw-bold">📈 Xu hướng &amp; Dự đoán</h6>
+                        <p class="small mb-0">
+                            Chọn mã SP → line chart 13 tháng lịch sử (nét liền tím)
+                            + 3 tháng dự đoán (nét đứt vàng) + vùng tin cậy 90%.<br />
+                            3 thẻ dự đoán tháng tới với tín hiệu ↑↓→.
+                        </p>
                     </div>
                 </div>
+
+                <hr />
+                <h6 class="fw-bold">🤖 Nhận biết thuật toán dự đoán</h6>
+                <div class="row g-2">
+                    <div class="col-md-6">
+                        <div class="p-2 rounded d-flex align-items-start gap-2" style="background:#ede9fe;border:1px solid #c4b5fd">
+                            <i class="bi bi-robot text-purple fs-5" style="color:#7c3aed"></i>
+                            <div class="small">
+                                <strong class="d-block" style="color:#6d28d9">ML.NET SSA</strong>
+                                Badge tím xuất hiện khi có đủ ≥ 4 tháng dữ liệu.<br />
+                                Hiển thị: <code>ML.NET SSA (window=6, n=12)</code><br />
+                                Vùng tin cậy dựa trên phân tích phổ thực sự — chính xác hơn.
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-6">
+                        <div class="p-2 rounded d-flex align-items-start gap-2" style="background:#fef3c7;border:1px solid #fcd34d">
+                            <i class="bi bi-graph-up text-warning fs-5"></i>
+                            <div class="small">
+                                <strong class="d-block text-warning">Linear Regression (fallback)</strong>
+                                Badge vàng xuất hiện khi dữ liệu &lt; 4 tháng.<br />
+                                Hiển thị: <code>Linear Regression (n=2 — cần ≥4 điểm)</code><br />
+                                Vùng tin cậy ±20% cố định.
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <hr />
+                <h6 class="fw-bold">💡 Bảng chiến lược gợi ý</h6>
+                <p class="small mb-0">
+                    Mỗi khu vực hiển thị: SP bán chạy nhất · Tổng SL · Tổng doanh số ·
+                    Xu hướng <span class="badge" style="background:#dcfce7;color:#16a34a">↑ Tăng</span>
+                    <span class="badge" style="background:#fee2e2;color:#dc2626">↓ Giảm</span>
+                    <span class="badge bg-light text-secondary border">→ Ổn định</span>
+                    · Gợi ý hành động cụ thể.
+                    Bảng thay đổi theo metric Số lượng / Doanh số.
+                </p>
             </div>
         </div>
     </section>
 
-    @* ══ 6. Export ════════════════════════════════════════════════ *@
-    <section id="export" class="mb-5">
-        <h4 class="section-heading"><i class="bi bi-download me-2 text-danger"></i>Export</h4>
-        <div class="card shadow-sm border-0">
+    @* ══ 6. AI Chatbot ═════════════════════════════════════════════ *@
+    <section id="chatbot" class="mb-5">
+        <h4 class="section-heading"><i class="bi bi-robot me-2" style="color:#7c3aed"></i>AI Chatbot</h4>
+        <div class="card shadow-sm border-0 mb-3">
             <div class="card-body">
-                <p>Export buttons appear in the <strong>toolbar</strong> (the bar directly below the config bar) once data has loaded.</p>
-                <table class="table table-sm table-hover align-middle">
-                    <thead class="table-dark">
-                        <tr><th>Format</th><th>Data Grid</th><th>Pivot Table</th></tr>
-                    </thead>
-                    <tbody>
-                        <tr>
-                            <td><i class="bi bi-file-earmark-excel text-success me-1"></i><strong>Excel (.xlsx)</strong></td>
-                            <td>All rows (not just current page) with column headers</td>
-                            <td>Merged group headers for multi-value pivots, row/col totals, grand total</td>
-                        </tr>
-                        <tr>
-                            <td><i class="bi bi-filetype-csv text-secondary me-1"></i><strong>CSV</strong></td>
-                            <td>All rows, comma-delimited</td>
-                            <td>Flattened: one column per ColKey·ValueLabel combination</td>
-                        </tr>
-                        <tr>
-                            <td><i class="bi bi-file-earmark-pdf text-danger me-1"></i><strong>PDF</strong></td>
-                            <td>All rows in a formatted table</td>
-                            <td>Landscape orientation with two-row headers</td>
-                        </tr>
-                    </tbody>
-                </table>
-                <div class="alert alert-warning d-flex gap-2 mb-0">
-                    <i class="bi bi-exclamation-triangle-fill flex-shrink-0 mt-1"></i>
-                    <span>Exports always include <strong>all data</strong>, not just the current page. For very large datasets, Excel export may take a few seconds to generate.</span>
+                <p>
+                    Chatbot AI xuất hiện ở <strong>góc dưới phải</strong> trên mọi trang (trừ trang đăng nhập).
+                    Chạy local bằng <strong>Ollama</strong> (<code>http://localhost:11434</code>) — không gửi dữ liệu ra ngoài.
+                </p>
+                <div class="row g-3">
+                    <div class="col-md-6">
+                        <h6 class="fw-bold">🗺 Điều hướng thông minh</h6>
+                        <ul class="small ps-3 mb-0">
+                            <li>Yêu cầu mở trang bằng ngôn ngữ tự nhiên:<br />
+                                <em>"Xem bản đồ ngày 22/05/2024"</em> → bot trả về link <code>/map?date=2024-05-22</code></li>
+                            <li>Bot phân tích yêu cầu → chọn báo cáo phù hợp với tham số đúng</li>
+                            <li>Nếu thiếu tham số → bot hỏi lại trước khi mở trang</li>
+                            <li>Link xuất hiện dạng button có thể click ngay trong chat</li>
+                        </ul>
+                    </div>
+                    <div class="col-md-6">
+                        <h6 class="fw-bold">📋 Ngữ cảnh báo cáo</h6>
+                        <ul class="small ps-3 mb-0">
+                            <li>Bot biết danh sách tất cả báo cáo + tham số SP</li>
+                            <li>Trả lời câu hỏi về dữ liệu đang xem (cột, số dòng…)</li>
+                            <li>Gợi ý báo cáo phù hợp với nhu cầu người dùng</li>
+                        </ul>
+                        <h6 class="fw-bold mt-2">💬 Lịch sử chat</h6>
+                        <ul class="small ps-3 mb-0">
+                            <li>Lịch sử lưu vào DB (<code>DMSChatHistory</code>) theo user + ngày</li>
+                            <li>Mở lại chat trong ngày → tiếp tục cuộc hội thoại cũ</li>
+                        </ul>
+                    </div>
+                </div>
+
+                <hr />
+                <div class="row g-3">
+                    <div class="col-md-6">
+                        <h6 class="fw-bold">⭐ Khảo sát trải nghiệm hàng ngày</h6>
+                        <p class="small mb-0">
+                            Mỗi ngày, chatbox gửi 1 câu hỏi khảo sát sau vài phút sử dụng.<br />
+                            Đánh giá 1–5 sao + nhận xét tự do → lưu vào <code>DMSUserExperience</code>.<br />
+                            Mỗi user chỉ khảo sát 1 lần/ngày.
+                        </p>
+                    </div>
+                    <div class="col-md-6">
+                        <h6 class="fw-bold">🙏 Tự động xin lỗi</h6>
+                        <p class="small mb-0">
+                            Nếu đánh giá ≤ 2 sao hoặc chat chứa từ khoá tiêu cực
+                            (<em>chậm, lỗi, sai, tệ, dở, xấu…</em>),
+                            bot <strong>chỉ xin lỗi chân thành</strong>, không cố gắng sửa lỗi hay đề xuất giải pháp ngay.
+                        </p>
+                    </div>
                 </div>
             </div>
         </div>
@@ -360,33 +376,31 @@
 
     @* ══ 7. URL Deep Links ════════════════════════════════════════ *@
     <section id="url-params" class="mb-5">
-        <h4 class="section-heading"><i class="bi bi-link-45deg me-2 text-info"></i>URL Deep Links</h4>
+        <h4 class="section-heading"><i class="bi bi-link-45deg me-2 text-info"></i>Liên kết URL trực tiếp</h4>
         <div class="card shadow-sm border-0">
             <div class="card-body">
-                <p>You can link directly to a specific report with parameters pre-filled. The page auto-executes on load.</p>
-
-                <h6 class="fw-bold">Format</h6>
-                <code class="d-block bg-light p-2 rounded mb-3">
-                    /report?Source=<em>ObjectName</em>&amp;Type=<em>SP|View|Table</em>&amp;<em>ParamName</em>=<em>Value</em>
-                </code>
-
-                <h6 class="fw-bold">Examples</h6>
-                <table class="table table-sm table-hover mb-0">
-                    <thead class="table-secondary">
-                        <tr><th>URL</th><th>Effect</th></tr>
-                    </thead>
-                    <tbody class="small">
+                <table class="table table-sm table-hover small mb-0">
+                    <thead class="table-dark"><tr><th>URL</th><th>Tác dụng</th></tr></thead>
+                    <tbody>
                         <tr>
-                            <td><code>/report?Source=sp_DMS_RPT_ReportMasterDistributor&amp;Type=SP&amp;CompanyID=3</code></td>
-                            <td>Opens the Master Distributor SP with CompanyID=3 pre-filled and auto-runs</td>
+                            <td><code>/report?Source=sp_RPT_Sales&amp;Type=SP&amp;CompanyID=3</code></td>
+                            <td>Mở báo cáo SP với CompanyID=3, tự chạy ngay</td>
                         </tr>
                         <tr>
                             <td><code>/report?Source=vw_SalesSummary&amp;Type=View</code></td>
-                            <td>Opens the vw_SalesSummary view</td>
+                            <td>Mở view vw_SalesSummary</td>
                         </tr>
                         <tr>
-                            <td><code>/report?Source=SalesOrders&amp;Type=Table</code></td>
-                            <td>Opens the SalesOrders table directly</td>
+                            <td><code>/map?date=2024-05-22</code></td>
+                            <td>Mở bản đồ, tự tải vị trí SM ngày 22/05/2024</td>
+                        </tr>
+                        <tr>
+                            <td><code>/product-sales</code></td>
+                            <td>Mở trang phân tích sản phẩm (chọn kỳ thủ công)</td>
+                        </tr>
+                        <tr>
+                            <td><code>/help</code></td>
+                            <td>Trang hướng dẫn này</td>
                         </tr>
                     </tbody>
                 </table>
@@ -394,197 +408,123 @@
         </div>
     </section>
 
-    @* ══ 8. Report Catalog Setup ══════════════════════════════════ *@
+    @* ══ 8. Danh mục báo cáo ══════════════════════════════════════ *@
     <section id="report-catalog" class="mb-5">
-        <h4 class="section-heading"><i class="bi bi-collection-fill me-2 text-warning"></i>Report Catalog Setup</h4>
+        <h4 class="section-heading"><i class="bi bi-collection-fill me-2 text-warning"></i>Danh mục báo cáo</h4>
         <div class="card shadow-sm border-0">
             <div class="card-body">
                 <p>
-                    If the view <code>DMSViewReportTemplate</code> exists in your database, the app loads it
-                    automatically and shows a <strong>📋 Reports…</strong> dropdown in the config bar.
-                    Selecting an entry fills all fields and runs the report.
+                    Nếu view <code>DMSViewReportTemplate</code> tồn tại trong DB, hệ thống tải tự động và hiện dropdown
+                    <strong>📋 Chọn báo cáo</strong> trên config bar. Chọn → điền tất cả trường và tự chạy.
                 </p>
-
-                <h6 class="fw-bold mt-3">Expected Columns (auto-detected, any of these names work)</h6>
-                <table class="table table-sm table-hover align-middle mb-3">
-                    <thead class="table-secondary">
-                        <tr><th>Purpose</th><th>Accepted column names</th><th>Required?</th></tr>
-                    </thead>
-                    <tbody class="small">
-                        <tr>
-                            <td><strong>Display name</strong></td>
-                            <td><code>ReportName</code>, <code>Name</code>, <code>Title</code>, <code>DisplayName</code></td>
-                            <td><span class="badge bg-danger">Yes</span></td>
-                        </tr>
-                        <tr>
-                            <td><strong>Source object</strong></td>
-                            <td><code>SourceName</code>, <code>Source</code>, <code>ObjectName</code>, <code>SPName</code>, <code>ProcName</code>, <code>ViewName</code></td>
-                            <td><span class="badge bg-danger">Yes</span></td>
-                        </tr>
-                        <tr>
-                            <td><strong>Source type</strong></td>
-                            <td><code>SourceType</code>, <code>Type</code>, <code>ObjectType</code> — values: <code>SP</code>, <code>View</code>, <code>Table</code></td>
-                            <td><span class="badge bg-secondary">Auto-inferred</span></td>
-                        </tr>
-                        <tr>
-                            <td><strong>Default params</strong></td>
-                            <td>Any other non-null columns (e.g. <code>CompanyID</code>, <code>FromDate</code>)</td>
-                            <td><span class="badge bg-light text-dark border">Optional</span></td>
-                        </tr>
-                    </tbody>
-                </table>
-
-                <h6 class="fw-bold">Minimal example view</h6>
-                <pre class="bg-dark text-light p-3 rounded small mb-0"><code>CREATE OR ALTER VIEW DMSViewReportTemplate AS
-SELECT
-    N'Master Distributor'              AS ReportName,
-    'sp_DMS_RPT_ReportMasterDistributor' AS SourceName,
-    'SP'                               AS SourceType,
-    3                                  AS CompanyID
-UNION ALL
-SELECT
-    N'Sales Summary View',
-    'vw_SalesSummary',
-    'View',
-    NULL;</code></pre>
-
-                <div class="alert alert-info d-flex gap-2 mt-3 mb-0">
-                    <i class="bi bi-info-circle-fill flex-shrink-0"></i>
-                    <span>
-                        If the view does not exist or cannot be queried, the dropdown is simply hidden —
-                        no error is shown and all other features continue to work normally.
-                    </span>
-                </div>
-            </div>
-        </div>
-    </section>
-
-    @* ══ 9. Large Data & Performance ══════════════════════════════ *@
-    <section id="performance" class="mb-5">
-        <h4 class="section-heading"><i class="bi bi-speedometer2 me-2 text-danger"></i>Large Data &amp; Performance</h4>
-        <div class="card shadow-sm border-0">
-            <div class="card-body">
-
-                <h6 class="fw-bold">Loading Progress</h6>
-                <p class="small">
-                    When a stored procedure returns a large result set, a live row counter and animated
-                    progress bar appear in the body area, along with a skeleton grid preview.
-                    The row count updates every 2,000 rows. Click <strong>Cancel</strong> at any time to abort.
-                </p>
-
-                <h6 class="fw-bold">Large SP Warning</h6>
-                <p class="small">
-                    If a stored procedure returns more than <strong>50,000 rows</strong> and does not have
-                    native paging parameters (<code>@@PageNumber</code> / <code>@@PageSize</code>), a yellow
-                    banner alerts you. All filtering, sorting, and pivot analysis still works — they run
-                    in-memory on the cached data.
-                </p>
-
-                <h6 class="fw-bold">Pivot Performance — Server-Side vs. In-Memory</h6>
-                <table class="table table-sm table-hover small mb-3">
-                    <thead class="table-secondary">
-                        <tr><th>Source type</th><th>Pivot method</th><th>How it works</th></tr>
-                    </thead>
+                <table class="table table-sm table-hover align-middle small mb-3">
+                    <thead class="table-secondary"><tr><th>Mục đích</th><th>Tên cột chấp nhận</th><th>Bắt buộc?</th></tr></thead>
                     <tbody>
-                        <tr>
-                            <td><strong>View / Table</strong></td>
-                            <td><span class="badge bg-success">SQL GROUP BY</span></td>
-                            <td>The database aggregates data; only the summarised result travels over the network. Fast even on millions of rows.</td>
-                        </tr>
-                        <tr>
-                            <td><strong>Stored Procedure</strong></td>
-                            <td><span class="badge bg-info text-dark">In-memory</span></td>
-                            <td>Pivot is computed from the cached row set already loaded in memory. Fast if the data fits in RAM.</td>
-                        </tr>
+                        <tr><td><strong>Tên hiển thị</strong></td><td><code>ReportName</code>, <code>Name</code>, <code>Title</code>, <code>DisplayName</code></td><td><span class="badge bg-danger">Có</span></td></tr>
+                        <tr><td><strong>Tên đối tượng SQL</strong></td><td><code>SourceName</code>, <code>Source</code>, <code>ObjectName</code>, <code>SPName</code>, <code>ProcName</code>, <code>ViewName</code></td><td><span class="badge bg-danger">Có</span></td></tr>
+                        <tr><td><strong>Loại nguồn</strong></td><td><code>SourceType</code>, <code>Type</code> — giá trị: <code>SP</code> / <code>View</code> / <code>Table</code></td><td><span class="badge bg-secondary">Tự suy</span></td></tr>
+                        <tr><td><strong>Tham số mặc định</strong></td><td>Bất kỳ cột nào khác không null (vd: <code>CompanyID</code>, <code>FromDate</code>)</td><td><span class="badge bg-light text-dark border">Tuỳ chọn</span></td></tr>
                     </tbody>
                 </table>
-
-                <h6 class="fw-bold">Tips</h6>
-                <ul class="small mb-0">
-                    <li>Prefer <strong>Views</strong> over stored procedures for pivot analysis on very large tables.</li>
-                    <li>Add <code>@@PageNumber</code> and <code>@@PageSize</code> parameters to your SP to enable native server-side paging and avoid loading all rows.</li>
-                    <li>Use column filters to narrow the result set before exporting.</li>
-                    <li>Results are <strong>cached per user per source+params</strong> — re-running the same report with the same params is instant (served from cache).</li>
-                </ul>
+                <pre class="bg-dark text-light p-3 rounded small mb-0"><code>CREATE OR ALTER VIEW DMSViewReportTemplate AS
+SELECT N'Báo cáo Master'          AS ReportName,
+       'sp_DMS_RPT_Master'         AS SourceName,
+       'SP'                        AS SourceType,
+       3                           AS CompanyID
+UNION ALL
+SELECT N'Tổng hợp doanh số', 'vw_Sales', 'View', NULL;</code></pre>
             </div>
         </div>
     </section>
 
-    @* ══ 10. Keyboard Shortcuts ═══════════════════════════════════ *@
-    <section id="shortcuts" class="mb-5">
-        <h4 class="section-heading"><i class="bi bi-keyboard me-2 text-secondary"></i>Keyboard Shortcuts</h4>
+    @* ══ 9. Hiệu năng ═════════════════════════════════════════════ *@
+    <section id="performance" class="mb-5">
+        <h4 class="section-heading"><i class="bi bi-speedometer2 me-2 text-danger"></i>Hiệu năng &amp; Dữ liệu lớn</h4>
         <div class="card shadow-sm border-0">
             <div class="card-body">
-                <table class="table table-sm table-hover align-middle mb-0">
-                    <thead class="table-dark">
-                        <tr><th>Key</th><th>Context</th><th>Action</th></tr>
-                    </thead>
-                    <tbody class="small">
-                        <tr>
-                            <td><kbd>Enter</kbd></td>
-                            <td>Column alias input</td>
-                            <td>Save the new column display name</td>
-                        </tr>
-                        <tr>
-                            <td><kbd>Esc</kbd></td>
-                            <td>Column alias input</td>
-                            <td>Cancel renaming, restore previous name</td>
-                        </tr>
-                        <tr>
-                            <td>Double-click header</td>
-                            <td>Data grid</td>
-                            <td>Enter column rename mode</td>
-                        </tr>
-                        <tr>
-                            <td>Click header</td>
-                            <td>Data grid</td>
-                            <td>Toggle sort ascending / descending</td>
-                        </tr>
-                        <tr>
-                            <td>Drag header</td>
-                            <td>Data grid</td>
-                            <td>Reorder the column</td>
-                        </tr>
-                        <tr>
-                            <td>Click pivot cell</td>
-                            <td>Pivot table</td>
-                            <td>Open drill-down modal for that intersection</td>
-                        </tr>
-                        <tr>
-                            <td>Click backdrop</td>
-                            <td>Drill-down modal / Column manager</td>
-                            <td>Close the panel</td>
-                        </tr>
+                <div class="row g-3">
+                    <div class="col-md-6">
+                        <h6 class="fw-bold">🔄 Tiến trình tải</h6>
+                        <p class="small">SP trả về tập dữ liệu lớn → hiển thị bộ đếm dòng theo thời gian thực (cập nhật mỗi 2.000 dòng) + progress bar + skeleton grid. Click <strong>Huỷ</strong> bất kỳ lúc nào.</p>
+
+                        <h6 class="fw-bold">⚠ Cảnh báo SP lớn</h6>
+                        <p class="small mb-0">SP trả về &gt; 50.000 dòng mà không có tham số native paging (<code>@@PageNumber</code> / <code>@@PageSize</code>) → banner vàng cảnh báo. Mọi tính năng vẫn hoạt động bình thường trên dữ liệu cache.</p>
+                    </div>
+                    <div class="col-md-6">
+                        <h6 class="fw-bold">🔒 NOLOCK &amp; Index</h6>
+                        <p class="small">Tất cả query phân tích sản phẩm dùng <code>WITH (NOLOCK)</code> để tránh block transaction ghi.<br />Filter ngày dùng range (<code>OrderDate &gt;= @@From AND &lt; @@To</code>) thay vì <code>YEAR(OrderDate)</code> — tận dụng được index.</p>
+
+                        <h6 class="fw-bold">💾 Cache Blazor</h6>
+                        <p class="small mb-0">Computed values (danh sách SP, bảng chiến lược) được cache thành field — không tính lại mỗi render cycle. Chỉ rebuild khi data hoặc metric thay đổi.</p>
+                    </div>
+                </div>
+                <hr />
+                <table class="table table-sm table-hover small mb-0">
+                    <thead class="table-secondary"><tr><th>Nguồn</th><th>Pivot method</th><th>Cách hoạt động</th></tr></thead>
+                    <tbody>
+                        <tr><td><strong>View / Table</strong></td><td><span class="badge bg-success">SQL GROUP BY</span></td><td>DB tổng hợp, chỉ kết quả tóm tắt truyền qua mạng — nhanh kể cả hàng triệu dòng</td></tr>
+                        <tr><td><strong>Stored Procedure</strong></td><td><span class="badge bg-info text-dark">In-memory</span></td><td>Pivot tính từ cache dữ liệu đã tải — nhanh nếu data vừa RAM</td></tr>
                     </tbody>
                 </table>
             </div>
         </div>
     </section>
 
-    @* ══ Back to top ═══════════════════════════════════════════════ *@
-    <div class="text-center py-3 border-top">
-        <a href="#" class="btn btn-outline-secondary btn-sm me-2">
-            <i class="bi bi-arrow-up me-1"></i>Back to top
-        </a>
-        <a href="/report" class="btn btn-primary btn-sm">
-            <i class="bi bi-play-fill me-1"></i>Open Report
-        </a>
+    @* ══ 10. Phím tắt ═════════════════════════════════════════════ *@
+    <section id="shortcuts" class="mb-5">
+        <h4 class="section-heading"><i class="bi bi-keyboard me-2 text-secondary"></i>Phím tắt &amp; Thao tác nhanh</h4>
+        <div class="card shadow-sm border-0">
+            <div class="card-body">
+                <table class="table table-sm table-hover align-middle small mb-0">
+                    <thead class="table-dark"><tr><th>Thao tác</th><th>Ngữ cảnh</th><th>Kết quả</th></tr></thead>
+                    <tbody>
+                        <tr><td><kbd>Enter</kbd></td><td>Ô alias cột</td><td>Lưu tên hiển thị mới</td></tr>
+                        <tr><td><kbd>Esc</kbd></td><td>Ô alias cột</td><td>Huỷ, khôi phục tên cũ</td></tr>
+                        <tr><td>Double-click tiêu đề cột</td><td>Lưới dữ liệu</td><td>Vào chế độ đổi tên cột</td></tr>
+                        <tr><td>Click tiêu đề cột</td><td>Lưới dữ liệu</td><td>Chuyển sắp xếp ASC / DESC</td></tr>
+                        <tr><td>Kéo tiêu đề cột</td><td>Lưới dữ liệu</td><td>Đổi thứ tự cột</td></tr>
+                        <tr><td>Click ô dữ liệu</td><td>Pivot table</td><td>Mở drill-down modal</td></tr>
+                        <tr><td>Click nền mờ</td><td>Drill-down / Column manager</td><td>Đóng panel</td></tr>
+                        <tr><td>Click <i class="bi bi-signpost-2-fill text-primary"></i></td><td>Sidebar bản đồ / Popup marker</td><td>Vẽ / xoá lộ trình SM</td></tr>
+                        <tr><td>Click slice/cột chart</td><td>Biểu đồ doanh số (Map)</td><td>Bản đồ fly-to khu vực tương ứng</td></tr>
+                        <tr><td>Click ngày trên calendar</td><td>Date picker Map</td><td>Chọn ngày, đóng popup</td></tr>
+                        <tr><td>Click backdrop calendar</td><td>Date picker Map</td><td>Đóng popup không lưu</td></tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </section>
+
+    @* ══ Footer ════════════════════════════════════════════════════ *@
+    <div class="text-center py-3 border-top d-flex justify-content-center gap-2 flex-wrap">
+        <a href="#" class="btn btn-outline-secondary btn-sm"><i class="bi bi-arrow-up me-1"></i>Đầu trang</a>
+        <a href="/map"           class="btn btn-outline-success btn-sm"><i class="bi bi-geo-alt me-1"></i>Bản đồ</a>
+        <a href="/product-sales" class="btn btn-outline-warning btn-sm"><i class="bi bi-box-seam me-1"></i>Sản phẩm</a>
+        <a href="/report"        class="btn btn-primary btn-sm"><i class="bi bi-table me-1"></i>Báo cáo</a>
     </div>
 
 </div>
 
 @code {
-    private static readonly (string Label, string Anchor, string Icon)[] _sections =
+    private static readonly (string Label, string Anchor, string Icon, string Color)[] _sections =
     [
-        ("Overview",        "overview",       "bi-info-circle"),
-        ("Getting Started", "getting-started","bi-rocket-takeoff"),
-        ("Config Bar",      "config-bar",     "bi-sliders"),
-        ("Data Grid",       "data-grid",      "bi-table"),
-        ("Pivot",           "pivot",          "bi-grid-3x3-gap"),
-        ("Export",          "export",         "bi-download"),
-        ("URL Links",       "url-params",     "bi-link-45deg"),
-        ("Report Catalog",  "report-catalog", "bi-collection"),
-        ("Performance",     "performance",    "bi-speedometer2"),
-        ("Shortcuts",       "shortcuts",      "bi-keyboard"),
+        ("Tổng quan",        "overview",       "bi-info-circle",       "#4f46e5"),
+        ("Đăng nhập",        "login",          "bi-shield-lock",       "#16a34a"),
+        ("Báo cáo",          "report",         "bi-table",             "#2563eb"),
+        ("Bản đồ",           "map",            "bi-geo-alt",           "#16a34a"),
+        ("Phân tích SP",     "product-sales",  "bi-box-seam",          "#d97706"),
+        ("AI Chatbot",       "chatbot",        "bi-robot",             "#7c3aed"),
+        ("URL Links",        "url-params",     "bi-link-45deg",        "#0891b2"),
+        ("Danh mục BC",      "report-catalog", "bi-collection",        "#ca8a04"),
+        ("Hiệu năng",        "performance",    "bi-speedometer2",      "#dc2626"),
+        ("Phím tắt",         "shortcuts",      "bi-keyboard",          "#475569"),
+    ];
+
+    private static readonly (string Icon, string Title, string Sub, string Bg)[] _overviewCards =
+    [
+        ("bi-table",         "Báo cáo linh hoạt",   "SP · View · Table · Pivot · Export",       "#f0f9ff"),
+        ("bi-geo-alt-fill",  "Bản đồ số",            "GPS · Lộ trình · Doanh số · Địa chỉ",     "#f0fdf4"),
+        ("bi-box-seam-fill", "Phân tích Sản phẩm",  "ML.NET SSA · Khu vực · Dự đoán 3 tháng", "#fffbeb"),
+        ("bi-robot",         "AI Chatbot",           "Ollama local · Điều hướng · Lịch sử",     "#faf5ff"),
     ];
 }

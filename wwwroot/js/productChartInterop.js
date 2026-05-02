@@ -153,17 +153,30 @@ window.productChartInterop = (() => {
         const actual    = data.actual    || [];
         const predicted = data.predicted || [];
         const field     = metric === 'amount' ? 'amount' : 'qty';
+        const lower     = metric === 'amount' ? 'amountLower' : 'qtyLower';
+        const upper     = metric === 'amount' ? 'amountUpper' : 'qtyUpper';
         const unit      = metric === 'amount' ? 'đ' : 'SP';
 
         const allLabels  = [...actual.map(d => d.label), ...predicted.map(d => d.label)];
         const actualVals = actual.map(d => d[field]);
+        const nA = actual.length, nP = predicted.length;
 
-        // Connect last actual → first predicted
+        // ── Actual line (solid) ──
         const actualFull = [...actualVals, ...predicted.map(() => null)];
+
+        // ── Predicted line (dashed) — connect to last actual ──
         const predFull   = [...actual.map(() => null), ...predicted.map(d => d[field])];
-        if (actual.length > 0 && predicted.length > 0) {
-            actualFull[actual.length] = predicted[0][field];
-            predFull[actual.length-1] = actualVals[actualVals.length-1];
+        if (nA > 0 && nP > 0) {
+            actualFull[nA]   = predicted[0][field];
+            predFull[nA - 1] = actualVals[nA - 1];
+        }
+
+        // ── Confidence band: upper & lower ──
+        const upperFull = [...actual.map(() => null), ...predicted.map(d => d[upper] ?? d[field])];
+        const lowerFull = [...actual.map(() => null), ...predicted.map(d => d[lower] ?? d[field])];
+        if (nA > 0 && nP > 0) {
+            upperFull[nA - 1] = actualVals[nA - 1];
+            lowerFull[nA - 1] = actualVals[nA - 1];
         }
 
         _trendChart = new Chart(canvas, {
@@ -171,6 +184,31 @@ window.productChartInterop = (() => {
             data: {
                 labels  : allLabels,
                 datasets: [
+                    // Upper bound (invisible line, fills down to lower)
+                    {
+                        label          : 'Giới hạn trên',
+                        data           : upperFull,
+                        borderColor    : 'transparent',
+                        backgroundColor: 'rgba(245,158,11,.12)',
+                        borderWidth    : 0,
+                        pointRadius    : 0,
+                        fill           : '+1',   // fill down to lowerFull dataset
+                        tension        : 0.35,
+                        spanGaps       : true
+                    },
+                    // Lower bound
+                    {
+                        label          : 'Giới hạn dưới',
+                        data           : lowerFull,
+                        borderColor    : 'transparent',
+                        backgroundColor: 'transparent',
+                        borderWidth    : 0,
+                        pointRadius    : 0,
+                        fill           : false,
+                        tension        : 0.35,
+                        spanGaps       : true
+                    },
+                    // Actual line
                     {
                         label          : 'Thực tế',
                         data           : actualFull,
@@ -183,17 +221,18 @@ window.productChartInterop = (() => {
                         tension        : 0.35,
                         spanGaps       : true
                     },
+                    // Predicted line (dashed)
                     {
-                        label          : 'Dự đoán',
+                        label          : 'Dự đoán (ML.NET SSA)',
                         data           : predFull,
                         borderColor    : '#f59e0b',
-                        backgroundColor: 'rgba(245,158,11,.05)',
+                        backgroundColor: 'transparent',
                         borderWidth    : 2.5,
                         borderDash     : [7, 4],
                         pointRadius    : 5,
                         pointStyle     : 'rectRot',
                         pointHoverRadius: 7,
-                        fill           : true,
+                        fill           : false,
                         tension        : 0.3,
                         spanGaps       : true
                     }
@@ -206,19 +245,39 @@ window.productChartInterop = (() => {
                 plugins: {
                     legend: {
                         position: 'top',
-                        labels  : { boxWidth: 11, font: { size: 10 } }
+                        labels  : {
+                            boxWidth: 11, font: { size: 10 },
+                            filter: item => item.text !== 'Giới hạn trên' && item.text !== 'Giới hạn dưới'
+                        }
                     },
                     title: {
                         display: !!(data.inventoryName || data.inventoryCD),
-                        text   : data.inventoryName || data.inventoryCD || '',
+                        text   : [
+                            data.inventoryName || data.inventoryCD || '',
+                            data.isSSA === false
+                                ? '⚠ Linear Regression (cần ≥ 4 tháng dữ liệu để dùng ML.NET SSA)'
+                                : data.isSSA === true ? '🤖 ML.NET SSA · Khoảng tin cậy 90%' : ''
+                        ].filter(Boolean),
                         font   : { size: 11, weight: '700' },
                         color  : '#1e293b', padding: { bottom: 4 }
                     },
                     tooltip: {
                         callbacks: {
-                            label: ctx => ctx.raw != null
-                                ? `  ${ctx.dataset.label}: ${fmt(ctx.raw)} ${unit}`
-                                : null
+                            label: ctx => {
+                                if (ctx.raw == null) return null;
+                                const lbl = ctx.dataset.label;
+                                if (lbl === 'Giới hạn trên' || lbl === 'Giới hạn dưới') return null;
+                                const i = ctx.dataIndex - actual.length;
+                                if (lbl.startsWith('Dự đoán') && i >= 0 && predicted[i]) {
+                                    const lo = fmt(predicted[i][lower] ?? ctx.raw);
+                                    const hi = fmt(predicted[i][upper] ?? ctx.raw);
+                                    return [
+                                        `  📈 ${lbl}: ${fmt(ctx.raw)} ${unit}`,
+                                        `  🔻 Khoảng tin cậy 90%: ${lo} – ${hi}`
+                                    ];
+                                }
+                                return `  ${lbl}: ${fmt(ctx.raw)} ${unit}`;
+                            }
                         }
                     }
                 },

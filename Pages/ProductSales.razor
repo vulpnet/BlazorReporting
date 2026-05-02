@@ -1,7 +1,9 @@
 @page "/product-sales"
 @using BlazorReporting.Data
+@using BlazorReporting.Services
 @using System.Text.Json
 @inject IDataRepository Repo
+@inject SalesForecastService Forecaster
 @inject IJSRuntime JS
 @implements IAsyncDisposable
 
@@ -205,6 +207,16 @@ else
                 @* Prediction cards *@
                 @if (_predictions.Count > 0)
                 {
+                    @if (_forecast != null)
+                    {
+                        <div class="d-flex align-items-center gap-1 mb-2">
+                            <span class="algo-badge @_forecast.AlgorithmBadgeClass">
+                                <i class="bi @_forecast.AlgorithmIcon"></i>
+                                @(_forecast.IsSSA ? "ML.NET SSA" : "Linear Regression")
+                            </span>
+                            <span class="algo-detail">@_forecast.AlgorithmLabel</span>
+                        </div>
+                    }
                     <div class="ps-pred-cards">
                         @foreach (var pred in _predictions)
                         {
@@ -463,39 +475,56 @@ else
         StateHasChanged();
     }
 
-    // ── Load trend + compute prediction ───────────────────
+    // ── Load trend + ML.NET prediction ────────────────────
+    private ForecastResult? _forecast;
+
     private async Task LoadTrendAsync()
     {
         if (string.IsNullOrEmpty(_selectedProduct)) return;
-
         _trendLoading   = true;
         _trendNeedsDraw = false;
         _predictions    = [];
         StateHasChanged();
-
         try
         {
-            _trendPoints = await Repo.GetProductTrendAsync(
-                [_selectedProduct], historyMonths: 13);
-
+            _trendPoints = await Repo.GetProductTrendAsync([_selectedProduct], historyMonths: 13);
             if (_trendPoints.Count > 0)
             {
-                _predictions    = ComputePredictions(_trendPoints);
+                _forecast       = await Task.Run(() => Forecaster.Forecast(_trendPoints, 3));
+                _predictions    = BuildPredictions(_forecast);
                 _trendNeedsDraw = true;
             }
         }
         catch (Exception ex) { _error = ex.Message; }
-        finally
+        finally { _trendLoading = false; StateHasChanged(); }
+    }
+
+    private static List<PredictionItem> BuildPredictions(ForecastResult fc)
+    {
+        var result = new List<PredictionItem>();
+        for (int i = 0; i < fc.Labels.Count; i++)
         {
-            _trendLoading = false;
-            StateHasChanged();
+            var predQ = (long)fc.Qty.Predicted[i];
+            var sig   = i > 0
+                ? (predQ > (long)fc.Qty.Predicted[i-1] * 1.03f ? "up"
+                        : predQ < (long)fc.Qty.Predicted[i-1] * 0.97f ? "down" : "flat")
+                : "flat";
+            var (icon, txt) = sig switch
+            {
+                "up"   => ("bi-arrow-up-right-circle-fill",   "Tăng"),
+                "down" => ("bi-arrow-down-right-circle-fill", "Giảm"),
+                _      => ("bi-dash-circle-fill",              "Ổn định")
+            };
+            result.Add(new PredictionItem(fc.Labels[i], predQ,
+                (decimal)fc.Amount.Predicted[i], sig, icon, txt));
         }
+        return result;
     }
 
     // ── Render trend chart ─────────────────────────────────
     private async Task RenderTrendChartAsync()
     {
-        if (_trendPoints.Count == 0) return;
+        if (_trendPoints.Count == 0 || _forecast == null) return;
         try
         {
             var actual = _trendPoints.Select(p => new
@@ -503,87 +532,26 @@ else
                 label  = $"T{p.Month}/{p.Year}",
                 qty    = p.TotalQty,
                 amount = p.TotalAmount
-            }).ToList();
-
-            var predicted = _predictions.Select(p => new
+            });
+            var predicted = _forecast.Labels.Select((lbl, i) => new
             {
-                label  = p.Label,
-                qty    = p.Qty,
-                amount = p.Amount
-            }).ToList();
-
+                label       = lbl,
+                qty         = (long)_forecast.Qty.Predicted[i],
+                amount      = (decimal)_forecast.Amount.Predicted[i],
+                qtyLower    = (long)_forecast.Qty.Lower[i],
+                qtyUpper    = (long)_forecast.Qty.Upper[i],
+                amountLower = (decimal)_forecast.Amount.Lower[i],
+                amountUpper = (decimal)_forecast.Amount.Upper[i]
+            });
             var invName = _trendPoints.FirstOrDefault()?.InventoryName ?? _selectedProduct;
-            var payload = new { inventoryCD = _selectedProduct, inventoryName = invName, actual, predicted };
-            var json = JsonSerializer.Serialize(payload,
+            var payload = new { inventoryCD = _selectedProduct, inventoryName = invName,
+                                isSSA = _forecast?.IsSSA, actual, predicted };
+            var json    = JsonSerializer.Serialize(payload,
                 new JsonSerializerOptions { PropertyNamingPolicy = JsonNamingPolicy.CamelCase });
-
             await JS.InvokeVoidAsync("productChartInterop.renderTrendChart",
                 "ps-trend-chart", json, _metric);
         }
         catch { /* ignore */ }
-    }
-
-    // ── Linear-regression prediction (3 tháng tới) ────────
-    private List<PredictionItem> ComputePredictions(IReadOnlyList<ProductTrendPoint> points)
-    {
-        var sorted = points.OrderBy(p => p.Year).ThenBy(p => p.Month).ToList();
-        var qtyVals    = sorted.Select(p => (double)p.TotalQty).ToList();
-        var amountVals = sorted.Select(p => (double)p.TotalAmount).ToList();
-
-        var (slopeQ, interceptQ) = LinearRegression(qtyVals);
-        var (slopeA, interceptA) = LinearRegression(amountVals);
-
-        int n         = sorted.Count;
-        var lastYear  = sorted[^1].Year;
-        var lastMonth = sorted[^1].Month;
-
-        var result = new List<PredictionItem>();
-        for (int step = 1; step <= 3; step++)
-        {
-            var m = lastMonth + step;
-            var y = lastYear + (m - 1) / 12;
-            m = ((m - 1) % 12) + 1;
-
-            var predQty    = Math.Max(0, interceptQ + slopeQ * (n - 1 + step));
-            var predAmount = Math.Max(0, interceptA + slopeA * (n - 1 + step));
-
-            // So sánh với điểm cuối thực tế
-            double refQ = qtyVals[^1];
-            double refA = amountVals[^1];
-            var signal = predQty > refQ * 1.05 ? "up"
-                       : predQty < refQ * 0.95 ? "down"
-                       : "flat";
-            var (icon, txt) = signal switch
-            {
-                "up"   => ("bi-arrow-up-right-circle-fill", "Tăng"),
-                "down" => ("bi-arrow-down-right-circle-fill","Giảm"),
-                _      => ("bi-dash-circle-fill",            "Ổn định")
-            };
-
-            result.Add(new PredictionItem(
-                $"T{m}/{y}", (long)predQty, (decimal)predAmount,
-                signal, icon, txt));
-        }
-        return result;
-    }
-
-    private static (double slope, double intercept) LinearRegression(IList<double> y)
-    {
-        int n = y.Count;
-        if (n < 2) return (0, y.Count > 0 ? y[0] : 0);
-
-        double sumX  = 0, sumY  = 0, sumXY = 0, sumX2 = 0;
-        for (int i = 0; i < n; i++)
-        {
-            sumX  += i;
-            sumY  += y[i];
-            sumXY += i * y[i];
-            sumX2 += (double)i * i;
-        }
-        double denom    = n * sumX2 - sumX * sumX;
-        double slope    = denom == 0 ? 0 : (n * sumXY - sumX * sumY) / denom;
-        double intercept= (sumY - slope * sumX) / n;
-        return (slope, intercept);
     }
 
     private static string FormatMoney(decimal v) =>

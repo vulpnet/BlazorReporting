@@ -24,6 +24,10 @@ builder.Services.AddScoped<IExportService, ExportService>();
 // Auth (scoped = per Blazor circuit / session)
 builder.Services.AddScoped<AuthService>();
 
+// ML.NET Sales Forecasting (singleton — MLContext is thread-safe, expensive to create)
+builder.Services.AddSingleton<SalesForecastService>();
+builder.Services.AddSingleton<SalesStrategyService>();
+
 // Chat history & Survey (scoped)
 builder.Services.AddScoped<ChatHistoryService>();
 builder.Services.AddScoped<SurveyService>();
