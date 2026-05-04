@@ -21,22 +21,62 @@
             </div>
         </div>
 
-        <select class="form-select form-select-sm ps-select" @bind="_historyMonths" disabled="@_training">
-            <option value="6">6 tháng lịch sử</option>
-            <option value="12">12 tháng lịch sử</option>
-            <option value="18">18 tháng lịch sử</option>
-            <option value="24">24 tháng lịch sử</option>
+        @* ── Năm ── *@
+        <select class="form-select form-select-sm ps-select" @bind="_year" disabled="@_training">
+            @for (int y = DateTime.Today.Year; y >= DateTime.Today.Year - 4; y--)
+            {
+                <option value="@y">@y</option>
+            }
         </select>
 
+        @* ── Kiểu kỳ ── *@
+        <select class="form-select form-select-sm ps-select" @bind="_periodType"
+                @bind:after="OnPeriodTypeChanged" disabled="@_training">
+            <option value="year">Cả năm</option>
+            <option value="quarter">Theo quý</option>
+            <option value="month">Theo tháng</option>
+        </select>
+
+        @* ── Giá trị kỳ ── *@
+        @if (_periodType == "quarter")
+        {
+            <select class="form-select form-select-sm ps-select" @bind="_periodValue" disabled="@_training">
+                <option value="1">Q1 (T1–T3)</option>
+                <option value="2">Q2 (T4–T6)</option>
+                <option value="3">Q3 (T7–T9)</option>
+                <option value="4">Q4 (T10–T12)</option>
+            </select>
+        }
+        else if (_periodType == "month")
+        {
+            <select class="form-select form-select-sm ps-select" @bind="_periodValue" disabled="@_training">
+                @for (int m = 1; m <= 12; m++)
+                {
+                    <option value="@m">Tháng @m</option>
+                }
+            </select>
+        }
+
+        @* ── Cửa sổ lịch sử train ── *@
+        <select class="form-select form-select-sm ps-select" @bind="_historyMonths" disabled="@_training"
+                title="Số tháng lịch sử dùng để huấn luyện mô hình ML.NET">
+            <option value="6">6T lịch sử</option>
+            <option value="12">12T lịch sử</option>
+            <option value="18">18T lịch sử</option>
+            <option value="24">24T lịch sử</option>
+        </select>
+
+        @* ── Top SP ── *@
         <select class="form-select form-select-sm ps-select" @bind="_topProducts" disabled="@_training">
-            <option value="10">Top 10 sản phẩm</option>
-            <option value="20">Top 20 sản phẩm</option>
-            <option value="30">Top 30 sản phẩm</option>
-            <option value="50">Top 50 sản phẩm</option>
+            <option value="10">Top 10 SP</option>
+            <option value="20">Top 20 SP</option>
+            <option value="30">Top 30 SP</option>
+            <option value="50">Top 50 SP</option>
         </select>
 
+        @* ── Filter hành động ── *@
         <select class="form-select form-select-sm ps-select" @bind="_filterAction" disabled="@_training">
-            <option value="all">Tất cả hành động</option>
+            <option value="all">Tất cả</option>
             <option value="import">📈 Nhập thêm</option>
             <option value="export">📉 Xuất bớt</option>
             <option value="maintain">➡ Duy trì</option>
@@ -50,11 +90,19 @@
             { <i class="bi bi-robot me-1"></i><span>Huấn luyện &amp; Phân tích</span> }
         </button>
 
+        <a class="btn btn-sm btn-outline-info d-flex align-items-center gap-1"
+           href="/help#sales-strategy" target="_blank"
+           title="Xem hướng dẫn chi tiết">
+            <i class="bi bi-question-circle-fill"></i>
+            <span class="d-none d-md-inline">Hướng dẫn</span>
+        </a>
+
         @if (_result != null && _result.All.Count > 0)
         {
-            <span class="badge bg-secondary ms-1" style="font-size:.7rem">
+            <span class="badge bg-secondary" style="font-size:.7rem">
                 @_result.TotalProvinces tỉnh · @_result.TotalProducts SP · @_result.All.Count cặp
             </span>
+            <span class="badge bg-primary" style="font-size:.7rem">@PeriodLabel</span>
         }
     </div>
 
@@ -148,8 +196,6 @@ else if (_result != null)
                 </div>
                 @foreach (var ps in _result.ProvinceSummaries)
                 {
-                    var dominant = ps.ImportCount >= ps.ExportCount && ps.ImportCount >= ps.MaintainCount
-                        ? "import" : ps.ExportCount >= ps.MaintainCount ? "export" : "maintain";
                     <div class="strat-province-item @(_selectedProvince == ps.ProvinceCode ? "strat-province-item--active" : "")"
                          @onclick="() => SelectProvince(ps.ProvinceCode)">
                         <div>
@@ -273,6 +319,10 @@ else if (_result != null)
 }
 
 @code {
+    // ── Filters ──────────────────────────────────────────────
+    private int    _year          = DateTime.Today.Year;
+    private string _periodType    = "month";
+    private int    _periodValue   = DateTime.Today.Month;
     private int    _historyMonths = 12;
     private int    _topProducts   = 20;
     private string _filterAction  = "all";
@@ -282,6 +332,21 @@ else if (_result != null)
     private string _error         = "";
     private int    _donePairs, _totalPairs;
     private StrategyResult? _result;
+
+    private string PeriodLabel => _periodType switch
+    {
+        "quarter" => $"Q{_periodValue}/{_year} · {_historyMonths}T train",
+        "month"   => $"T{_periodValue}/{_year} · {_historyMonths}T train",
+        _         => $"Năm {_year} · {_historyMonths}T train"
+    };
+
+    private void OnPeriodTypeChanged()
+    {
+        _periodValue = _periodType == "quarter" ? 1 : DateTime.Today.Month;
+    }
+
+    private int?  Quarter => _periodType == "quarter" ? _periodValue : null;
+    private int?  Month   => _periodType == "month"   ? _periodValue : null;
 
     private List<ProvinceProductStrategy> FilteredRows
     {
@@ -329,8 +394,9 @@ else if (_result != null)
 
         try
         {
-            // 1. Tải lịch sử từ DB
-            var history = await Repo.GetProvinceSalesHistoryAsync(_historyMonths, _topProducts);
+            // 1. Tải lịch sử từ DB (year/quarter/month xác định mốc cuối kỳ)
+            var history = await Repo.GetProvinceSalesHistoryAsync(
+                _year, Quarter, Month, _historyMonths, _topProducts);
             if (history.Count == 0)
             {
                 _error = "Không có dữ liệu lịch sử để huấn luyện.";
@@ -371,7 +437,6 @@ else if (_result != null)
                 ? _result.All
                 : _result.All.Where(r => r.ProvinceCode == _selectedProvince).ToList();
 
-            // Import chart: top SP nhập theo tỉnh
             var importData = src
                 .Where(r => r.Action == "import")
                 .OrderByDescending(r => r.GrowthRate)
@@ -379,7 +444,6 @@ else if (_result != null)
                 .Select(r => new { label = $"{r.InventoryName} ({r.ProvinceCode})", value = (double)(r.GrowthRate * 100) })
                 .ToList();
 
-            // Export chart: top SP xuất theo tỉnh
             var exportData = src
                 .Where(r => r.Action == "export")
                 .OrderBy(r => r.GrowthRate)

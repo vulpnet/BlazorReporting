@@ -86,10 +86,12 @@ public interface IDataRepository
     /// <summary>
     /// Lịch sử doanh số theo tháng nhóm theo Tỉnh/TP × Sản phẩm.
     /// Dùng để train ML.NET chiến lược nhập/xuất hàng theo khu vực.
-    /// topProducts: giới hạn N sản phẩm bán chạy nhất toàn quốc.
+    /// year/quarter/month xác định mốc cuối kỳ phân tích;
+    /// historyMonths lấy lùi từ mốc đó để làm dữ liệu huấn luyện.
     /// </summary>
     Task<IReadOnlyList<ProvinceSalesHistory>> GetProvinceSalesHistoryAsync(
-        int historyMonths = 18, int topProducts = 20,
+        int year, int? quarter, int? month,
+        int historyMonths = 12, int topProducts = 20,
         CancellationToken ct = default);
 }
 

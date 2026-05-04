@@ -495,12 +495,301 @@ SELECT N'Tổng hợp doanh số', 'vw_Sales', 'View', NULL;</code></pre>
         </div>
     </section>
 
+    @* ══ 11. Chiến lược kinh doanh ML.NET ════════════════════════ *@
+    <section id="sales-strategy" class="mb-5">
+        <h4 class="section-heading">
+            <i class="bi bi-robot me-2" style="color:#7c3aed"></i>Chiến lược kinh doanh – Cơ chế dự đoán
+            <code class="small">/sales-strategy</code>
+        </h4>
+
+        @* ── 1. Cơ chế hoạt động ── *@
+        <div class="card shadow-sm border-0 mb-3">
+            <div class="card-header fw-semibold" style="background:#1e293b;color:#f1f5f9">
+                <i class="bi bi-diagram-3-fill me-1"></i>1. Cơ chế hoạt động
+            </div>
+            <div class="card-body">
+                <p class="text-muted small mb-3">
+                    Hệ thống phân tích dữ liệu lịch sử bán hàng theo từng <strong>Tỉnh/TP × Sản phẩm</strong>,
+                    dùng ML.NET SSA dự đoán nhu cầu 3 tháng tới và đưa ra khuyến nghị tồn kho.
+                </p>
+                <div class="guide-flow">
+                    <div class="guide-flow-step">
+                        <div class="guide-flow-icon" style="background:#e0f2fe;color:#0369a1"><i class="bi bi-database-fill"></i></div>
+                        <div>
+                            <strong>1. Tải dữ liệu</strong>
+                            <p>Lấy lịch sử từ <code>DMSOrder</code> theo kỳ chọn + cửa sổ N tháng. Nhóm theo <em>Tỉnh × Sản phẩm × Tháng</em>.</p>
+                        </div>
+                    </div>
+                    <div class="guide-flow-arrow"><i class="bi bi-arrow-down"></i></div>
+                    <div class="guide-flow-step">
+                        <div class="guide-flow-icon" style="background:#ede9fe;color:#7c3aed"><i class="bi bi-robot"></i></div>
+                        <div>
+                            <strong>2. Huấn luyện ML.NET SSA</strong>
+                            <p>Mỗi cặp Tỉnh × SP được train 1 mô hình SSA riêng. Chạy song song đa luồng <code>Parallel.ForEachAsync</code>.</p>
+                        </div>
+                    </div>
+                    <div class="guide-flow-arrow"><i class="bi bi-arrow-down"></i></div>
+                    <div class="guide-flow-step">
+                        <div class="guide-flow-icon" style="background:#dcfce7;color:#15803d"><i class="bi bi-graph-up-arrow"></i></div>
+                        <div>
+                            <strong>3. Dự đoán 3 tháng tới</strong>
+                            <p>Mô hình dự đoán trung bình 3 tháng kế tiếp kèm <strong>khoảng tin cậy 90%</strong>.</p>
+                        </div>
+                    </div>
+                    <div class="guide-flow-arrow"><i class="bi bi-arrow-down"></i></div>
+                    <div class="guide-flow-step">
+                        <div class="guide-flow-icon" style="background:#fef3c7;color:#b45309"><i class="bi bi-lightbulb-fill"></i></div>
+                        <div>
+                            <strong>4. Phân loại &amp; Khuyến nghị</strong>
+                            <p>Tính tốc độ tăng trưởng → so ngưỡng → gắn nhãn Nhập / Xuất / Duy trì + lý do cụ thể.</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        @* ── 2. Thuật toán SSA ── *@
+        <div class="card shadow-sm border-0 mb-3">
+            <div class="card-header fw-semibold" style="background:#4f46e5;color:#fff">
+                <i class="bi bi-robot me-1"></i>2. Thuật toán SSA — Singular Spectrum Analysis
+            </div>
+            <div class="card-body">
+                <p class="small text-muted mb-3">
+                    SSA phân tách chuỗi thời gian thành 3 thành phần rồi dự đoán từng thành phần độc lập —
+                    chính xác hơn nhiều so với hồi quy tuyến tính, đặc biệt với dữ liệu có tính mùa vụ.
+                </p>
+
+                @* Decomposition visual *@
+                <div class="ssa-decomp mb-4">
+                    <div class="ssa-decomp-input">
+                        <div class="ssa-decomp-label">Dữ liệu thực tế (chuỗi doanh số tháng)</div>
+                        <div class="ssa-wave">
+                            @for (int i = 0; i < 12; i++)
+                            {
+                                var h = (int)(28 + Math.Sin(i * 0.6) * 10 + i * 1.5 + (i % 3 == 0 ? 6 : 0));
+                                <div class="ssa-bar" style="height:@(h)px;background:#4f46e5"></div>
+                            }
+                        </div>
+                    </div>
+                    <div class="ssa-decomp-eq"><i class="bi bi-arrows-collapse-vertical"></i> Phân tách SSA</div>
+                    <div class="ssa-decomp-parts">
+                        <div class="ssa-part ssa-part--trend">
+                            <i class="bi bi-graph-up-arrow"></i>
+                            <strong>Xu hướng</strong>
+                            <span>Đường tổng thể tăng hay giảm dần theo thời gian</span>
+                        </div>
+                        <div class="ssa-decomp-plus">+</div>
+                        <div class="ssa-part ssa-part--season">
+                            <i class="bi bi-calendar-week"></i>
+                            <strong>Mùa vụ</strong>
+                            <span>Pattern lặp lại hàng năm (tháng cao điểm, thấp điểm)</span>
+                        </div>
+                        <div class="ssa-decomp-plus">+</div>
+                        <div class="ssa-part ssa-part--noise">
+                            <i class="bi bi-lightning-charge"></i>
+                            <strong>Nhiễu</strong>
+                            <span>Biến động ngẫu nhiên, không dự đoán được — bị loại bỏ</span>
+                        </div>
+                    </div>
+                </div>
+
+                @* 4 bước SSA *@
+                <h6 class="fw-bold mb-2">4 bước xử lý của SSA:</h6>
+                <div class="ssa-steps mb-4">
+                    <div class="ssa-step">
+                        <div class="ssa-step-num">1</div>
+                        <div>
+                            <strong>Embedding — Tạo ma trận quỹ đạo</strong>
+                            <p>Chuỗi N tháng trượt theo cửa sổ <code>windowSize = min(N÷2, 12)</code> để tạo ma trận (L × K), L = windowSize, K = N − L + 1.</p>
+                            <div class="ssa-example">Ví dụ: 12 tháng → windowSize = 6 → ma trận <strong>6 × 7</strong></div>
+                        </div>
+                    </div>
+                    <div class="ssa-step">
+                        <div class="ssa-step-num">2</div>
+                        <div>
+                            <strong>SVD — Phân rã kỳ dị (Singular Value Decomposition)</strong>
+                            <p>Ma trận phân rã thành các <em>eigenvalue</em>. Eigenvalue lớn = xu hướng + mùa vụ. Eigenvalue nhỏ ≈ nhiễu → bị loại bỏ.</p>
+                        </div>
+                    </div>
+                    <div class="ssa-step">
+                        <div class="ssa-step-num">3</div>
+                        <div>
+                            <strong>Grouping — Nhóm thành phần</strong>
+                            <p>ML.NET tự động nhóm eigenvalue thành <em>Xu hướng</em> + <em>Mùa vụ</em>. Kết quả là chuỗi "sạch" không còn nhiễu.</p>
+                        </div>
+                    </div>
+                    <div class="ssa-step">
+                        <div class="ssa-step-num">4</div>
+                        <div>
+                            <strong>Forecasting — Ngoại suy 3 tháng tới</strong>
+                            <p>Dùng quan hệ tuyến tính giữa các eigenvector để ngoại suy. Tính <strong>khoảng tin cậy 90%</strong> (Lower – Upper bound).</p>
+                        </div>
+                    </div>
+                </div>
+
+                @* WindowSize *@
+                <div class="guide-formula mb-4">
+                    <div class="guide-formula-label">WindowSize — ảnh hưởng đến độ chính xác:</div>
+                    <div class="ssa-window-examples">
+                        <div class="ssa-win-item"><code>n=4  → ws=2</code> <span>Rất ít dữ liệu, chỉ bắt xu hướng cơ bản</span></div>
+                        <div class="ssa-win-item"><code>n=12 → ws=6</code> <span>Bắt được chu kỳ nửa năm (mùa hè/đông)</span></div>
+                        <div class="ssa-win-item"><code>n=24 → ws=12</code><span>Bắt được chu kỳ 1 năm đầy đủ — <strong>tốt nhất</strong></span></div>
+                    </div>
+                </div>
+
+                @* So sánh SSA vs Linear *@
+                <h6 class="fw-bold mb-2">So sánh SSA với Linear Regression:</h6>
+                <table class="guide-decision-table">
+                    <thead><tr><th>Tiêu chí</th><th><i class="bi bi-robot me-1"></i>ML.NET SSA</th><th><i class="bi bi-graph-up me-1"></i>Linear Regression</th></tr></thead>
+                    <tbody>
+                        <tr><td>Dữ liệu tối thiểu</td><td><span class="text-success fw-bold">≥ 4 tháng</span></td><td>≥ 2 tháng</td></tr>
+                        <tr><td>Phát hiện mùa vụ</td><td><span class="text-success">✅ Có</span></td><td><span class="text-danger">❌ Không</span></td></tr>
+                        <tr><td>Lọc nhiễu</td><td><span class="text-success">✅ Tự động</span></td><td><span class="text-danger">❌ Không</span></td></tr>
+                        <tr><td>Khoảng tin cậy</td><td>Tính từ dữ liệu thực (90%)</td><td>Cố định ±20%</td></tr>
+                        <tr><td>Khi dữ liệu đột biến</td><td>Ổn định (lọc nhiễu)</td><td>Bị ảnh hưởng nhiều</td></tr>
+                        <tr><td>Tốc độ train</td><td>Chậm hơn một chút</td><td><span class="text-success">Rất nhanh</span></td></tr>
+                        <tr><td>Hệ số tin cậy</td><td><span class="text-success fw-bold">× 1.0</span></td><td><span class="text-warning">× 0.65</span></td></tr>
+                        <tr><td>Khi nào dùng</td><td>Mặc định (≥ 4 điểm)</td><td>Fallback tự động</td></tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        @* ── 3. Điều kiện quyết định ── *@
+        <div class="card shadow-sm border-0 mb-3">
+            <div class="card-header fw-semibold bg-warning text-dark">
+                <i class="bi bi-signpost-split-fill me-1"></i>3. Điều kiện quyết định Nhập / Xuất / Duy trì
+            </div>
+            <div class="card-body">
+                <p class="small text-muted mb-3">
+                    Hệ thống tính <strong>GrowthRate</strong> = (Avg dự đoán 3T − Avg thực tế 3T) ÷ Avg thực tế 3T,
+                    rồi so với các ngưỡng sau:
+                </p>
+                <table class="guide-decision-table">
+                    <thead>
+                        <tr><th>Tốc độ tăng trưởng</th><th>Quyết định</th><th>Ý nghĩa</th><th>Hành động đề xuất</th></tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td><span class="strat-growth strat-growth--up fw-bold">&gt; +20%</span></td>
+                            <td><span class="strat-badge strategy-import-strong"><i class="bi bi-arrow-up-circle-fill me-1"></i>Nhập nhiều</span></td>
+                            <td>Nhu cầu tăng mạnh đột biến</td>
+                            <td>Tăng tồn kho ngay, đặt hàng sớm tránh thiếu hàng</td>
+                        </tr>
+                        <tr>
+                            <td><span class="strat-growth strat-growth--up">+7% → +20%</span></td>
+                            <td><span class="strat-badge strategy-import"><i class="bi bi-arrow-up-right-circle-fill me-1"></i>Nhập thêm</span></td>
+                            <td>Xu hướng tăng ổn định</td>
+                            <td>Tăng 10–20% lượng đặt hàng so với kỳ trước</td>
+                        </tr>
+                        <tr>
+                            <td><span class="strat-growth strat-growth--flat">-7% → +7%</span></td>
+                            <td><span class="strat-badge strategy-maintain"><i class="bi bi-dash-circle-fill me-1"></i>Duy trì</span></td>
+                            <td>Thị trường ổn định</td>
+                            <td>Giữ nguyên mức tồn kho, tiếp tục theo dõi</td>
+                        </tr>
+                        <tr>
+                            <td><span class="strat-growth strat-growth--down">-20% → -7%</span></td>
+                            <td><span class="strat-badge strategy-export"><i class="bi bi-arrow-down-right-circle-fill me-1"></i>Xuất bớt</span></td>
+                            <td>Xu hướng giảm nhẹ</td>
+                            <td>Giảm dần tồn kho, chuyển sang khu vực nhu cầu cao hơn</td>
+                        </tr>
+                        <tr>
+                            <td><span class="strat-growth strat-growth--down fw-bold">&lt; -20%</span></td>
+                            <td><span class="strat-badge strategy-export-strong"><i class="bi bi-arrow-down-circle-fill me-1"></i>Xuất gấp</span></td>
+                            <td>Nhu cầu sụt giảm mạnh</td>
+                            <td>Khuyến mãi đẩy hàng, chuyển kho gấp, không tái nhập</td>
+                        </tr>
+                    </tbody>
+                </table>
+                <div class="alert alert-warning d-flex gap-2 mt-3 mb-0 py-2">
+                    <i class="bi bi-exclamation-triangle-fill flex-shrink-0"></i>
+                    <span class="small">Ngưỡng <strong>±7%</strong> và <strong>±20%</strong> là giá trị mặc định.
+                    Thực tế nên điều chỉnh theo biên lợi nhuận và chi phí tồn kho của từng sản phẩm.</span>
+                </div>
+            </div>
+        </div>
+
+        @* ── 4. Độ tin cậy ── *@
+        <div class="card shadow-sm border-0 mb-3">
+            <div class="card-header fw-semibold bg-info text-white">
+                <i class="bi bi-shield-check-fill me-1"></i>4. Độ tin cậy (Confidence Score)
+            </div>
+            <div class="card-body">
+                <div class="guide-formula mb-3">
+                    <div class="guide-formula-label">Công thức:</div>
+                    <div class="guide-formula-expr">
+                        Confidence = min(1,&nbsp;<span class="text-primary">n ÷ 12</span>)&nbsp;×&nbsp;<span class="text-purple">hệ số thuật toán</span>
+                    </div>
+                    <div class="guide-formula-note">
+                        n = số tháng dữ liệu thực &nbsp;·&nbsp; Hệ số SSA = 1.0 &nbsp;·&nbsp; Hệ số Linear = 0.65
+                    </div>
+                </div>
+                <table class="guide-decision-table">
+                    <thead><tr><th>Tình huống</th><th>Công thức</th><th>Kết quả</th><th>Đánh giá</th></tr></thead>
+                    <tbody>
+                        <tr><td>18+ tháng + SSA</td><td><code>min(1,18/12)×1.0</code></td><td><span class="fw-bold text-success">100%</span></td><td>Rất tin cậy ✅</td></tr>
+                        <tr><td>12 tháng + SSA</td><td><code>min(1,12/12)×1.0</code></td><td><span class="fw-bold text-success">100%</span></td><td>Rất tin cậy ✅</td></tr>
+                        <tr><td>12 tháng + Linear</td><td><code>min(1,12/12)×0.65</code></td><td><span class="fw-bold text-warning">65%</span></td><td>Trung bình ⚠</td></tr>
+                        <tr><td>6 tháng + SSA</td><td><code>min(1,6/12)×1.0</code></td><td><span class="fw-bold text-warning">50%</span></td><td>Trung bình ⚠</td></tr>
+                        <tr><td>3 tháng + Linear</td><td><code>min(1,3/12)×0.65</code></td><td><span class="fw-bold text-danger">16%</span></td><td>Cần thêm dữ liệu ❌</td></tr>
+                    </tbody>
+                </table>
+                <div class="alert alert-info d-flex gap-2 mt-3 mb-0 py-2">
+                    <i class="bi bi-lightbulb-fill flex-shrink-0"></i>
+                    <span class="small">Để đạt tin cậy tối đa: chọn <strong>≥ 12 tháng lịch sử</strong>
+                    và đảm bảo mỗi cặp Tỉnh×SP có <strong>≥ 4 tháng</strong> có doanh số thực (không phải tháng 0).
+                    Chỉ hành động mạnh khi confidence <strong>&gt; 60%</strong>.</span>
+                </div>
+            </div>
+        </div>
+
+        @* ── 5. Cách đọc kết quả ── *@
+        <div class="card shadow-sm border-0">
+            <div class="card-header fw-semibold bg-success text-white">
+                <i class="bi bi-eye-fill me-1"></i>5. Cách đọc và sử dụng kết quả
+            </div>
+            <div class="card-body">
+                <div class="guide-tips">
+                    <div class="guide-tip guide-tip--import">
+                        <div class="guide-tip-badge"><i class="bi bi-1-circle-fill"></i>Ưu tiên Xuất gấp &amp; Nhập nhiều trước</div>
+                        <p>Lọc <strong>Xuất gấp</strong> trước — hàng tồn đọng cần giải phóng vốn ngay.
+                        Tiếp theo <strong>Nhập nhiều</strong> — cơ hội doanh thu bị bỏ lỡ nếu thiếu hàng.</p>
+                    </div>
+                    <div class="guide-tip guide-tip--info">
+                        <div class="guide-tip-badge"><i class="bi bi-2-circle-fill"></i>Xem theo từng tỉnh</div>
+                        <p>Click tỉnh trong sidebar để lọc kết quả. Chip
+                        <span class="strat-chip strat-chip--import">↑N</span>
+                        <span class="strat-chip strat-chip--export">↓N</span> tóm tắt nhanh số SP cần nhập/xuất.</p>
+                    </div>
+                    <div class="guide-tip guide-tip--warn">
+                        <div class="guide-tip-badge"><i class="bi bi-3-circle-fill"></i>Kiểm tra cột Tin cậy</div>
+                        <p>Thanh màu + % + nhãn <code>·SSA</code> / <code>·LR</code>.
+                        Chỉ hành động quyết liệt khi &gt; 60%. Dưới 30% nên thu thập thêm dữ liệu.</p>
+                    </div>
+                    <div class="guide-tip guide-tip--neutral">
+                        <div class="guide-tip-badge"><i class="bi bi-4-circle-fill"></i>Đọc cột Lý do &amp; Mùa vụ</div>
+                        <p>Mỗi dòng có giải thích cụ thể và tháng cao điểm lịch sử của SP tại tỉnh đó
+                        — giúp lập kế hoạch nhập hàng trước mùa để tránh thiếu.</p>
+                    </div>
+                    <div class="guide-tip guide-tip--success">
+                        <div class="guide-tip-badge"><i class="bi bi-5-circle-fill"></i>2 biểu đồ Top SP</div>
+                        <p>Cuối trang: <span style="color:#15803d;font-weight:600">Xanh = Top SP nên Nhập</span>,
+                        <span style="color:#b91c1c;font-weight:600">Đỏ = Top SP nên Xuất</span> cho khu vực đang xem.
+                        Trục X = % tăng trưởng dự đoán.</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
     @* ══ Footer ════════════════════════════════════════════════════ *@
     <div class="text-center py-3 border-top d-flex justify-content-center gap-2 flex-wrap">
         <a href="#" class="btn btn-outline-secondary btn-sm"><i class="bi bi-arrow-up me-1"></i>Đầu trang</a>
         <a href="/map"           class="btn btn-outline-success btn-sm"><i class="bi bi-geo-alt me-1"></i>Bản đồ</a>
         <a href="/product-sales" class="btn btn-outline-warning btn-sm"><i class="bi bi-box-seam me-1"></i>Sản phẩm</a>
-        <a href="/report"        class="btn btn-primary btn-sm"><i class="bi bi-table me-1"></i>Báo cáo</a>
+        <a href="/report"          class="btn btn-primary btn-sm"><i class="bi bi-table me-1"></i>Báo cáo</a>
+        <a href="/sales-strategy" class="btn btn-sm" style="background:#7c3aed;color:#fff"><i class="bi bi-robot me-1"></i>Chiến lược</a>
     </div>
 
 </div>
@@ -518,6 +807,7 @@ SELECT N'Tổng hợp doanh số', 'vw_Sales', 'View', NULL;</code></pre>
         ("Danh mục BC",      "report-catalog", "bi-collection",        "#ca8a04"),
         ("Hiệu năng",        "performance",    "bi-speedometer2",      "#dc2626"),
         ("Phím tắt",         "shortcuts",      "bi-keyboard",          "#475569"),
+        ("Chiến lược ML",    "sales-strategy", "bi-robot",             "#7c3aed"),
     ];
 
     private static readonly (string Icon, string Title, string Sub, string Bg)[] _overviewCards =

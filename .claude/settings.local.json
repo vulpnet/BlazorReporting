@@ -3,7 +3,8 @@
     "allow": [
       "Bash(dotnet build *)",
       "Bash(grep -v \"^$\\\\|^  $\")",
-      "Bash(dotnet add *)"
+      "Bash(dotnet add *)",
+      "Bash(powershell -Command ' *)"
     ]
   }
 }

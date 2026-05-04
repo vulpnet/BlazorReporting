@@ -785,59 +785,50 @@ public sealed class DataRepository : IDataRepository
 
     // ══════════════════════════════════════════════════════════════
     // GetProductSalesByAreaAsync
-    //   Top N sản phẩm (theo qty) × khu vực trong kỳ chọn
+    //   Top N sản phẩm × khu vực trong kỳ chọn — dùng view DMSOrder
+    //   Columns: InventoryCD, InventoryName, ProvinceID, AreaLabel,
+    //            TotalQty, TotalAmount, OrderCount, OrderDate
     // ══════════════════════════════════════════════════════════════
     public async Task<IReadOnlyList<ProductAreaItem>> GetProductSalesByAreaAsync(
         int year, int? quarter, int? month,
         string groupBy = "route", int topN = 10,
         CancellationToken ct = default)
     {
-        var areaCol = groupBy switch
-        {
-            "sm"       => "h.UserName",
-            "province" => "ISNULL(p.ProvinceCode,'(Khác)')",
-            _          => "ISNULL(h.RouteCode,'(Khác)')"
-        };
+        // groupBy = "province" → dùng tên tỉnh (join DMSAimProvince qua ProvinceID)
+        //         = "route" | others → dùng AreaLabel sẵn có trong DMSOrder
+        bool byProvince = groupBy == "province";
 
-        // Tính ngày đầu / cuối kỳ ở C# → tránh hàm YEAR()/MONTH() không dùng index
         var (dateFrom, dateTo) = BuildDateRange(year, quarter, month);
+
+        var areaExpr = byProvince
+            ? "ISNULL(pv.Descr, N'(Khác)')"
+            : "ISNULL(o.AreaLabel, N'(Khác)')";
+
+        var joinProvince = byProvince
+            ? "LEFT JOIN (SELECT DISTINCT ProvinceID, Descr FROM DMSAimProvince WITH (NOLOCK)) pv ON pv.ProvinceID = o.ProvinceID"
+            : "";
 
         var sql = $"""
             ;WITH TopProds AS (
-                SELECT TOP (@TopN) d.InventoryCD
-                FROM DMSAimOrderDetail  d WITH (NOLOCK)
-                INNER JOIN DMSAimOrderHeader h WITH (NOLOCK)
-                       ON  d.UserName       = h.UserName
-                       AND d.OrderCode      = h.OrderCode
-                       AND d.DistributorCode= h.DistributorCD
-                WHERE h.OrderDate >= @DateFrom AND h.OrderDate < @DateTo
-                GROUP BY d.InventoryCD
-                ORDER BY SUM(d.OrderQty) DESC
+                SELECT TOP (@TopN) InventoryCD
+                FROM   DMSOrder WITH (NOLOCK)
+                WHERE  OrderDate >= @DateFrom AND OrderDate < @DateTo
+                GROUP  BY InventoryCD
+                ORDER  BY SUM(TotalQty) DESC
             )
             SELECT
-                d.InventoryCD,
-                MAX(ISNULL(inv.InventoryName, d.InventoryCD)) AS InventoryName,
-                {areaCol}                                                  AS AreaLabel,
-                SUM(d.OrderQty)                                            AS TotalQty,
-                SUM(CAST(d.OrderQty AS DECIMAL(18,4)) * d.UnitPrice)      AS TotalAmount,
-                COUNT(DISTINCT h.OrderCode)                                AS OrderCount
-            FROM DMSAimOrderDetail  d WITH (NOLOCK)
-            INNER JOIN DMSAimOrderHeader h WITH (NOLOCK)
-                   ON  d.UserName       = h.UserName
-                   AND d.OrderCode      = h.OrderCode
-                   AND d.DistributorCode= h.DistributorCD
-            INNER JOIN TopProds tp ON d.InventoryCD = tp.InventoryCD
-            LEFT  JOIN DMSAimInventoryItem inv WITH (NOLOCK)
-                   ON  inv.InventoryCD  = d.InventoryCD
-            LEFT  JOIN DMSAimCustomer c WITH (NOLOCK)
-                   ON  c.UserName   = h.UserName
-                   AND c.CustomerCD = h.CustomerCD
-            LEFT  JOIN (SELECT DISTINCT ProvinceID, Descr ProvinceCode
-                        FROM DMSAimProvince WITH (NOLOCK)) p
-                   ON  p.ProvinceID = c.ProvinceID
-            WHERE h.OrderDate >= @DateFrom AND h.OrderDate < @DateTo
-            GROUP BY d.InventoryCD, {areaCol}
-            ORDER BY TotalQty DESC
+                o.InventoryCD,
+                MAX(ISNULL(o.InventoryName, o.InventoryCD)) AS InventoryName,
+                {areaExpr}                                  AS AreaLabel,
+                SUM(o.TotalQty)                             AS TotalQty,
+                SUM(o.TotalAmount)                          AS TotalAmount,
+                SUM(o.OrderCount)                           AS OrderCount
+            FROM   DMSOrder o WITH (NOLOCK)
+            INNER  JOIN TopProds tp ON o.InventoryCD = tp.InventoryCD
+            {joinProvince}
+            WHERE  o.OrderDate >= @DateFrom AND o.OrderDate < @DateTo
+            GROUP  BY o.InventoryCD, {areaExpr}
+            ORDER  BY TotalQty DESC
             """;
 
         await using var conn = new SqlConnection(_cs);
@@ -845,10 +836,10 @@ public sealed class DataRepository : IDataRepository
 
         using var cmd = conn.CreateCommand();
         cmd.CommandText    = sql;
-        cmd.CommandTimeout = 60;
+        cmd.CommandTimeout = 30;
         cmd.Parameters.AddWithValue("@DateFrom", dateFrom);
-        cmd.Parameters.AddWithValue("@DateTo",  dateTo);
-        cmd.Parameters.AddWithValue("@TopN",    topN);
+        cmd.Parameters.AddWithValue("@DateTo",   dateTo);
+        cmd.Parameters.AddWithValue("@TopN",     topN);
 
         var result = new List<ProductAreaItem>();
         await using var r = await cmd.ExecuteReaderAsync(ct);
@@ -931,53 +922,47 @@ public sealed class DataRepository : IDataRepository
     /// </summary>
     // ══════════════════════════════════════════════════════════════
     // GetProvinceSalesHistoryAsync
-    //   Lịch sử tháng × Tỉnh/TP × Sản phẩm — dữ liệu train ML.NET
+    //   Lịch sử tháng × Tỉnh/TP × Sản phẩm từ view DMSOrder.
+    //   year/quarter/month → xác định mốc cuối kỳ (toDate).
+    //   historyMonths     → lùi từ toDate để lấy khoảng train.
     // ══════════════════════════════════════════════════════════════
     public async Task<IReadOnlyList<ProvinceSalesHistory>> GetProvinceSalesHistoryAsync(
-        int historyMonths = 18, int topProducts = 20,
+        int year, int? quarter, int? month,
+        int historyMonths = 12, int topProducts = 20,
         CancellationToken ct = default)
     {
-        var fromDate = DateTime.Today.AddMonths(-historyMonths).Date;
+        // Tính mốc cuối kỳ từ period đã chọn
+        var (_, periodEnd) = BuildDateRange(year, quarter, month);
+        // Lùi historyMonths tháng từ cuối kỳ → đầu cửa sổ train
+        var fromDate = periodEnd.AddMonths(-historyMonths).Date;
 
-        var sql = $"""
+        const string sql = """
             ;WITH TopProds AS (
-                SELECT TOP (@TopProducts) d.InventoryCD
-                FROM   DMSAimOrderDetail  d WITH (NOLOCK)
-                INNER  JOIN DMSAimOrderHeader h WITH (NOLOCK)
-                       ON  d.UserName        = h.UserName
-                       AND d.OrderCode       = h.OrderCode
-                       AND d.DistributorCode = h.DistributorCD
-                WHERE  h.OrderDate >= @FromDate
-                GROUP  BY d.InventoryCD
-                ORDER  BY SUM(d.OrderQty) DESC
+                SELECT TOP (@TopProducts) InventoryCD
+                FROM   DMSOrder WITH (NOLOCK)
+                WHERE  OrderDate >= @FromDate
+                  AND  OrderDate <  @ToDate
+                GROUP  BY InventoryCD
+                ORDER  BY SUM(TotalQty) DESC
             )
             SELECT
-                ISNULL(pr.ProvinceCode, N'(Khác)')              AS ProvinceCode,
-                d.InventoryCD,
-                MAX(ISNULL(inv.InventoryName, d.InventoryCD))   AS InventoryName,
-                YEAR(h.OrderDate)                               AS Yr,
-                MONTH(h.OrderDate)                              AS Mo,
-                SUM(d.OrderQty)                                 AS TotalQty,
-                SUM(CAST(d.OrderQty AS DECIMAL(18,4)) * d.UnitPrice) AS TotalAmount,
-                COUNT(DISTINCT h.OrderCode)                     AS OrderCount
-            FROM   DMSAimOrderDetail  d WITH (NOLOCK)
-            INNER  JOIN DMSAimOrderHeader h WITH (NOLOCK)
-                   ON  d.UserName        = h.UserName
-                   AND d.OrderCode       = h.OrderCode
-                   AND d.DistributorCode = h.DistributorCD
-            INNER  JOIN TopProds tp ON d.InventoryCD = tp.InventoryCD
-            LEFT   JOIN DMSAimInventoryItem inv WITH (NOLOCK)
-                   ON  inv.InventoryCD = d.InventoryCD
-            LEFT   JOIN DMSAimCustomer c WITH (NOLOCK)
-                   ON  c.UserName   = h.UserName
-                   AND c.CustomerCD = h.CustomerCD
-            LEFT   JOIN (SELECT DISTINCT ProvinceID, Descr ProvinceCode
-                         FROM DMSAimProvince WITH (NOLOCK)) pr
-                   ON  pr.ProvinceID = c.ProvinceID
-            WHERE  h.OrderDate >= @FromDate
-            GROUP  BY ISNULL(pr.ProvinceCode, N'(Khác)'), d.InventoryCD,
-                      YEAR(h.OrderDate), MONTH(h.OrderDate)
-            ORDER  BY ProvinceCode, d.InventoryCD, Yr, Mo
+                ISNULL(o.AreaLabel, N'(Khác)')              AS ProvinceCode,
+                o.InventoryCD,
+                MAX(ISNULL(o.InventoryName, o.InventoryCD)) AS InventoryName,
+                YEAR(o.OrderDate)                           AS Yr,
+                MONTH(o.OrderDate)                          AS Mo,
+                SUM(o.TotalQty)                             AS TotalQty,
+                SUM(o.TotalAmount)                          AS TotalAmount,
+                SUM(o.OrderCount)                           AS OrderCount
+            FROM   DMSOrder o WITH (NOLOCK)
+            INNER  JOIN TopProds tp ON o.InventoryCD = tp.InventoryCD
+            WHERE  o.OrderDate >= @FromDate
+              AND  o.OrderDate <  @ToDate
+            GROUP  BY ISNULL(o.AreaLabel, N'(Khác)'),
+                      o.InventoryCD,
+                      YEAR(o.OrderDate),
+                      MONTH(o.OrderDate)
+            ORDER  BY ProvinceCode, o.InventoryCD, Yr, Mo
             """;
 
         await using var conn = new SqlConnection(_cs);
@@ -985,8 +970,9 @@ public sealed class DataRepository : IDataRepository
 
         using var cmd = conn.CreateCommand();
         cmd.CommandText    = sql;
-        cmd.CommandTimeout = 120;
+        cmd.CommandTimeout = 60;
         cmd.Parameters.AddWithValue("@FromDate",    fromDate);
+        cmd.Parameters.AddWithValue("@ToDate",      periodEnd);
         cmd.Parameters.AddWithValue("@TopProducts", topProducts);
 
         var result = new List<ProvinceSalesHistory>();
