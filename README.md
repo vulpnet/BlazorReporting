@@ -158,6 +158,217 @@ Config-based authentication — users and roles defined in `appsettings.json`, n
 
 ---
 
+---
+
+## 🤖 ML Forecasting Engine — How It Works
+
+The forecasting pipeline consists of **3 coordinated services** working in sequence:
+
+```
+SalesForecastService          →  raw SSA forecast (qty + amount)
+      ↓
+SeasonalFactorService         →  seasonal multiplier per (Province × Product × Month)
+      ↓
+SalesStrategyService          →  adjusted growth rate → Import / Export / Maintain
+```
+
+---
+
+### 1. SalesForecastService — SSA + Linear Fallback
+
+**Primary algorithm: Singular Spectrum Analysis (ML.NET SSA)**
+
+```
+Input  : ProductTrendPoint[] — monthly (Year, Month, TotalQty, TotalAmount)
+Output : ForecastResult      — labels, qty series, amount series, confidence bands
+```
+
+**Window size formula (adaptive):**
+```
+windowSize = max(2, min(n / 2, 12))
+
+Where n = number of historical data points
+- n = 4  → windowSize = 2
+- n = 12 → windowSize = 6
+- n = 24 → windowSize = 12  (capped)
+```
+
+**Confidence bands: 90%**
+```
+SSA outputs 3 arrays per forecast:
+  Forecast[t]  — point prediction
+  Lower[t]     — 90% lower bound  = max(0, lower)
+  Upper[t]     — 90% upper bound
+```
+
+**Fallback: Linear Regression (when n < 4 or SSA returns NaN/Inf)**
+```
+Ordinary Least Squares:
+  slope (s) = (n·Σxy − Σx·Σy) / (n·Σx² − (Σx)²)
+  intercept (b) = (Σy − s·Σx) / n
+  pred(t) = max(0, b + s·t)
+
+Confidence bands (±20%):
+  Lower[t] = pred[t] × 0.80
+  Upper[t] = pred[t] × 1.20
+```
+
+**Algorithm label exposed to UI:**
+```
+IsSSA = true  → "ML.NET SSA (window=W, n=N)"
+IsSSA = false → "Linear Regression (n=N — cần ≥4 điểm để dùng SSA)"
+```
+
+---
+
+### 2. SeasonalFactorService — Multi-Factor Seasonal Adjustment
+
+Computes a **seasonal multiplier** for each (Province × Product × Month) combination by multiplying independent factors:
+
+```
+SeasonalFactor = f_holiday × f_midautumn × f_summer × f_national × f_climate
+```
+
+**Holiday factor (f_holiday):**
+```
+Month 1–2 (Tết):
+  Confectionery → ×2.8
+  Condiment     → ×2.0
+  Beverage      → ×1.8
+  InstantFood   → ×1.5
+  Others        → ×1.3
+
+Month 12 (pre-Tết stocking):
+  Confectionery → ×1.8
+  Condiment     → ×1.5
+  Beverage      → ×1.4
+  Others        → ×1.2
+```
+
+**Mid-Autumn factor (f_midautumn):**
+```
+Month 8–9:
+  Confectionery → ×1.8
+  Others        → ×1.0
+```
+
+**Summer factor (f_summer):**
+```
+Month 6–8:
+  Beverage    → ×1.5
+  FrozenFood  → ×1.6
+  PersonalCare→ ×1.1
+```
+
+**Climate factor (f_climate) by region:**
+```
+North (Miền Bắc):
+  Month 11–2 (winter):  Beverage    → ×0.75  |  InstantFood/Condiment → ×1.15
+  Month 6–8  (summer):  Household   → ×1.10
+
+Central (Miền Trung):
+  Month 9–12 (flood):   All         → ×0.82
+  Month 6–8  (hot/dry): Beverage    → ×1.60
+
+South (Miền Nam):
+  Month 5–10 (rainy):   Beverage    → ×1.20  |  Others → ×0.95
+  Month 11–4 (dry):     Beverage    → ×1.35  |  Others → ×1.05
+```
+
+**Province → Climate Region mapping:**
+```
+North   : Hà Nội, Hải Phòng, Thanh Hóa, Nghệ An, Hà Tĩnh, ...
+Central : Đà Nẵng, Huế, Quảng Nam, Khánh Hòa, Lâm Đồng, ...
+South   : (default) TP.HCM, Cần Thơ, ...
+```
+
+**Product → Category auto-detection (keyword matching):**
+```
+"bia", "rượu", "nước ngọt" ... → Beverage
+"bánh", "kẹo", "mứt"       ... → Confectionery
+"nước mắm", "dầu ăn"       ... → Condiment
+"mì gói", "phở", "bún"     ... → InstantFood
+"kem", "đông lạnh"          ... → FrozenFood
+"dầu gội", "sữa tắm"       ... → PersonalCare
+"bột giặt", "nước rửa chén" ... → Household
+```
+
+**Inventory signal (from purchase history):**
+```
+zeros_ratio = count(qty == 0) / n
+  > 25% → PossibleStockout
+
+velocity_change = (avg_last_3M - avg_prev_3M) / avg_prev_3M
+  > 35% → SurgeBuying
+  > 12% → Increasing
+  < -35%→ SharpDecline
+  < -12%→ Slowing
+  else  → Stable
+```
+
+---
+
+### 3. SalesStrategyService — Final Adjusted Growth & Action
+
+Combines SSA forecast + seasonal factor + inventory signal into a single **AdjustedGrowthRate**, then maps to an action:
+
+**Adjusted growth formula:**
+```
+rawGrowth     = (predQtyAvg - avgQty3M) / avgQty3M       ← from SSA/Linear
+seasonAdj     = (SeasonalFactor - 1.0) × 0.4             ← 40% weight on seasonal
+inventoryAdj  = SurgeBuying      → +0.08
+                PossibleStockout → +0.10
+                SharpDecline     → -0.08
+                others           → 0.0
+
+AdjustedGrowthRate = rawGrowth + seasonAdj + inventoryAdj
+```
+
+**Action thresholds:**
+```
+AdjustedGrowthRate > +20% → "Nhập nhiều"  (Import Strong)
+AdjustedGrowthRate > + 7% → "Nhập thêm"  (Import)
+AdjustedGrowthRate < -20% → "Xuất gấp"   (Export Strong)
+AdjustedGrowthRate < - 7% → "Xuất bớt"   (Export)
+otherwise                 → "Duy trì"    (Maintain)
+```
+
+**Confidence score:**
+```
+confidence = min(1.0, n/12) × ssaWeight × signalWeight
+
+ssaWeight    = 1.0  if UsedSSA else 0.65
+signalWeight = 0.9  if InventorySignal == Unknown else 1.0
+```
+
+**Parallel processing:** All (Province × Product) pairs processed concurrently via `Parallel.ForEachAsync` with `MaxDegreeOfParallelism = max(2, CPU_cores - 1)`.
+
+---
+
+### Full Pipeline Summary
+
+```
+History data (Province × Product × Month)
+        ↓
+[SalesForecastService]
+  SSA (n≥4): windowSize = max(2, min(n/2, 12)), confidence=90%
+  Fallback:  OLS linear regression ± 20% bands
+        ↓
+[SeasonalFactorService]
+  Factor = f_holiday × f_midautumn × f_summer × f_national × f_climate
+  Province → Region (North/Central/South)
+  Product  → Category (8 types, keyword detection)
+  History  → InventorySignal (velocity analysis)
+        ↓
+[SalesStrategyService]
+  AdjustedGrowth = rawGrowth + (SF-1)×0.4 + inventoryAdj
+  Action = Import Strong / Import / Maintain / Export / Export Strong
+  Confidence = f(n, SSA, signal)
+        ↓
+StrategyResult → TopImport / TopExport / ProvinceSummaries
+```
+
+
 ## 🛠 Tech Stack
 
 | Layer | Package | Version |
