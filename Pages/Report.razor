@@ -325,7 +325,7 @@
             {
                 <PivotTable Pivot="@_pivotResult"
                             RowField="@_pivotConfig.RowField"
-                            ColField="@_pivotConfig.ColumnField"
+                            ColFields="@_pivotConfig.ValidColumnFields"
                             Config="@_pivotConfig"
                             DrillDownProvider="@GetDrillDownDataAsync" />
             }
@@ -942,7 +942,7 @@
                 var grouped = await Repo.FetchPivotGroupByAsync(
                     _config,
                     _pivotConfig.RowField,
-                    _pivotConfig.ColumnField,
+                    _pivotConfig.ValidColumnFields,
                     vds);
 
                 _pivotResult = await Task.Run(() => BuildPivotFromGroupBy(grouped, vds));
@@ -970,8 +970,8 @@
         IReadOnlyList<Dictionary<string, object?>> grouped,
         IReadOnlyList<PivotValueDef> vds)
     {
-        var rowField = _pivotConfig.RowField;
-        var colField = _pivotConfig.ColumnField;
+        var rowField  = _pivotConfig.RowField;
+        var colFields = _pivotConfig.ValidColumnFields;
 
         var rowSet = new SortedSet<string>(StringComparer.OrdinalIgnoreCase);
         var colSet = new SortedSet<string>(StringComparer.OrdinalIgnoreCase);
@@ -981,7 +981,8 @@
         foreach (var row in grouped)
         {
             var rk = GetKey(row, rowField);
-            var ck = GetKey(row, colField);
+            // Build composite column key from all column fields
+            var ck = PivotConfig.MakeColKey(colFields.Select(f => GetKey(row, f)));
             rowSet.Add(rk);
             colSet.Add(ck);
 

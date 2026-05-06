@@ -241,40 +241,91 @@ else if (_result != null)
                     <thead>
                         <tr>
                             <th>Tỉnh / TP</th>
-                            <th>Mã SP</th>
-                            <th>Tên sản phẩm</th>
-                            <th class="text-end">TB 3T thực (SP)</th>
-                            <th class="text-end">Dự đoán 3T (SP)</th>
+                            <th>Sản phẩm</th>
+                            <th class="text-end">TB 3T thực</th>
+                            <th class="text-end">Dự đoán 3T</th>
                             <th class="text-end">Tăng trưởng</th>
                             <th>Khuyến nghị</th>
-                            <th>Lý do</th>
+                            <th>Yếu tố tác động</th>
+                            <th>Lý do &amp; Sự kiện</th>
                             <th class="text-center">Tin cậy</th>
                         </tr>
                     </thead>
                     <tbody>
                         @foreach (var row in FilteredRows)
                         {
+                            var invColor = row.InventorySignal switch {
+                                InventorySignal.SurgeBuying      => "text-danger",
+                                InventorySignal.PossibleStockout => "text-danger",
+                                InventorySignal.SharpDecline     => "text-warning",
+                                InventorySignal.Increasing       => "text-success",
+                                _ => "text-muted"
+                            };
+                            var invIcon = row.InventorySignal switch {
+                                InventorySignal.SurgeBuying      => "bi-exclamation-triangle-fill",
+                                InventorySignal.PossibleStockout => "bi-dash-circle-fill",
+                                InventorySignal.SharpDecline     => "bi-graph-down-arrow",
+                                InventorySignal.Increasing       => "bi-graph-up-arrow",
+                                InventorySignal.Slowing          => "bi-hourglass-split",
+                                _ => "bi-check2-circle"
+                            };
                             <tr class="strat-row strat-row--@row.Action">
-                                <td><span class="ps-area-badge">@row.ProvinceCode</span></td>
-                                <td><code style="font-size:.75rem">@row.InventoryCD</code></td>
-                                <td class="strat-prod-name" title="@row.InventoryName">@row.InventoryName</td>
+                                <td>
+                                    <span class="ps-area-badge">@row.ProvinceCode</span>
+                                    <div style="font-size:.65rem;color:#94a3b8;margin-top:.1rem">@row.Region</div>
+                                </td>
+                                <td>
+                                    <div class="strat-prod-name fw-semibold" title="@row.InventoryName">@row.InventoryName</div>
+                                    <div style="font-size:.67rem;color:#94a3b8">@row.ProductCategory</div>
+                                </td>
                                 <td class="text-end fw-semibold">@row.AvgQty3M.ToString("N0")</td>
                                 <td class="text-end fw-semibold">@row.PredQty3M.ToString("N0")</td>
                                 <td class="text-end">
-                                    <span class="strat-growth strat-growth--@(row.GrowthRate > 0 ? "up" : row.GrowthRate < 0 ? "down" : "flat")">
-                                        @row.GrowthRate.ToString("+0.0%;-0.0%;0%")
+                                    @* Tăng trưởng đã điều chỉnh *@
+                                    <span class="strat-growth strat-growth--@(row.AdjustedGrowthRate > 0 ? "up" : row.AdjustedGrowthRate < 0 ? "down" : "flat")">
+                                        @row.AdjustedGrowthRate.ToString("+0.0%;-0.0%;0%")
                                     </span>
+                                    @if (MathF.Abs(row.SeasonalMultiplier - 1f) > 0.05f)
+                                    {
+                                        <div style="font-size:.65rem;color:#7c3aed" title="Hệ số mùa vụ">
+                                            ×@row.SeasonalMultiplier.ToString("0.0") mùa
+                                        </div>
+                                    }
                                 </td>
                                 <td>
                                     <span class="strat-badge @row.BadgeClass">
                                         <i class="bi @row.ActionIcon me-1"></i>@row.ActionLabel
                                     </span>
                                 </td>
+                                <td>
+                                    @* Climate *@
+                                    <div class="strat-factor-row" title="Khí hậu vùng">
+                                        <span style="font-size:.72rem">@row.ClimateContext</span>
+                                    </div>
+                                    @* Inventory signal *@
+                                    <div class="strat-factor-row @invColor" title="Tín hiệu tồn kho">
+                                        <i class="bi @invIcon me-1"></i>
+                                        <span style="font-size:.7rem">@InvSignalLabel(row.InventorySignal)</span>
+                                    </div>
+                                    @* Seasonal multiplier bar *@
+                                    @{ var sfCls = row.SeasonalMultiplier >= 1.1f ? "strat-season-fill--up"
+                                                  : row.SeasonalMultiplier <= 0.9f ? "strat-season-fill--down"
+                                                  : "strat-season-fill--flat";
+                                       var sfW   = Math.Min(100,(int)(row.SeasonalMultiplier * 50)); }
+                                    <div class="strat-season-bar" title="Hệ số mùa vụ @row.SeasonalMultiplier×">
+                                        <div class="strat-season-fill @sfCls" style="width:@(sfW)%"></div>
+                                    </div>
+                                </td>
                                 <td class="strat-reason">
                                     @row.Reason
-                                    @if (!string.IsNullOrEmpty(row.SeasonNote))
+                                    @if (row.UpcomingEvents.Count > 0)
                                     {
-                                        <span class="strat-season">· @row.SeasonNote</span>
+                                        <div class="strat-events">
+                                            @foreach (var ev in row.UpcomingEvents.Take(2))
+                                            {
+                                                <span class="strat-event-tag">@ev</span>
+                                            }
+                                        </div>
                                     }
                                 </td>
                                 <td class="text-center">
@@ -461,6 +512,17 @@ else if (_result != null)
         }
         catch { /* ignore */ }
     }
+
+    private static string InvSignalLabel(InventorySignal sig) => sig switch
+    {
+        InventorySignal.SurgeBuying      => "Khách đang mua gom",
+        InventorySignal.PossibleStockout => "Dấu hiệu hết hàng",
+        InventorySignal.SharpDecline     => "Bán chậm đột ngột",
+        InventorySignal.Increasing       => "Đơn hàng tăng dần",
+        InventorySignal.Slowing          => "Đơn hàng chậm lại",
+        InventorySignal.Stable           => "Ổn định",
+        _                                => "Chưa đủ dữ liệu"
+    };
 
     private static string FormatM(decimal v)
     {

@@ -551,107 +551,199 @@ SELECT N'Tổng hợp doanh số', 'vw_Sales', 'View', NULL;</code></pre>
         @* ── 2. Thuật toán SSA ── *@
         <div class="card shadow-sm border-0 mb-3">
             <div class="card-header fw-semibold" style="background:#4f46e5;color:#fff">
-                <i class="bi bi-robot me-1"></i>2. Thuật toán SSA — Singular Spectrum Analysis
+                <i class="bi bi-robot me-1"></i>2. Hệ thống dự đoán hoạt động như thế nào?
+                <span class="ms-2 badge" style="background:rgba(255,255,255,.2);font-weight:400;font-size:.72rem">Dành cho Marketing &amp; Vận hành</span>
             </div>
             <div class="card-body">
-                <p class="small text-muted mb-3">
-                    SSA phân tách chuỗi thời gian thành 3 thành phần rồi dự đoán từng thành phần độc lập —
-                    chính xác hơn nhiều so với hồi quy tuyến tính, đặc biệt với dữ liệu có tính mùa vụ.
-                </p>
 
-                @* Decomposition visual *@
+                @* Analogy intro *@
+                <div class="ssa-analogy-box mb-4">
+                    <div class="ssa-analogy-icon"><i class="bi bi-person-workspace"></i></div>
+                    <div>
+                        <strong>Hãy tưởng tượng một nhân viên kinh doanh kỳ cựu 10 năm kinh nghiệm</strong>
+                        <p class="mb-0">
+                            Họ không chỉ nhìn vào tháng vừa rồi — họ nhớ rằng <em>"năm nào Tết cũng bán chạy gấp đôi"</em>,
+                            <em>"mùa hè miền Bắc nước giải khát tăng mạnh"</em>, hay <em>"tháng 8 năm ngoái bán tụt vì đối thủ
+                            khuyến mãi — năm nay không nên lo điều đó nữa"</em>.
+                            Đó chính xác là cách hệ thống SSA hoạt động — <strong>nhớ cả pattern lẫn biết bỏ qua những biến động bất thường</strong>.
+                        </p>
+                    </div>
+                </div>
+
+                @* 3 things SSA reads *@
+                <h6 class="fw-bold mb-3">Hệ thống đọc 3 tín hiệu từ lịch sử bán hàng:</h6>
                 <div class="ssa-decomp mb-4">
                     <div class="ssa-decomp-input">
-                        <div class="ssa-decomp-label">Dữ liệu thực tế (chuỗi doanh số tháng)</div>
+                        <div class="ssa-decomp-label">
+                            Dữ liệu bán hàng thực tế — ví dụ: <em>Nước mắm Phú Quốc tại Hà Nội (12 tháng qua)</em>
+                        </div>
                         <div class="ssa-wave">
-                            @for (int i = 0; i < 12; i++)
+                            @{ int[] demo = [320,290,310,480,510,460,340,320,360,490,820,750]; }
+                            @foreach (var v in demo)
                             {
-                                var h = (int)(28 + Math.Sin(i * 0.6) * 10 + i * 1.5 + (i % 3 == 0 ? 6 : 0));
-                                <div class="ssa-bar" style="height:@(h)px;background:#4f46e5"></div>
+                                var h = (int)(v / 25.0);
+                                <div class="ssa-bar" style="height:@(h)px;background:#4f46e5"
+                                     title="@v thùng"></div>
                             }
                         </div>
+                        <div class="ssa-wave-labels">
+                            <span>T6</span><span>T7</span><span>T8</span><span>T9</span>
+                            <span>T10</span><span>T11</span><span>T12</span><span>T1</span>
+                            <span>T2</span><span>T3</span><span>T4</span><span>T5</span>
+                        </div>
                     </div>
-                    <div class="ssa-decomp-eq"><i class="bi bi-arrows-collapse-vertical"></i> Phân tách SSA</div>
+                    <div class="ssa-decomp-eq"><i class="bi bi-arrow-down-circle-fill"></i> Hệ thống tách ra</div>
                     <div class="ssa-decomp-parts">
                         <div class="ssa-part ssa-part--trend">
                             <i class="bi bi-graph-up-arrow"></i>
-                            <strong>Xu hướng</strong>
-                            <span>Đường tổng thể tăng hay giảm dần theo thời gian</span>
+                            <strong>📈 Xu hướng thị trường</strong>
+                            <span>Thương hiệu đang được ưa chuộng hơn hay đang mất thị phần? Doanh số tháng sau có cao hơn tháng trước không, <em>loại bỏ yếu tố mùa vụ</em>?</span>
                         </div>
                         <div class="ssa-decomp-plus">+</div>
                         <div class="ssa-part ssa-part--season">
                             <i class="bi bi-calendar-week"></i>
-                            <strong>Mùa vụ</strong>
-                            <span>Pattern lặp lại hàng năm (tháng cao điểm, thấp điểm)</span>
+                            <strong>📅 Nhịp mùa vụ</strong>
+                            <span>Tháng nào trong năm thị trường luôn bùng nổ? Tháng nào trầm lắng? Ví dụ: <em>nước mắm tăng vọt tháng Tết, giảm tháng 7–8</em>.</span>
                         </div>
                         <div class="ssa-decomp-plus">+</div>
                         <div class="ssa-part ssa-part--noise">
                             <i class="bi bi-lightning-charge"></i>
-                            <strong>Nhiễu</strong>
-                            <span>Biến động ngẫu nhiên, không dự đoán được — bị loại bỏ</span>
+                            <strong>⚡ Biến động bất thường</strong>
+                            <span>Tháng đó đối thủ khuyến mãi đặc biệt? Thiên tai? Sự kiện bất ngờ? Hệ thống <em>tự động loại bỏ</em> — không để chúng làm lệch dự đoán.</span>
                         </div>
                     </div>
                 </div>
 
-                @* 4 bước SSA *@
-                <h6 class="fw-bold mb-2">4 bước xử lý của SSA:</h6>
-                <div class="ssa-steps mb-4">
-                    <div class="ssa-step">
-                        <div class="ssa-step-num">1</div>
-                        <div>
-                            <strong>Embedding — Tạo ma trận quỹ đạo</strong>
-                            <p>Chuỗi N tháng trượt theo cửa sổ <code>windowSize = min(N÷2, 12)</code> để tạo ma trận (L × K), L = windowSize, K = N − L + 1.</p>
-                            <div class="ssa-example">Ví dụ: 12 tháng → windowSize = 6 → ma trận <strong>6 × 7</strong></div>
-                        </div>
+                @* Real example *@
+                <div class="ssa-example-card mb-4">
+                    <div class="ssa-example-header">
+                        <i class="bi bi-lightbulb-fill me-1"></i>
+                        Ví dụ thực tế: Nước mắm Phú Quốc tại Hà Nội
                     </div>
-                    <div class="ssa-step">
-                        <div class="ssa-step-num">2</div>
-                        <div>
-                            <strong>SVD — Phân rã kỳ dị (Singular Value Decomposition)</strong>
-                            <p>Ma trận phân rã thành các <em>eigenvalue</em>. Eigenvalue lớn = xu hướng + mùa vụ. Eigenvalue nhỏ ≈ nhiễu → bị loại bỏ.</p>
-                        </div>
-                    </div>
-                    <div class="ssa-step">
-                        <div class="ssa-step-num">3</div>
-                        <div>
-                            <strong>Grouping — Nhóm thành phần</strong>
-                            <p>ML.NET tự động nhóm eigenvalue thành <em>Xu hướng</em> + <em>Mùa vụ</em>. Kết quả là chuỗi "sạch" không còn nhiễu.</p>
-                        </div>
-                    </div>
-                    <div class="ssa-step">
-                        <div class="ssa-step-num">4</div>
-                        <div>
-                            <strong>Forecasting — Ngoại suy 3 tháng tới</strong>
-                            <p>Dùng quan hệ tuyến tính giữa các eigenvector để ngoại suy. Tính <strong>khoảng tin cậy 90%</strong> (Lower – Upper bound).</p>
+                    <div class="ssa-example-body">
+                        <div class="ssa-example-row">
+                            <div class="ssa-example-item ssa-example-item--actual">
+                                <div class="ssa-example-lbl">3 tháng vừa qua (thực tế)</div>
+                                <div class="ssa-example-vals">
+                                    <span>T3: <strong>490 thùng</strong></span>
+                                    <span>T4: <strong>820 thùng</strong></span>
+                                    <span>T5: <strong>750 thùng</strong></span>
+                                </div>
+                                <div class="ssa-example-avg">Trung bình: <strong>687 thùng/tháng</strong></div>
+                            </div>
+                            <div class="ssa-example-arrow"><i class="bi bi-arrow-right-circle-fill"></i></div>
+                            <div class="ssa-example-item ssa-example-item--pred">
+                                <div class="ssa-example-lbl">3 tháng tới (SSA dự đoán)</div>
+                                <div class="ssa-example-vals">
+                                    <span>T6: <strong>~340 thùng</strong></span>
+                                    <span>T7: <strong>~310 thùng</strong></span>
+                                    <span>T8: <strong>~290 thùng</strong></span>
+                                </div>
+                                <div class="ssa-example-avg">Trung bình: <strong>~313 thùng/tháng</strong></div>
+                            </div>
+                            <div class="ssa-example-arrow"><i class="bi bi-arrow-right-circle-fill"></i></div>
+                            <div class="ssa-example-item ssa-example-item--result">
+                                <div class="ssa-example-lbl">Kết quả phân tích</div>
+                                <div class="strat-growth strat-growth--down fw-bold" style="font-size:1.1rem">−54%</div>
+                                <span class="strat-badge strategy-export-strong mt-1">
+                                    <i class="bi bi-arrow-down-circle-fill me-1"></i>Xuất gấp
+                                </span>
+                                <div class="ssa-example-why">
+                                    Mùa hè đến — nhu cầu nước mắm tại HN luôn giảm mạnh T6–T8.
+                                    Cần giảm tồn kho trước khi vào mùa trầm.
+                                </div>
+                            </div>
                         </div>
                     </div>
                 </div>
 
-                @* WindowSize *@
+                @* What this means for you *@
+                <h6 class="fw-bold mb-2">Điều này có ý nghĩa gì với công việc của bạn?</h6>
+                <div class="ssa-meaning-cards mb-4">
+                    <div class="ssa-meaning-card">
+                        <div class="ssa-meaning-icon" style="background:#dbeafe;color:#1d4ed8">
+                            <i class="bi bi-megaphone-fill"></i>
+                        </div>
+                        <div>
+                            <strong>Marketing</strong>
+                            <p>Biết trước tháng nào nhu cầu tăng → lên kế hoạch campaign sớm 4–6 tuần.
+                            Tháng nào giảm → chạy khuyến mãi kích cầu thay vì chờ hàng tồn đọng.</p>
+                        </div>
+                    </div>
+                    <div class="ssa-meaning-card">
+                        <div class="ssa-meaning-icon" style="background:#d1fae5;color:#065f46">
+                            <i class="bi bi-truck"></i>
+                        </div>
+                        <div>
+                            <strong>Vận hành &amp; Điều phối</strong>
+                            <p>Đặt hàng nhà cung cấp đúng thời điểm — không thiếu hàng lúc cao điểm,
+                            không ứ đọng vốn lúc thấp điểm. Điều phối hàng giữa kho tỉnh này sang tỉnh khác dựa trên dự báo.</p>
+                        </div>
+                    </div>
+                </div>
+
+                @* How much data *@
                 <div class="guide-formula mb-4">
-                    <div class="guide-formula-label">WindowSize — ảnh hưởng đến độ chính xác:</div>
+                    <div class="guide-formula-label">Hệ thống cần bao nhiêu lịch sử để dự đoán tốt?</div>
                     <div class="ssa-window-examples">
-                        <div class="ssa-win-item"><code>n=4  → ws=2</code> <span>Rất ít dữ liệu, chỉ bắt xu hướng cơ bản</span></div>
-                        <div class="ssa-win-item"><code>n=12 → ws=6</code> <span>Bắt được chu kỳ nửa năm (mùa hè/đông)</span></div>
-                        <div class="ssa-win-item"><code>n=24 → ws=12</code><span>Bắt được chu kỳ 1 năm đầy đủ — <strong>tốt nhất</strong></span></div>
+                        <div class="ssa-win-item">
+                            <span class="ssa-data-badge ssa-data-badge--bad">3 tháng</span>
+                            <span>Quá ít — chỉ đoán theo quán tính, chưa thấy được mùa vụ. Dùng công thức đơn giản hơn.</span>
+                        </div>
+                        <div class="ssa-win-item">
+                            <span class="ssa-data-badge ssa-data-badge--ok">6–11 tháng</span>
+                            <span>Đủ để dùng SSA — bắt được một phần chu kỳ mùa vụ.</span>
+                        </div>
+                        <div class="ssa-win-item">
+                            <span class="ssa-data-badge ssa-data-badge--good">12 tháng</span>
+                            <span><strong>Tốt</strong> — nhìn thấy đủ 1 năm, phát hiện được tháng cao/thấp điểm rõ ràng.</span>
+                        </div>
+                        <div class="ssa-win-item">
+                            <span class="ssa-data-badge ssa-data-badge--best">18–24 tháng</span>
+                            <span><strong>Tốt nhất</strong> — nhìn thấy 2 vòng mùa vụ, dự đoán cực kỳ chính xác.</span>
+                        </div>
                     </div>
                 </div>
 
-                @* So sánh SSA vs Linear *@
-                <h6 class="fw-bold mb-2">So sánh SSA với Linear Regression:</h6>
-                <table class="guide-decision-table">
-                    <thead><tr><th>Tiêu chí</th><th><i class="bi bi-robot me-1"></i>ML.NET SSA</th><th><i class="bi bi-graph-up me-1"></i>Linear Regression</th></tr></thead>
-                    <tbody>
-                        <tr><td>Dữ liệu tối thiểu</td><td><span class="text-success fw-bold">≥ 4 tháng</span></td><td>≥ 2 tháng</td></tr>
-                        <tr><td>Phát hiện mùa vụ</td><td><span class="text-success">✅ Có</span></td><td><span class="text-danger">❌ Không</span></td></tr>
-                        <tr><td>Lọc nhiễu</td><td><span class="text-success">✅ Tự động</span></td><td><span class="text-danger">❌ Không</span></td></tr>
-                        <tr><td>Khoảng tin cậy</td><td>Tính từ dữ liệu thực (90%)</td><td>Cố định ±20%</td></tr>
-                        <tr><td>Khi dữ liệu đột biến</td><td>Ổn định (lọc nhiễu)</td><td>Bị ảnh hưởng nhiều</td></tr>
-                        <tr><td>Tốc độ train</td><td>Chậm hơn một chút</td><td><span class="text-success">Rất nhanh</span></td></tr>
-                        <tr><td>Hệ số tin cậy</td><td><span class="text-success fw-bold">× 1.0</span></td><td><span class="text-warning">× 0.65</span></td></tr>
-                        <tr><td>Khi nào dùng</td><td>Mặc định (≥ 4 điểm)</td><td>Fallback tự động</td></tr>
-                    </tbody>
-                </table>
+                @* SSA vs Linear — business language *@
+                <h6 class="fw-bold mb-2">SSA so với cách tính đơn giản (đường thẳng):</h6>
+                <div class="ssa-compare-cards">
+                    <div class="ssa-compare-card ssa-compare-card--ssa">
+                        <div class="ssa-compare-header">
+                            <i class="bi bi-robot me-1"></i><strong>Hệ thống SSA</strong>
+                            <span class="algo-badge badge-ssa ms-auto">Ưu tiên dùng</span>
+                        </div>
+                        <ul class="guide-list mt-2">
+                            <li>✅ Hiểu được <strong>mùa vụ</strong> — biết tháng Tết luôn tăng</li>
+                            <li>✅ <strong>Bỏ qua biến động bất thường</strong> — khuyến mãi 1 lần không làm lệch dự đoán</li>
+                            <li>✅ Cho biết <strong>khoảng dao động</strong>: "dự đoán 500 thùng, thực tế sẽ rơi vào 420–580 thùng"</li>
+                            <li>✅ Càng nhiều dữ liệu càng chính xác</li>
+                            <li>⚠ Cần ít nhất <strong>4 tháng</strong> dữ liệu mới hoạt động</li>
+                        </ul>
+                    </div>
+                    <div class="ssa-compare-card ssa-compare-card--lr">
+                        <div class="ssa-compare-header">
+                            <i class="bi bi-graph-up me-1"></i><strong>Tính đường thẳng đơn giản</strong>
+                            <span class="algo-badge badge-linear ms-auto">Dự phòng</span>
+                        </div>
+                        <ul class="guide-list mt-2">
+                            <li>❌ Không biết mùa vụ — tháng Tết vẫn dự đoán bằng tháng thường</li>
+                            <li>❌ Một tháng bán đột biến sẽ kéo lệch toàn bộ dự đoán</li>
+                            <li>⚠ Khoảng dao động cố định ±20% (không tính từ thực tế)</li>
+                            <li>✅ Dùng được khi chỉ có ít dữ liệu (&lt; 4 tháng)</li>
+                            <li>✅ Tính nhanh hơn</li>
+                        </ul>
+                    </div>
+                </div>
+
+                <div class="alert alert-success d-flex gap-2 mt-3 mb-0 py-2">
+                    <i class="bi bi-check-circle-fill flex-shrink-0"></i>
+                    <span class="small">
+                        <strong>Lời khuyên thực tế:</strong> Chọn <strong>12–18 tháng lịch sử</strong> khi phân tích.
+                        Hệ thống tự động dùng SSA khi đủ dữ liệu và chuyển sang tính đơn giản khi cần —
+                        bạn không cần làm gì thêm, chỉ cần đọc kết quả và hành động.
+                    </span>
+                </div>
             </div>
         </div>
 

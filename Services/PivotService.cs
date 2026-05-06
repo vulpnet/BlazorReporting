@@ -6,19 +6,20 @@ public sealed class PivotService : IPivotService
 {
     public PivotResult Build(IReadOnlyList<Dictionary<string, object?>> data, PivotConfig config)
     {
-        var valueDefs = config.ValidValues;
-        if (!config.IsValid || data.Count == 0 || valueDefs.Count == 0)
+        var valueDefs  = config.ValidValues;
+        var colFields  = config.ValidColumnFields;
+        if (!config.IsValid || data.Count == 0 || valueDefs.Count == 0 || colFields.Count == 0)
             return PivotResult.Empty;
 
-        // buckets[rowKey][colKey][label] = list of raw numbers
+        // buckets[rowKey][compositeColKey][label] = list of raw numbers
         var buckets = new Dictionary<string, Dictionary<string, Dictionary<string, List<double>>>>(
             StringComparer.OrdinalIgnoreCase);
         var colSet = new SortedSet<string>(StringComparer.OrdinalIgnoreCase);
 
         foreach (var row in data)
         {
-            var rk = GetKey(row, config.RowField);
-            var ck = GetKey(row, config.ColumnField);
+            var rk = GetFieldKey(row, config.RowField);
+            var ck = MakeCompositeKey(row, colFields);
             colSet.Add(ck);
 
             if (!buckets.TryGetValue(rk, out var colMap))
@@ -35,8 +36,8 @@ public sealed class PivotService : IPivotService
             }
         }
 
-        var rowKeys  = buckets.Keys.OrderBy(k => k).ToList();
-        var colKeys  = colSet.ToList();
+        var rowKeys = buckets.Keys.OrderBy(k => k).ToList();
+        var colKeys = colSet.ToList();
 
         var resultData = new Dictionary<string, Dictionary<string, Dictionary<string, object?>>>(
             StringComparer.OrdinalIgnoreCase);
@@ -83,18 +84,24 @@ public sealed class PivotService : IPivotService
 
         return new PivotResult
         {
-            RowKeys    = rowKeys,
-            ColumnKeys = colKeys,
-            ValueDefs  = valueDefs,
-            Data       = resultData,
-            RowTotals  = rowTotals,
-            ColTotals  = colTotals,
+            RowKeys     = rowKeys,
+            ColumnKeys  = colKeys,
+            ValueDefs   = valueDefs,
+            Data        = resultData,
+            RowTotals   = rowTotals,
+            ColTotals   = colTotals,
             GrandTotals = grandTotals
         };
     }
 
-    private static string GetKey(Dictionary<string, object?> row, string field) =>
+    // ── Helpers ───────────────────────────────────────────────────────
+    private static string GetFieldKey(Dictionary<string, object?> row, string field) =>
         row.TryGetValue(field, out var v) && v != null ? v.ToString()! : "(blank)";
+
+    private static string MakeCompositeKey(
+        Dictionary<string, object?> row,
+        IReadOnlyList<string> fields) =>
+        PivotConfig.MakeColKey(fields.Select(f => GetFieldKey(row, f)));
 
     private static double Aggregate(List<double> vals, AggregationType agg) => agg switch
     {
@@ -108,12 +115,12 @@ public sealed class PivotService : IPivotService
 
     private static double ToDouble(object? v)
     {
-        if (v is null)    return 0;
-        if (v is double d)  return d;
+        if (v is null)     return 0;
+        if (v is double d)   return d;
         if (v is decimal dc) return (double)dc;
-        if (v is int i)     return i;
-        if (v is long l)    return l;
-        if (v is float f)   return f;
+        if (v is int i)      return i;
+        if (v is long l)     return l;
+        if (v is float f)    return f;
         return double.TryParse(v.ToString(), out var p) ? p : 0;
     }
 }

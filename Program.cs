@@ -26,6 +26,7 @@ builder.Services.AddScoped<AuthService>();
 
 // ML.NET Sales Forecasting (singleton — MLContext is thread-safe, expensive to create)
 builder.Services.AddSingleton<SalesForecastService>();
+builder.Services.AddSingleton<SeasonalFactorService>();
 builder.Services.AddSingleton<SalesStrategyService>();
 
 // Chat history & Survey (scoped)

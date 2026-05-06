@@ -59,7 +59,7 @@ public sealed class ExportService : IExportService
         bool multi = nv > 1;
 
         // ── Row 1: group headers ──
-        ws.Cell(1, 1).Value = $"{config.RowField} \\ {config.ColumnField}";
+        ws.Cell(1, 1).Value = $"{config.RowField} \\ {string.Join(" + ", config.ValidColumnFields)}";
         ws.Cell(1, 1).Style.Font.Bold = true;
         ws.Cell(1, 1).Style.Fill.BackgroundColor = XLColor.FromHtml("#1e293b");
         ws.Cell(1, 1).Style.Font.FontColor = XLColor.White;
@@ -69,7 +69,7 @@ public sealed class ExportService : IExportService
         foreach (var ck in pivot.ColumnKeys)
         {
             var hdr = ws.Cell(1, col);
-            hdr.Value = ck;
+            hdr.Value = PivotConfig.DisplayColKey(ck);
             hdr.Style.Font.Bold = true;
             hdr.Style.Fill.BackgroundColor = XLColor.FromHtml("#2563EB");
             hdr.Style.Font.FontColor = XLColor.White;
@@ -219,10 +219,10 @@ public sealed class ExportService : IExportService
         var sb  = new StringBuilder();
 
         // Header
-        var headers = new List<string> { Escape($"{config.RowField}/{config.ColumnField}") };
+        var headers = new List<string> { Escape($"{config.RowField}/{string.Join("+", config.ValidColumnFields)}") };
         foreach (var ck in pivot.ColumnKeys)
             foreach (var vd in vds)
-                headers.Add(Escape(vds.Count > 1 ? $"{ck}·{vd.Label}" : ck));
+                headers.Add(Escape(vds.Count > 1 ? $"{PivotConfig.DisplayColKey(ck)}·{vd.Label}" : PivotConfig.DisplayColKey(ck)));
         if (config.ShowRowTotals)
             foreach (var vd in vds)
                 headers.Add(Escape(vds.Count > 1 ? $"Total·{vd.Label}" : "Total"));
@@ -329,7 +329,7 @@ public sealed class ExportService : IExportService
             {
                 col.Item().Text(title).FontSize(14).Bold();
                 col.Item().Text(
-                    $"Rows: {config.RowField}  |  Columns: {config.ColumnField}  |  " +
+                    $"Rows: {config.RowField}  |  Columns: {string.Join(" + ", config.ValidColumnFields)}  |  " +
                     string.Join(", ", vds.Select(v => v.Label))).FontSize(9).Italic();
 
                 col.Item().PaddingTop(8).Table(t =>
@@ -343,13 +343,13 @@ public sealed class ExportService : IExportService
                     t.Header(h =>
                     {
                         h.Cell().Background("#1e293b").Padding(3)
-                            .Text($"{config.RowField}/{config.ColumnField}")
+                            .Text($"{config.RowField}/{string.Join("+", config.ValidColumnFields)}")
                             .FontColor("#FFFFFF").Bold().FontSize(7);
 
                         foreach (var ck in pivot.ColumnKeys)
                             foreach (var vd in vds)
                                 h.Cell().Background("#2563EB").Padding(3)
-                                    .Text(multi ? $"{ck}\n{vd.Label}" : ck)
+                                    .Text(multi ? $"{PivotConfig.DisplayColKey(ck)}\n{vd.Label}" : PivotConfig.DisplayColKey(ck))
                                     .FontColor("#FFFFFF").Bold().FontSize(6);
 
                         if (config.ShowRowTotals)

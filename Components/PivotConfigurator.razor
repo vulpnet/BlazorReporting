@@ -1,6 +1,6 @@
 @* Pivot Configurator — Excel-style "PivotTable Fields" panel.
    Available Fields → drag or click R/C/V → Row / Column / Values zones.
-   Values zone supports multiple fields, each with its own aggregation. *@
+   Columns zone supports multiple fields (composite key). *@
 
 <div class="xl-pivot-panel card border-0 shadow-sm mb-3">
 
@@ -59,7 +59,7 @@
                                     <button class="xl-qbtn" title="Set as Row"
                                             @onclick:stopPropagation="true"
                                             @onclick="() => QuickAssign(f, ZoneKind.Row)">R</button>
-                                    <button class="xl-qbtn" title="Set as Column"
+                                    <button class="xl-qbtn" title="Add to Columns"
                                             @onclick:stopPropagation="true"
                                             @onclick="() => QuickAssign(f, ZoneKind.Col)">C</button>
                                     <button class="xl-qbtn xl-qbtn-val" title="Add to Values"
@@ -98,7 +98,7 @@
                         </div>
                     </div>
 
-                    @* ── Columns zone ── *@
+                    @* ── Columns zone (multi-field) ── *@
                     <div class="xl-zone @(_dropTarget == ZoneKind.Col ? "drag-over" : "")"
                          @ondragover:preventDefault="true"
                          @ondragover="() => _dropTarget = ZoneKind.Col"
@@ -106,25 +106,29 @@
                          @ondrop="() => CommitDrop(ZoneKind.Col)">
                         <div class="xl-zone-hdr xl-zone-hdr-col">
                             <i class="bi bi-arrow-right-short me-1"></i>Columns
+                            @if (Config.ColumnFields.Count > 1)
+                            {
+                                <span class="badge bg-primary ms-1" style="font-size:.65rem">@Config.ColumnFields.Count</span>
+                            }
                         </div>
                         <div class="xl-zone-body">
-                            @if (!string.IsNullOrEmpty(Config.ColumnField))
+                            @foreach (var cf in Config.ColumnFields.Where(f => !string.IsNullOrEmpty(f)))
                             {
                                 <span class="xl-chip xl-chip-col"
                                       draggable="true"
-                                      @ondragstart="() => BeginDrag(Config.ColumnField, ZoneKind.Col)"
+                                      @ondragstart="() => BeginDrag(cf, ZoneKind.Col)"
                                       @ondragend="EndDrag">
                                     <i class="bi bi-grip-vertical" style="font-size:.7rem;cursor:grab"></i>
-                                    <span class="text-truncate">@Config.ColumnField</span>
+                                    <span class="text-truncate">@cf</span>
                                     <button class="xl-chip-remove"
-                                            @onclick="() => RemoveField(ZoneKind.Col, Config.ColumnField)"
+                                            @onclick="() => RemoveField(ZoneKind.Col, cf)"
                                             title="Remove">×</button>
                                 </span>
                             }
-                            else
+                            @if (!Config.ColumnFields.Any(f => !string.IsNullOrEmpty(f)))
                             {
                                 <span class="text-muted small fst-italic" style="font-size:.72rem">
-                                    Drop a field here
+                                    Drop fields here
                                 </span>
                             }
                         </div>
@@ -339,8 +343,9 @@
     private void RebuildAvailable()
     {
         var used = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-        if (!string.IsNullOrEmpty(Config.RowField))    used.Add(Config.RowField);
-        if (!string.IsNullOrEmpty(Config.ColumnField)) used.Add(Config.ColumnField);
+        if (!string.IsNullOrEmpty(Config.RowField)) used.Add(Config.RowField);
+        foreach (var cf in Config.ColumnFields.Where(f => !string.IsNullOrEmpty(f)))
+            used.Add(cf);
         foreach (var vd in Config.ValueFields.Where(v => !string.IsNullOrEmpty(v.Field)))
             used.Add(vd.Field);
 
@@ -386,9 +391,9 @@
                 break;
 
             case ZoneKind.Col:
-                if (!string.IsNullOrEmpty(Config.ColumnField) && Config.ColumnField != field)
-                    _available.Add(Config.ColumnField);
-                Config.ColumnField = field;
+                // Multi-field: add if not already present
+                if (!Config.ColumnFields.Contains(field, StringComparer.OrdinalIgnoreCase))
+                    Config.ColumnFields.Add(field);
                 break;
 
             case ZoneKind.Val:
@@ -419,7 +424,7 @@
                 if (Config.RowField == field) Config.RowField = "";
                 break;
             case ZoneKind.Col:
-                if (Config.ColumnField == field) Config.ColumnField = "";
+                Config.ColumnFields.Remove(field);
                 break;
             case ZoneKind.Val:
                 var hit = Config.ValueFields.FirstOrDefault(v => v.Field == field);
@@ -436,8 +441,8 @@
 
     private void ResetAll()
     {
-        Config.RowField    = "";
-        Config.ColumnField = "";
+        Config.RowField = "";
+        Config.ColumnFields.Clear();
         Config.ValueFields.Clear();
         Config.ShowRowTotals  = true;
         Config.ShowColTotals  = true;

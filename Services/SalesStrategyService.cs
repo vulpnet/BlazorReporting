@@ -7,18 +7,16 @@ namespace BlazorReporting.Services;
 // ══════════════════════════════════════════════════════════════
 //  SalesStrategyService
 //  Train ML.NET SSA cho từng cặp (Tỉnh × Sản phẩm),
-//  đưa ra khuyến nghị Nhập / Xuất / Duy trì hàng tồn kho.
+//  kết hợp yếu tố mùa vụ + khí hậu + tồn kho để
+//  đưa ra khuyến nghị Nhập / Xuất / Duy trì.
 // ══════════════════════════════════════════════════════════════
 
 public sealed class SalesStrategyService
 {
-    private readonly MLContext _ml = new(seed: 42);
+    private readonly MLContext            _ml      = new(seed: 42);
+    private readonly SeasonalFactorService _seasonal = new();
 
     // ── Phân tích toàn bộ ────────────────────────────────────
-    /// <summary>
-    /// Nhận dữ liệu lịch sử từ DB, train SSA cho từng cặp Tỉnh×SP,
-    /// trả về danh sách chiến lược có gắn nhãn hành động.
-    /// </summary>
     public async Task<StrategyResult> AnalyzeAsync(
         IReadOnlyList<ProvinceSalesHistory> history,
         IProgress<(int Done, int Total)>? progress = null,
@@ -27,7 +25,6 @@ public sealed class SalesStrategyService
         if (history.Count == 0)
             return StrategyResult.Empty;
 
-        // Nhóm theo (Tỉnh, SP)
         var groups = history
             .GroupBy(h => (h.ProvinceCode, h.InventoryCD, h.InventoryName))
             .ToList();
@@ -59,7 +56,7 @@ public sealed class SalesStrategyService
 
         var list = results
             .OrderBy(r => r.ProvinceCode)
-            .ThenByDescending(r => Math.Abs(r.GrowthRate))
+            .ThenByDescending(r => Math.Abs(r.AdjustedGrowthRate))
             .ToList();
 
         return new StrategyResult(list);
@@ -74,10 +71,9 @@ public sealed class SalesStrategyService
         var qtyVals = pts.Select(p => (float)p.TotalQty).ToArray();
         var amtVals = pts.Select(p => (float)p.TotalAmount).ToArray();
 
-        // Forecast 3 tháng tới
+        // ── SSA forecast ──────────────────────────────────────
         bool usedSSA;
         float[] predQty, predAmt;
-
         if (n >= 4)
         {
             var (qPred, qSSA) = TrySSA(qtyVals, 3);
@@ -92,63 +88,126 @@ public sealed class SalesStrategyService
             usedSSA = false;
         }
 
-        // Trung bình 3 tháng thực tế gần nhất
+        // ── Trung bình thực tế & dự đoán ─────────────────────
         int lookback   = Math.Min(3, n);
         float avgQty3M = qtyVals.TakeLast(lookback).Average();
         float avgAmt3M = amtVals.TakeLast(lookback).Average();
-
-        // Trung bình 3 tháng dự đoán
         float predQtyAvg = predQty.Average();
         float predAmtAvg = predAmt.Average();
-
-        // Tốc độ tăng trưởng
-        float growthRate = avgQty3M == 0 ? 0f
+        float growthRate  = avgQty3M == 0 ? 0f
             : (predQtyAvg - avgQty3M) / avgQty3M;
 
-        // Độ tin cậy: càng nhiều dữ liệu + SSA → càng cao
-        float confidence = Math.Min(1f, n / 12f) * (usedSSA ? 1f : 0.65f);
+        // ── Yếu tố mùa vụ + khí hậu + tồn kho ───────────────
+        var lastPt  = pts[^1];
+        var factors = _seasonal.Analyze(province, name,
+                          lastPt.Year, lastPt.Month,
+                          qtyVals.Select(v => (long)v).ToArray());
 
-        // Xác định hành động
-        var (action, label, icon, color, badgeClass, reason) = growthRate switch
+        float seasonalMult = factors.AvgSeasonalFactor;
+        var   invSig       = factors.InventorySignal;
+
+        // Điều chỉnh tăng trưởng bằng hệ số mùa vụ
+        // (chỉ áp dụng 40% trọng số để SSA vẫn là chủ đạo)
+        float adjustedGrowth = growthRate + (seasonalMult - 1.0f) * 0.4f;
+
+        // Điều chỉnh thêm từ tín hiệu tồn kho
+        adjustedGrowth += invSig switch
         {
-            > 0.20f  => ("import",   "Nhập nhiều",  "bi-arrow-up-circle-fill",          "#15803d", "strategy-import-strong",
-                         $"Nhu cầu tăng mạnh {growthRate:+0.0%;-0.0%} — tăng tồn kho ngay để tránh thiếu hàng"),
-            > 0.07f  => ("import",   "Nhập thêm",   "bi-arrow-up-right-circle-fill",    "#16a34a", "strategy-import",
-                         $"Xu hướng tăng {growthRate:+0.0%;-0.0%} — cân nhắc nhập thêm để đáp ứng nhu cầu"),
-            < -0.20f => ("export",   "Xuất gấp",    "bi-arrow-down-circle-fill",        "#b91c1c", "strategy-export-strong",
-                         $"Nhu cầu giảm mạnh {growthRate:+0.0%;-0.0%} — cần xuất/chuyển hàng sang khu vực khác ngay"),
-            < -0.07f => ("export",   "Xuất bớt",    "bi-arrow-down-right-circle-fill",  "#dc2626", "strategy-export",
-                         $"Xu hướng giảm {growthRate:+0.0%;-0.0%} — nên giảm tồn kho từ từ, tránh ứ đọng vốn"),
-            _        => ("maintain", "Duy trì",      "bi-dash-circle-fill",              "#6b7280", "strategy-maintain",
-                         $"Ổn định ({growthRate:+0.0%;-0.0%}) — duy trì mức tồn kho hiện tại")
+            InventorySignal.SurgeBuying     => +0.08f,   // mua gom → cần nhập gấp
+            InventorySignal.PossibleStockout=> +0.10f,   // có thể hết hàng → ưu tiên nhập
+            InventorySignal.SharpDecline    => -0.08f,   // giảm mạnh → đẩy hàng
+            _ => 0f
         };
 
-        // Tháng peak: tháng có doanh số cao nhất trong lịch sử
-        var peakMonth = pts.MaxBy(p => p.TotalQty);
-        string seasonNote = peakMonth != null
-            ? $"Tháng cao điểm: T{peakMonth.Month} ({peakMonth.TotalQty:N0} SP)"
+        // ── Hành động cuối ───────────────────────────────────
+        var (action, label, icon, color, badgeClass) = adjustedGrowth switch
+        {
+            > 0.20f  => ("import",   "Nhập nhiều",  "bi-arrow-up-circle-fill",         "#15803d", "strategy-import-strong"),
+            > 0.07f  => ("import",   "Nhập thêm",   "bi-arrow-up-right-circle-fill",   "#16a34a", "strategy-import"),
+            < -0.20f => ("export",   "Xuất gấp",    "bi-arrow-down-circle-fill",       "#b91c1c", "strategy-export-strong"),
+            < -0.07f => ("export",   "Xuất bớt",    "bi-arrow-down-right-circle-fill", "#dc2626", "strategy-export"),
+            _        => ("maintain", "Duy trì",      "bi-dash-circle-fill",             "#6b7280", "strategy-maintain")
+        };
+
+        // ── Lý do chi tiết ────────────────────────────────────
+        var reasonParts = new List<string>();
+
+        // SSA/Linear trend
+        reasonParts.Add(growthRate > 0.05f
+            ? $"Xu hướng bán tăng {growthRate:+0.0%;-0.0%}"
+            : growthRate < -0.05f
+            ? $"Xu hướng bán giảm {growthRate:+0.0%;-0.0%}"
+            : "Doanh số ổn định");
+
+        // Seasonal
+        if (MathF.Abs(seasonalMult - 1f) > 0.08f)
+            reasonParts.Add(seasonalMult > 1f
+                ? $"mùa vụ thuận lợi (×{seasonalMult:0.0})"
+                : $"mùa vụ kém thuận lợi (×{seasonalMult:0.0})");
+
+        // Inventory signal
+        reasonParts.Add(invSig switch
+        {
+            InventorySignal.SurgeBuying      => "⚡ khách đang mua gom số lượng lớn",
+            InventorySignal.PossibleStockout => "⚠️ có dấu hiệu hết hàng định kỳ",
+            InventorySignal.SharpDecline     => "📉 tốc độ bán giảm đột ngột",
+            InventorySignal.Increasing       => "📈 đơn hàng đang tăng dần",
+            InventorySignal.Slowing          => "🐌 đơn hàng đang chậm lại",
+            _ => ""
+        });
+
+        // Climate
+        if (!string.IsNullOrEmpty(factors.ClimateContext))
+            reasonParts.Add(factors.ClimateContext);
+
+        // Upcoming events
+        var nextEvents = factors.MonthFactors
+            .SelectMany(m => m.Events).Distinct().Take(2).ToList();
+        reasonParts.AddRange(nextEvents);
+
+        string reason = string.Join(" · ", reasonParts.Where(r => !string.IsNullOrEmpty(r)));
+
+        // ── Độ tin cậy ───────────────────────────────────────
+        float confidence = Math.Min(1f, n / 12f)
+            * (usedSSA ? 1f : 0.65f)
+            * (invSig == InventorySignal.Unknown ? 0.9f : 1f);
+
+        // ── Peak month ────────────────────────────────────────
+        var peakPt = pts.MaxBy(p => p.TotalQty);
+        string seasonNote = peakPt != null
+            ? $"Tháng cao điểm: T{peakPt.Month} ({peakPt.TotalQty:N0} SP)"
             : "";
 
         return new ProvinceProductStrategy(
-            ProvinceCode : province,
-            InventoryCD  : cd,
-            InventoryName: name,
-            AvgQty3M     : (long)avgQty3M,
-            AvgAmount3M  : (decimal)avgAmt3M,
-            PredQty3M    : (long)predQtyAvg,
-            PredAmount3M : (decimal)predAmtAvg,
-            PredQtyMonths: predQty.Select(v => (long)v).ToArray(),
-            GrowthRate   : growthRate,
-            Action       : action,
-            ActionLabel  : label,
-            ActionIcon   : icon,
-            ActionColor  : color,
-            BadgeClass   : badgeClass,
-            Confidence   : confidence,
-            DataPoints   : n,
-            UsedSSA      : usedSSA,
-            Reason       : reason,
-            SeasonNote   : seasonNote);
+            ProvinceCode      : province,
+            InventoryCD       : cd,
+            InventoryName     : name,
+            AvgQty3M          : (long)avgQty3M,
+            AvgAmount3M       : (decimal)avgAmt3M,
+            PredQty3M         : (long)predQtyAvg,
+            PredAmount3M      : (decimal)predAmtAvg,
+            PredQtyMonths     : predQty.Select(v => (long)v).ToArray(),
+            GrowthRate        : growthRate,
+            AdjustedGrowthRate: adjustedGrowth,
+            SeasonalMultiplier: seasonalMult,
+            Action            : action,
+            ActionLabel       : label,
+            ActionIcon        : icon,
+            ActionColor       : color,
+            BadgeClass        : badgeClass,
+            Confidence        : confidence,
+            DataPoints        : n,
+            UsedSSA           : usedSSA,
+            Reason            : reason,
+            SeasonNote        : seasonNote,
+            Region            : factors.Region,
+            ProductCategory   : factors.Category,
+            ClimateContext    : factors.ClimateContext,
+            InventorySignal   : invSig,
+            UpcomingEvents    : factors.MonthFactors
+                                       .SelectMany(m => m.Events)
+                                       .Distinct().Take(3).ToList(),
+            MonthFactors      : factors.MonthFactors);
     }
 
     // ── ML.NET SSA ────────────────────────────────────────────
@@ -156,20 +215,17 @@ public sealed class SalesStrategyService
     {
         try
         {
-            int ws      = Math.Max(2, Math.Min(values.Length / 2, 12));
-            var dv      = _ml.Data.LoadFromEnumerable(values.Select(v => new Dp { V = v }));
-            var pipe    = _ml.Forecasting.ForecastBySsa(
-                              outputColumnName          : "F",
-                              inputColumnName           : "V",
-                              windowSize                : ws,
-                              seriesLength              : values.Length,
-                              trainSize                 : values.Length,
-                              horizon                   : horizon,
-                              confidenceLevel           : 0.90f,
-                              confidenceLowerBoundColumn: "Lo",
-                              confidenceUpperBoundColumn: "Hi");
-            var engine  = pipe.Fit(dv).CreateTimeSeriesEngine<Dp, Fo>(_ml);
-            var out_    = engine.Predict();
+            int ws     = Math.Max(2, Math.Min(values.Length / 2, 12));
+            var dv     = _ml.Data.LoadFromEnumerable(values.Select(v => new Dp { V = v }));
+            var pipe   = _ml.Forecasting.ForecastBySsa(
+                             outputColumnName: "F", inputColumnName: "V",
+                             windowSize: ws, seriesLength: values.Length,
+                             trainSize: values.Length, horizon: horizon,
+                             confidenceLevel: 0.90f,
+                             confidenceLowerBoundColumn: "Lo",
+                             confidenceUpperBoundColumn: "Hi");
+            var engine = pipe.Fit(dv).CreateTimeSeriesEngine<Dp, Fo>(_ml);
+            var out_   = engine.Predict();
             if (out_.F.Any(v => !float.IsFinite(v)))
                 return (LinearPredict(values, horizon), false);
             return (out_.F.Select(v => MathF.Max(0f, v)).ToArray(), true);
@@ -177,7 +233,6 @@ public sealed class SalesStrategyService
         catch { return (LinearPredict(values, horizon), false); }
     }
 
-    // ── Linear fallback ───────────────────────────────────────
     private static float[] LinearPredict(float[] values, int horizon)
     {
         int n = values.Length;
@@ -190,58 +245,63 @@ public sealed class SalesStrategyService
         double s = d == 0 ? 0 : (n * sxy - sx * sy) / d;
         double b = (sy - s * sx) / n;
         return Enumerable.Range(n, horizon)
-            .Select(i => (float)Math.Max(0, b + s * i)).ToArray();
+                         .Select(i => (float)Math.Max(0, b + s * i)).ToArray();
     }
 
-    private class Dp { public float V  { get; set; } }
-    private class Fo { public float[] F  { get; set; } = []; public float[] Lo { get; set; } = []; public float[] Hi { get; set; } = []; }
+    private class Dp { public float V { get; set; } }
+    private class Fo { public float[] F { get; set; } = []; public float[] Lo { get; set; } = []; public float[] Hi { get; set; } = []; }
 }
 
-// ── Result types ──────────────────────────────────────────────
+// ── Result records ────────────────────────────────────────────
 
 public sealed record ProvinceProductStrategy(
-    string   ProvinceCode,
-    string   InventoryCD,
-    string   InventoryName,
-    long     AvgQty3M,          // Trung bình 3 tháng thực tế
-    decimal  AvgAmount3M,
-    long     PredQty3M,         // Trung bình 3 tháng dự đoán
-    decimal  PredAmount3M,
-    long[]   PredQtyMonths,     // 3 giá trị dự đoán chi tiết
-    float    GrowthRate,        // Tỉ lệ tăng trưởng dự đoán
-    string   Action,            // import | export | maintain
-    string   ActionLabel,       // Nhập thêm | Xuất bớt | Duy trì …
-    string   ActionIcon,
-    string   ActionColor,
-    string   BadgeClass,
-    float    Confidence,        // 0–1
-    int      DataPoints,        // Số tháng dữ liệu train
-    bool     UsedSSA,
-    string   Reason,            // Lý do gợi ý
-    string   SeasonNote);       // Ghi chú mùa vụ
+    string              ProvinceCode,
+    string              InventoryCD,
+    string              InventoryName,
+    long                AvgQty3M,
+    decimal             AvgAmount3M,
+    long                PredQty3M,
+    decimal             PredAmount3M,
+    long[]              PredQtyMonths,
+    float               GrowthRate,           // Tăng trưởng thuần SSA
+    float               AdjustedGrowthRate,   // Sau điều chỉnh mùa vụ + tồn kho
+    float               SeasonalMultiplier,   // Hệ số mùa vụ
+    string              Action,
+    string              ActionLabel,
+    string              ActionIcon,
+    string              ActionColor,
+    string              BadgeClass,
+    float               Confidence,
+    int                 DataPoints,
+    bool                UsedSSA,
+    string              Reason,
+    string              SeasonNote,
+    // ── Yếu tố môi trường ────
+    string              Region,
+    string              ProductCategory,
+    string              ClimateContext,
+    InventorySignal     InventorySignal,
+    List<string>        UpcomingEvents,
+    List<MonthSeasonFactor> MonthFactors);
 
 public sealed class StrategyResult
 {
     public static readonly StrategyResult Empty = new([]);
-
     public IReadOnlyList<ProvinceProductStrategy> All { get; }
 
-    // Thống kê nhanh
-    public int TotalProvinces  => All.Select(r => r.ProvinceCode).Distinct().Count();
-    public int TotalProducts   => All.Select(r => r.InventoryCD).Distinct().Count();
-    public int ImportCount     => All.Count(r => r.Action == "import");
-    public int ExportCount     => All.Count(r => r.Action == "export");
-    public int MaintainCount   => All.Count(r => r.Action == "maintain");
+    public int TotalProvinces => All.Select(r => r.ProvinceCode).Distinct().Count();
+    public int TotalProducts  => All.Select(r => r.InventoryCD).Distinct().Count();
+    public int ImportCount    => All.Count(r => r.Action == "import");
+    public int ExportCount    => All.Count(r => r.Action == "export");
+    public int MaintainCount  => All.Count(r => r.Action == "maintain");
 
-    // Top theo hành động
-    public IReadOnlyList<ProvinceProductStrategy> TopImport  =>
+    public IReadOnlyList<ProvinceProductStrategy> TopImport =>
         All.Where(r => r.Action == "import")
-           .OrderByDescending(r => r.GrowthRate).Take(20).ToList();
-    public IReadOnlyList<ProvinceProductStrategy> TopExport  =>
+           .OrderByDescending(r => r.AdjustedGrowthRate).Take(20).ToList();
+    public IReadOnlyList<ProvinceProductStrategy> TopExport =>
         All.Where(r => r.Action == "export")
-           .OrderBy(r => r.GrowthRate).Take(20).ToList();
+           .OrderBy(r => r.AdjustedGrowthRate).Take(20).ToList();
 
-    // Danh sách tỉnh duy nhất + tóm tắt
     public IReadOnlyList<ProvinceSummary> ProvinceSummaries =>
         All.GroupBy(r => r.ProvinceCode)
            .Select(g => new ProvinceSummary(
@@ -250,8 +310,7 @@ public sealed class StrategyResult
                g.Count(r => r.Action == "export"),
                g.Count(r => r.Action == "maintain"),
                g.Sum(r => r.PredAmount3M)))
-           .OrderByDescending(p => p.PredAmount3M)
-           .ToList();
+           .OrderByDescending(p => p.PredAmount3M).ToList();
 
     public StrategyResult(IReadOnlyList<ProvinceProductStrategy> all) => All = all;
 }

@@ -20,11 +20,12 @@ public interface IDataRepository
         CancellationToken ct = default);
 
     /// <summary>SQL GROUP BY pivot aggregation for View/Table sources.
-    /// Returns one row per (rowField, colField) — avoids full table scan in memory.</summary>
+    /// Returns one row per (rowField, compositeColKey) — avoids full table scan in memory.
+    /// Supports multiple column fields; composite key is joined with PivotConfig.ColKeySep.</summary>
     Task<IReadOnlyList<Dictionary<string, object?>>> FetchPivotGroupByAsync(
         DataSourceConfig config,
         string rowField,
-        string colField,
+        IReadOnlyList<string> colFields,
         IReadOnlyList<PivotValueDef> valueDefs,
         CancellationToken ct = default);
 

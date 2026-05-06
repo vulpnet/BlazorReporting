@@ -1,4 +1,5 @@
 @* PivotTable — renders cross-tab with grouped headers for multiple value fields.
+   Supports composite column keys (multiple column fields joined with PivotConfig.ColKeySep).
    Clicking any data cell opens a drill-down modal. *@
 
 @if (Pivot is null || Pivot.RowKeys.Count == 0)
@@ -24,18 +25,19 @@ else
                     <th class="pivot-corner" rowspan="@(multi ? 2 : 1)">
                         @RowField
                         <span class="text-white-50 mx-1">/</span>
-                        @ColField
+                        @string.Join(" + ", ColFields)
                     </th>
 
                     @foreach (var ck in Pivot.ColumnKeys)
                     {
+                        var display = PivotConfig.DisplayColKey(ck);
                         @if (multi)
                         {
-                            <th class="text-center pivot-col-group" colspan="@nv">@ck</th>
+                            <th class="text-center pivot-col-group" colspan="@nv">@display</th>
                         }
                         else
                         {
-                            <th class="text-end">@ck</th>
+                            <th class="text-end">@display</th>
                         }
                     }
 
@@ -92,7 +94,7 @@ else
                                 var val = GetCell(rk, ck, vd.Label);
                                 <td class="text-end @(val != null ? "pivot-cell" : "text-muted")"
                                     style="@(val != null ? "cursor:pointer" : "")"
-                                    title="@(val != null ? $"Click to drill-down: {rk} / {ck}" : "")"
+                                    title="@(val != null ? $"Click to drill-down: {rk} / {PivotConfig.DisplayColKey(ck)}" : "")"
                                     @onclick="() => DrillDown(rk, ck, val)">
                                     @FmtVal(val)
                                 </td>
@@ -156,7 +158,7 @@ else
                         Drill-Down &nbsp;
                         <span class="badge bg-secondary">@_drillRowKey</span>
                         <i class="bi bi-x mx-1 opacity-50"></i>
-                        <span class="badge bg-primary">@_drillColKey</span>
+                        <span class="badge bg-primary">@PivotConfig.DisplayColKey(_drillColKey)</span>
                         @if (_drillValue != null)
                         {
                             <span class="badge bg-success ms-1">@FmtVal(_drillValue)</span>
@@ -230,9 +232,9 @@ else
     [Parameter, EditorRequired]
     public PivotResult? Pivot { get; set; }
 
-    [Parameter] public string     RowField  { get; set; } = "";
-    [Parameter] public string     ColField  { get; set; } = "";
-    [Parameter] public PivotConfig? Config  { get; set; }
+    [Parameter] public string                  RowField  { get; set; } = "";
+    [Parameter] public IReadOnlyList<string>   ColFields { get; set; } = [];
+    [Parameter] public PivotConfig?            Config    { get; set; }
 
     [Parameter]
     public Func<Dictionary<string, object?>, Task<IReadOnlyList<Dictionary<string, object?>>>>?
@@ -273,21 +275,24 @@ else
     {
         if (val is null || DrillDownProvider is null) return;
 
-        _drillRowKey = rk;
-        _drillColKey = ck;
-        _drillValue  = val;
-        _drillOpen   = true;
+        _drillRowKey  = rk;
+        _drillColKey  = ck;
+        _drillValue   = val;
+        _drillOpen    = true;
         _drillLoading = true;
-        _drillData   = [];
+        _drillData    = [];
         StateHasChanged();
 
         try
         {
-            var filters = new Dictionary<string, object?>
-            {
-                [RowField] = rk,
-                [ColField] = ck
-            };
+            // Build filters: one entry per row field + one per each column field
+            var filters = new Dictionary<string, object?> { [RowField] = rk };
+
+            // Split composite column key back into individual values
+            var colParts = PivotConfig.SplitColKey(ck);
+            for (int i = 0; i < ColFields.Count && i < colParts.Length; i++)
+                filters[ColFields[i]] = colParts[i];
+
             _drillData = await DrillDownProvider(filters);
             _drillCols = _drillData.Count > 0 ? _drillData[0].Keys.ToList() : [];
         }

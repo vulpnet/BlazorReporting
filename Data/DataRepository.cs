@@ -83,13 +83,15 @@ public sealed class DataRepository : IDataRepository
     public async Task<IReadOnlyList<Dictionary<string, object?>>> FetchPivotGroupByAsync(
         DataSourceConfig config,
         string rowField,
-        string colField,
+        IReadOnlyList<string> colFields,
         IReadOnlyList<PivotValueDef> valueDefs,
         CancellationToken ct = default)
     {
         var src  = $"[{Esc(config.Source)}]";
         var rCol = $"[{Esc(rowField)}]";
-        var cCol = $"[{Esc(colField)}]";
+
+        // Support 1..N column fields
+        var cCols = colFields.Select(f => $"[{Esc(f)}]").ToList();
 
         // Build aggregate columns — alias = vd.Label so PivotService can locate by name
         var aggCols = valueDefs.Select(vd =>
@@ -97,12 +99,15 @@ public sealed class DataRepository : IDataRepository
 
         var (whereClause, filterParms) = BuildWhereClause(config.Filters);
 
+        var selectCols  = string.Join(", ", cCols);
+        var groupByPart = string.Join(", ", cCols);
+
         var sql = $"""
-            SELECT {rCol}, {cCol}, {string.Join(", ", aggCols)}
+            SELECT {rCol}, {selectCols}, {string.Join(", ", aggCols)}
             FROM   {src}
             {whereClause}
-            GROUP  BY {rCol}, {cCol}
-            ORDER  BY {rCol}, {cCol}
+            GROUP  BY {rCol}, {groupByPart}
+            ORDER  BY {rCol}, {groupByPart}
             """;
 
         await using var conn = new SqlConnection(_cs);
