@@ -1,0 +1,126 @@
+@using BlazorReporting.Services
+@inject NavMenuService MenuSvc
+@inject AuthService Auth
+@inject NavigationManager Nav
+@implements IDisposable
+
+<aside class="dm-sidebar @(Collapsed ? "is-collapsed" : "")">
+
+    <div class="dm-sidebar__brand">
+        <a href="/report" class="dm-brand-link">
+            <div class="dm-brand-mark">
+                <i class="bi bi-bar-chart-line-fill"></i>
+            </div>
+            <div class="dm-brand-text">
+                <div class="dm-brand-title">DMSPRO</div>
+                <div class="dm-brand-sub">Reporting Suite</div>
+            </div>
+        </a>
+        <button class="dm-collapse-btn" type="button" @onclick="ToggleCollapse"
+                title="@(Collapsed ? "Mở rộng" : "Thu gọn")">
+            <i class="bi @(Collapsed ? "bi-chevron-double-right" : "bi-chevron-double-left")"></i>
+        </button>
+    </div>
+
+    <div class="dm-sidebar__search">
+        <i class="bi bi-search"></i>
+        <input type="text" placeholder="Tìm menu..." @bind="_query" @bind:event="oninput" />
+        @if (!string.IsNullOrEmpty(_query))
+        {
+            <button class="dm-search-clear" @onclick="() => _query = string.Empty">
+                <i class="bi bi-x"></i>
+            </button>
+        }
+    </div>
+
+    <nav class="dm-sidebar__nav">
+        @foreach (var group in FilteredGroups())
+        {
+            <div class="dm-nav-group">
+                <div class="dm-nav-group__label">@group.Name</div>
+                @foreach (var item in group.Items)
+                {
+                    var active = IsActive(item.Href);
+                    <a class="dm-nav-item @(active ? "is-active" : "")"
+                       href="@item.Href"
+                       target="@(item.OpenInNewTab ? "_blank" : null)"
+                       title="@item.Title">
+                        <i class="bi @item.Icon"></i>
+                        <span class="dm-nav-item__text">@item.Title</span>
+                        @if (!string.IsNullOrEmpty(item.Badge))
+                        {
+                            <span class="dm-nav-badge">@item.Badge</span>
+                        }
+                    </a>
+                }
+            </div>
+        }
+        @if (!FilteredGroups().Any())
+        {
+            <div class="dm-nav-empty">Không có menu phù hợp</div>
+        }
+    </nav>
+
+    <div class="dm-sidebar__user">
+        <div class="dm-user-avatar">
+            @(Auth.FullName.Length > 0 ? Auth.FullName[0].ToString().ToUpper() : "U")
+        </div>
+        <div class="dm-user-info">
+            <div class="dm-user-name">@Auth.FullName</div>
+            <div class="dm-user-role">@Auth.Role</div>
+        </div>
+        <button class="dm-logout" @onclick="OnLogout" title="Đăng xuất">
+            <i class="bi bi-box-arrow-right"></i>
+        </button>
+    </div>
+</aside>
+
+@code {
+    [Parameter] public bool Collapsed { get; set; }
+    [Parameter] public EventCallback<bool> CollapsedChanged { get; set; }
+    [Parameter] public EventCallback OnLogout { get; set; }
+
+    private string _query = string.Empty;
+    private IReadOnlyList<NavMenuGroup> _groups = Array.Empty<NavMenuGroup>();
+
+    protected override void OnInitialized()
+    {
+        _groups = MenuSvc.GetMenu(Auth.Role);
+        Nav.LocationChanged += OnLocationChanged;
+    }
+
+    private void OnLocationChanged(object? s, Microsoft.AspNetCore.Components.Routing.LocationChangedEventArgs e)
+        => InvokeAsync(StateHasChanged);
+
+    public void Dispose() => Nav.LocationChanged -= OnLocationChanged;
+
+    private async Task ToggleCollapse()
+    {
+        Collapsed = !Collapsed;
+        await CollapsedChanged.InvokeAsync(Collapsed);
+    }
+
+    private bool IsActive(string href)
+    {
+        var current = new Uri(Nav.Uri).AbsolutePath.TrimEnd('/');
+        var target  = href.TrimEnd('/');
+        if (string.IsNullOrEmpty(target)) target = "/";
+        return string.Equals(current, target, StringComparison.OrdinalIgnoreCase);
+    }
+
+    private IEnumerable<NavMenuGroup> FilteredGroups()
+    {
+        if (string.IsNullOrWhiteSpace(_query)) return _groups;
+
+        var q = _query.Trim();
+        return _groups
+            .Select(g => new NavMenuGroup(
+                g.Name,
+                g.Order,
+                g.Items.Where(i =>
+                    i.Title.Contains(q, StringComparison.OrdinalIgnoreCase) ||
+                    g.Name.Contains(q, StringComparison.OrdinalIgnoreCase)).ToList()))
+            .Where(g => g.Items.Count > 0)
+            .ToList();
+    }
+}

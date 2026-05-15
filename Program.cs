@@ -24,6 +24,9 @@ builder.Services.AddScoped<IExportService, ExportService>();
 // Auth (scoped = per Blazor circuit / session)
 builder.Services.AddScoped<AuthService>();
 
+// Nav menu (singleton — reflection scan once)
+builder.Services.AddSingleton<NavMenuService>();
+
 // ML.NET Sales Forecasting (singleton — MLContext is thread-safe, expensive to create)
 builder.Services.AddSingleton<SalesForecastService>();
 builder.Services.AddSingleton<SeasonalFactorService>();

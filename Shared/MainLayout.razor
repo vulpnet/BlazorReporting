@@ -8,10 +8,12 @@
 @inject NavigationManager Nav
 @inject ProtectedLocalStorage Store
 @inject IDataRepository Repo
+@inject NavMenuService MenuSvc
+@implements IDisposable
 
 @if (!Auth.IsInitialized)
 {
-    <div style="min-height:100vh;background:#f8fafc"></div>
+    <div style="min-height:100vh;background:#f1f5f9"></div>
 }
 else if (!Auth.IsLoggedIn)
 {
@@ -19,86 +21,42 @@ else if (!Auth.IsLoggedIn)
 }
 else
 {
-    <div class="d-flex flex-column min-vh-100">
+    <div class="dm-shell @(_collapsed ? "is-collapsed" : "") @(_mobileOpen ? "is-mobile-open" : "")">
 
-        <nav class="navbar navbar-expand-md navbar-dark px-3 py-2" style="background:#1a1a2e">
-            <a class="navbar-brand fw-bold d-flex align-items-center gap-2" href="/report">
-                <div style="width:28px;height:28px;border-radius:6px;
-                            background:linear-gradient(135deg,#4f46e5,#7c3aed);
-                            display:flex;align-items:center;justify-content:center;font-size:.9rem">
-                    <i class="bi bi-bar-chart-line-fill"></i>
+        <Sidebar Collapsed="_collapsed" CollapsedChanged="OnCollapsedChanged" OnLogout="LogoutAsync" />
+
+        <div class="dm-shell__main">
+
+            <header class="dm-topbar">
+                <button class="dm-topbar__toggle dm-only-desktop" @onclick="ToggleCollapse"
+                        title="@(_collapsed ? "Mở rộng menu" : "Thu gọn menu")">
+                    <i class="bi @(_collapsed ? "bi-chevron-double-right" : "bi-chevron-double-left")"></i>
+                </button>
+                <button class="dm-topbar__toggle dm-only-mobile" @onclick="() => _mobileOpen = !_mobileOpen"
+                        title="Menu">
+                    <i class="bi bi-list"></i>
+                </button>
+
+                <div class="dm-topbar__title">
+                    <span class="dm-topbar__crumb">@CurrentGroup</span>
+                    @CurrentTitle
                 </div>
-                <span class="d-none d-sm-inline" style="font-size:.95rem;letter-spacing:.02em">
-                    DMSPRO <span style="font-weight:300;opacity:.7">Reporting</span>
-                </span>
-            </a>
 
-            <button class="navbar-toggler border-0" type="button"
-                    data-bs-toggle="collapse" data-bs-target="#mainNav"
-                    aria-controls="mainNav" aria-expanded="false">
-                <span class="navbar-toggler-icon"></span>
-            </button>
+                <a class="btn btn-sm btn-light border" href="/help" target="_blank" title="Hướng dẫn">
+                    <i class="bi bi-question-circle"></i>
+                </a>
+            </header>
 
-            <div class="collapse navbar-collapse" id="mainNav">
-                <ul class="navbar-nav me-auto mt-2 mt-md-0">
-                    <li class="nav-item">
-                        <a class="nav-link" href="/report">
-                            <i class="bi bi-table me-1"></i>Báo cáo
-                        </a>
-                    </li>
-                    <li class="nav-item">
-                        <a class="nav-link" href="/map">
-                            <i class="bi bi-geo-alt me-1"></i>Bản đồ
-                        </a>
-                    </li>
-                    <li class="nav-item">
-                        <a class="nav-link" href="/product-sales">
-                            <i class="bi bi-box-seam me-1"></i>Sản phẩm
-                        </a>
-                    </li>
-                    <li class="nav-item">
-                        <a class="nav-link" href="/sales-strategy">
-                            <i class="bi bi-robot me-1"></i>Chiến lược
-                        </a>
-                    </li>
-                    <li class="nav-item">
-                        <a class="nav-link" href="/help" target="_blank">
-                            <i class="bi bi-question-circle me-1"></i>Hướng dẫn
-                        </a>
-                    </li>
-                </ul>
+            <main class="dm-content">
+                @Body
+            </main>
 
-                <ul class="navbar-nav mt-2 mt-md-0 align-items-md-center gap-2">
-                    <li class="nav-item d-flex align-items-center gap-2">
-                        <div class="nav-user-avatar">
-                            @(Auth.FullName.Length > 0 ? Auth.FullName[0].ToString().ToUpper() : "U")
-                        </div>
-                        <div class="d-none d-md-block">
-                            <div style="font-size:.8rem;color:#e2e8f0;line-height:1.1">@Auth.FullName</div>
-                            <div style="font-size:.68rem;color:#94a3b8">@Auth.Role</div>
-                        </div>
-                    </li>
-                    <li class="nav-item">
-                        <button class="btn btn-sm nav-logout-btn" @onclick="LogoutAsync">
-                            <i class="bi bi-box-arrow-right me-1"></i>
-                            <span class="d-none d-md-inline">Đăng xuất</span>
-                        </button>
-                    </li>
-                </ul>
-            </div>
-        </nav>
-
-        <main class="flex-grow-1 overflow-hidden">
-            @Body
-        </main>
-
-        <footer class="text-center text-muted py-2 border-top"
-                style="font-size:.72rem;background:#f8fafc">
-            DMSPRO Reporting &copy; @DateTime.Now.Year
-        </footer>
+            <footer class="dm-footer">
+                DMSPRO Reporting &copy; @DateTime.Now.Year &middot; v1.0
+            </footer>
+        </div>
     </div>
 
-    @* ── AI Chatbox — hiện trên mọi trang đã đăng nhập ── *@
     <ChatWindow ReportLinks="@_reportLinks" />
 }
 
@@ -109,12 +67,38 @@ else
 
 @code {
     private IReadOnlyList<ChatNavLink> _reportLinks = [];
+    private bool _collapsed;
+    private bool _mobileOpen;
+
+    private string CurrentTitle => CurrentItem()?.Title ?? "Trang chủ";
+    private string CurrentGroup => CurrentItem()?.Group ?? "";
+
+    private NavMenuItem? CurrentItem()
+    {
+        var path = new Uri(Nav.Uri).AbsolutePath.TrimEnd('/');
+        if (string.IsNullOrEmpty(path)) path = "/";
+        return MenuSvc.GetMenu(Auth.Role)
+            .SelectMany(g => g.Items)
+            .FirstOrDefault(i => string.Equals(i.Href.TrimEnd('/'), path, StringComparison.OrdinalIgnoreCase));
+    }
+
+    protected override void OnInitialized()
+    {
+        Nav.LocationChanged += OnLocationChanged;
+    }
+
+    private void OnLocationChanged(object? s, Microsoft.AspNetCore.Components.Routing.LocationChangedEventArgs e)
+    {
+        _mobileOpen = false;
+        InvokeAsync(StateHasChanged);
+    }
+
+    public void Dispose() => Nav.LocationChanged -= OnLocationChanged;
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
         if (!firstRender) return;
 
-        // Restore session
         if (!Auth.IsInitialized)
         {
             try
@@ -130,9 +114,28 @@ else
             StateHasChanged();
         }
 
-        // Load report catalog cho chatbot (non-blocking)
+        // Restore sidebar collapsed pref
+        try
+        {
+            var col = await Store.GetAsync<bool>("dmspro_sidebar_collapsed");
+            if (col.Success && col.Value != _collapsed)
+            {
+                _collapsed = col.Value;
+                StateHasChanged();
+            }
+        }
+        catch { }
+
         _ = LoadReportLinksAsync();
     }
+
+    private async Task OnCollapsedChanged(bool v)
+    {
+        _collapsed = v;
+        try { await Store.SetAsync("dmspro_sidebar_collapsed", v); } catch { }
+    }
+
+    private Task ToggleCollapse() => OnCollapsedChanged(!_collapsed);
 
     private async Task LoadReportLinksAsync()
     {
@@ -150,7 +153,6 @@ else
             var sourceKeys = new[] { "SourceName","Source","ObjectName","SPName","ProcName","ViewName","TableName","RPT_SOURCE" };
             var typeKeys   = new[] { "SourceType","Type","ObjectType","RPT_TYPE","SourceKind" };
 
-            // Bước 1: build danh sách cơ bản
             var drafts = new List<(string Name, string Source, string TypeStr)>();
             foreach (var row in rows)
             {
@@ -168,7 +170,6 @@ else
                 drafts.Add((name, source, typeStr));
             }
 
-            // Bước 2: fetch SP params song song cho tất cả SP
             var spTasks = drafts
                 .Where(d => d.TypeStr == "SP")
                 .ToDictionary(
@@ -177,7 +178,6 @@ else
 
             await Task.WhenAll(spTasks.Values);
 
-            // Bước 3: gộp lại thành ChatNavLink
             var links = drafts.Select(d =>
             {
                 var url = $"/report?Source={d.Source}&Type={d.TypeStr}";
@@ -196,7 +196,7 @@ else
             _reportLinks = links;
             await InvokeAsync(StateHasChanged);
         }
-        catch { /* DMSViewReportTemplate không tồn tại — bỏ qua */ }
+        catch { }
     }
 
     private static string? Pick(Dictionary<string, object?> row, string[] keys)
