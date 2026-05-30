@@ -1,0 +1,1434 @@
+@page "/territory-map"
+@attribute [NavMenu(Title="Territory Performance", Icon="bi-map", Group="Phân tích", GroupOrder=10, Order=25)]
+@using BlazorReporting.Data
+@using BlazorReporting.Services
+@using System.Text.Json
+@inject IDataRepository Repo
+@inject SalesForecastService Forecaster
+@inject IJSRuntime JS
+@inject NavigationManager Nav
+@implements IAsyncDisposable
+
+<PageTitle>Territory Performance – DMSPRO</PageTitle>
+
+@* ══ TOOLBAR ══════════════════════════════════════════ *@
+<div class="map-toolbar">
+    <div class="d-flex align-items-center gap-2 flex-wrap">
+
+        <div class="d-flex align-items-center gap-2 me-2">
+            <div class="map-title-icon"><i class="bi bi-map-fill"></i></div>
+            <div>
+                <div class="map-title">Territory Performance</div>
+                <div class="map-subtitle">Vị trí salesman</div>
+            </div>
+        </div>
+
+        @* ── Custom Calendar Picker (ngày SM) ── *@
+        <div class="cal-wrap">
+            <button class="cal-trigger @(_showDatePicker ? "cal-trigger--open" : "")"
+                    @onclick="ToggleDatePicker" disabled="@_loading">
+                <i class="bi bi-calendar3 cal-trigger-icon"></i>
+                <span>@_date.ToString("dd/MM/yyyy")</span>
+                <i class="bi bi-chevron-down cal-trigger-caret @(_showDatePicker ? "cal-trigger-caret--up" : "")"></i>
+            </button>
+
+            @if (_showDatePicker)
+            {
+                <div class="cal-backdrop" @onclick="() => _showDatePicker = false"></div>
+                <div class="cal-popup" @onclick:stopPropagation="true">
+                    <div class="cal-header">
+                        <button class="cal-nav" @onclick="CalPrevMonth"><i class="bi bi-chevron-left"></i></button>
+                        <span class="cal-month-year">
+                            @(System.Globalization.CultureInfo.GetCultureInfo("en-US").DateTimeFormat.GetMonthName(_calMonth))
+                            &nbsp;<span class="cal-year">@_calYear</span>
+                        </span>
+                        <button class="cal-nav" @onclick="CalNextMonth"><i class="bi bi-chevron-right"></i></button>
+                    </div>
+                    <div class="cal-grid">
+                        @foreach (var d in new[] {"Sun","Mon","Tue","Wed","Thu","Fri","Sat"})
+                        { <div class="cal-dow">@d</div> }
+                        @{
+                            var firstDay    = new DateTime(_calYear, _calMonth, 1);
+                            var startDow    = (int)firstDay.DayOfWeek;
+                            var daysInMonth = DateTime.DaysInMonth(_calYear, _calMonth);
+                            var prevDays    = DateTime.DaysInMonth(_calMonth == 1 ? _calYear - 1 : _calYear, _calMonth == 1 ? 12 : _calMonth - 1);
+                            var today       = DateTime.Today;
+                            for (int e = 0; e < startDow; e++)
+                            {
+                                var pd = new DateTime(_calMonth==1?_calYear-1:_calYear, _calMonth==1?12:_calMonth-1, prevDays-startDow+1+e);
+                                <div class="cal-cell cal-cell--other" @onclick="() => SelectCalDate(pd)">@pd.Day</div>
+                            }
+                            for (int d = 1; d <= daysInMonth; d++)
+                            {
+                                var thisDate   = new DateTime(_calYear, _calMonth, d);
+                                var isToday    = thisDate == today;
+                                var isSelected = thisDate.Date == _date.Date;
+                                var cls = "cal-cell" + (isSelected?" cal-cell--selected":"") + (isToday&&!isSelected?" cal-cell--today":"");
+                                <div class="@cls" @onclick="() => SelectCalDate(thisDate)">@d</div>
+                            }
+                            int total2 = startDow + daysInMonth;
+                            int rem2   = total2 % 7 == 0 ? 0 : 7 - (total2 % 7);
+                            for (int e = 1; e <= rem2; e++)
+                            {
+                                var nd = new DateTime(_calMonth==12?_calYear+1:_calYear, _calMonth==12?1:_calMonth+1, e);
+                                <div class="cal-cell cal-cell--other" @onclick="() => SelectCalDate(nd)">@nd.Day</div>
+                            }
+                        }
+                    </div>
+                    <div class="cal-footer">
+                        <button class="cal-today-btn" @onclick="GoToToday">Today</button>
+                    </div>
+                </div>
+            }
+        </div>
+
+        <button class="btn btn-primary btn-sm d-flex align-items-center gap-1"
+                @onclick="LoadAsync" disabled="@_loading">
+            @if (_loading)
+            { <span class="spinner-border spinner-border-sm"></span><span>Đang tải…</span> }
+            else
+            { <i class="bi bi-search"></i><span>Xem bản đồ</span> }
+        </button>
+
+
+        @* ── 6 tính năng mới ── *@
+        @if (_locations.Count > 0)
+        {
+            <div class="btn-group btn-group-sm border-start ms-1 ps-2">
+
+                @* Biểu đồ doanh số *@
+                <button class="btn @(_showChart ? "btn-primary" : "btn-outline-primary") d-flex align-items-center gap-1"
+                        title="Biểu đồ doanh số" @onclick="ToggleChartAsync">
+                    <i class="bi bi-bar-chart-fill"></i>
+                    <span class="d-none d-md-inline">Doanh số</span>
+                </button>
+
+                @* Phân tích sản phẩm *@
+                <button class="btn @(_showProductPanel ? "btn-warning" : "btn-outline-warning") d-flex align-items-center gap-1"
+                        title="Phân tích sản phẩm" @onclick="ToggleProductPanelAsync">
+                    <i class="bi bi-box-seam-fill"></i>
+                    <span class="d-none d-md-inline">Sản phẩm</span>
+                </button>
+
+                @* Outlier alert *@
+                <button class="btn btn-outline-danger d-flex align-items-center gap-1 position-relative"
+                        title="Cảnh báo outlier" @onclick="ToggleOutlierAsync">
+                    <i class="bi bi-exclamation-triangle-fill"></i>
+                    @if (_outlierCount > 0)
+                    {
+                        <span class="position-absolute top-0 start-100 translate-middle badge rounded-pill bg-danger"
+                              style="font-size:.55rem">@_outlierCount</span>
+                    }
+                    <span class="d-none d-md-inline">Alert</span>
+                </button>
+
+                @* Replay *@
+                @if (_routeInfo != null)
+                {
+                    <button class="btn @(_replaying ? "btn-success" : "btn-outline-success") d-flex align-items-center gap-1"
+                            title="Replay lộ trình" @onclick="ToggleReplayAsync">
+                        <i class="bi @(_replaying ? "bi-pause-fill" : "bi-play-fill")"></i>
+                        <span class="d-none d-md-inline">@(_replaying ? "Dừng" : "Replay")</span>
+                    </button>
+                }
+            </div>
+
+            @* Filter cây tổ chức *@
+            <div class="position-relative">
+                <button class="btn btn-sm btn-outline-secondary d-flex align-items-center gap-1"
+                        style="min-width:180px;justify-content:space-between"
+                        @onclick="ToggleTreeFilterAsync">
+                    <span class="text-truncate" style="max-width:140px">
+                        @(_selectedTreeLabel ?? "— Tất cả —")
+                    </span>
+                    <i class="bi bi-chevron-@(_showTreeFilter ? "up" : "down")" style="font-size:.7rem;flex-shrink:0"></i>
+                </button>
+
+                @if (_showTreeFilter && _smTree.Count > 0)
+                {
+                    <div class="position-absolute top-100 start-0 mt-1 bg-dark border rounded shadow"
+                         style="z-index:2000;min-width:300px;max-height:400px;overflow-y:auto;border-color:#334155!important">
+
+                        <div class="px-2 py-1 border-bottom" style="border-color:#334155!important">
+                            <button class="btn btn-sm btn-link text-secondary p-0" style="font-size:.78rem"
+                                    @onclick="() => SelectTreeNodeAsync(null, null, null)">
+                                <i class="bi bi-x-circle me-1"></i>Tất cả SM
+                            </button>
+                        </div>
+
+                        @foreach (var n0 in _smTree.Where(n => n.FilterType == "stlvl0").OrderBy(n => n.Name))
+                        {
+                            var exp0 = _expandedNodes.Contains(n0.Id);
+                            <div class="tree-node tree-node--l0" @onclick:stopPropagation="true">
+                                <span class="tree-toggle" @onclick="() => ToggleExpand(n0.Id)">
+                                    <i class="bi bi-chevron-@(exp0 ? "down" : "right") me-1" style="font-size:.65rem"></i>
+                                </span>
+                                <i class="bi bi-building me-1 text-primary"></i>
+                                <span class="flex-grow-1" @onclick="() => SelectTreeNodeAsync(n0.FilterType, n0.Id, NodeLabel(n0))">@n0.Name</span>
+                                <span class="badge bg-primary ms-1">@n0.SmCount</span>
+                            </div>
+
+                            @if (exp0)
+                            {
+                                @foreach (var n1 in _smTree.Where(n => n.FilterType == "stlvl1" && n.ParentId == n0.Id).OrderBy(n => n.Name))
+                                {
+                                    var exp1 = _expandedNodes.Contains(n1.Id);
+                                    <div class="tree-node tree-node--l1" @onclick:stopPropagation="true">
+                                        <span class="tree-toggle" @onclick="() => ToggleExpand(n1.Id)">
+                                            <i class="bi bi-chevron-@(exp1 ? "down" : "right") me-1" style="font-size:.65rem"></i>
+                                        </span>
+                                        <i class="bi bi-diagram-3 me-1 text-info"></i>
+                                        <span class="flex-grow-1" @onclick="() => SelectTreeNodeAsync(n1.FilterType, n1.Id, NodeLabel(n1))">@n1.Name</span>
+                                        <span class="badge bg-info ms-1">@n1.SmCount</span>
+                                    </div>
+
+                                    @if (exp1)
+                                    {
+                                        @foreach (var n2 in _smTree.Where(n => n.FilterType == "stlvl2" && n.ParentId == n1.Id).OrderBy(n => n.Name))
+                                        {
+                                            var exp2 = _expandedNodes.Contains(n2.Id);
+                                            <div class="tree-node tree-node--l2" @onclick:stopPropagation="true">
+                                                <span class="tree-toggle" @onclick="() => ToggleExpand(n2.Id)">
+                                                    <i class="bi bi-chevron-@(exp2 ? "down" : "right") me-1" style="font-size:.65rem"></i>
+                                                </span>
+                                                <i class="bi bi-geo me-1 text-success"></i>
+                                                <span class="flex-grow-1" @onclick="() => SelectTreeNodeAsync(n2.FilterType, n2.Id, NodeLabel(n2))">@n2.Name</span>
+                                                <span class="badge bg-success ms-1">@n2.SmCount</span>
+                                            </div>
+
+                                            @if (exp2)
+                                            {
+                                                @foreach (var ns in _smTree.Where(n => n.FilterType == "ss" && n.ParentId == n2.Id).OrderBy(n => n.Name))
+                                                {
+                                                    var expS = _expandedNodes.Contains(ns.Id);
+                                                    <div class="tree-node tree-node--l3" @onclick:stopPropagation="true">
+                                                        <span class="tree-toggle" @onclick="() => ToggleExpand(ns.Id)">
+                                                            <i class="bi bi-chevron-@(expS ? "down" : "right") me-1" style="font-size:.65rem"></i>
+                                                        </span>
+                                                        <i class="bi bi-person-badge me-1 text-warning"></i>
+                                                        <span class="flex-grow-1" @onclick="() => SelectTreeNodeAsync(ns.FilterType, ns.Id, NodeLabel(ns))">@ns.Name</span>
+                                                        <span class="badge bg-warning text-dark ms-1">@ns.SmCount</span>
+                                                    </div>
+
+                                                    @if (expS)
+                                                    {
+                                                        @foreach (var nd in _smTree.Where(n => n.FilterType == "distributor" && n.ParentId == ns.Id).OrderBy(n => n.Name))
+                                                        {
+                                                            var expD = _expandedNodes.Contains(nd.Id);
+                                                            <div class="tree-node tree-node--l4" @onclick:stopPropagation="true">
+                                                                <span class="tree-toggle" @onclick="() => ToggleExpand(nd.Id)">
+                                                                    <i class="bi bi-chevron-@(expD ? "down" : "right") me-1" style="font-size:.65rem"></i>
+                                                                </span>
+                                                                <i class="bi bi-shop me-1 text-orange"></i>
+                                                                <span class="flex-grow-1 text-truncate" @onclick="() => SelectTreeNodeAsync(nd.FilterType, nd.Id, NodeLabel(nd))">@nd.Name</span>
+                                                                <span class="badge bg-secondary ms-1">@nd.SmCount</span>
+                                                            </div>
+
+                                                            @if (expD)
+                                                            {
+                                                                @foreach (var nr in _smTree.Where(n => n.FilterType == "route" && n.ParentId == nd.Id).OrderBy(n => n.Name))
+                                                                {
+                                                                    <div class="tree-node tree-node--l5" @onclick="() => SelectTreeNodeAsync(nr.FilterType, nr.Id, NodeLabel(nr))">
+                                                                        <i class="bi bi-signpost-2 me-1" style="color:#94a3b8"></i>
+                                                                        <span class="flex-grow-1 text-truncate">@nr.Name</span>
+                                                                        <span class="badge bg-dark ms-1">@nr.SmCount</span>
+                                                                    </div>
+                                                                }
+                                                            }
+                                                        }
+                                                    }
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    </div>
+                }
+            </div>
+
+            @* Search *@
+            <div class="input-group input-group-sm ms-auto" style="width:180px">
+                <span class="input-group-text bg-white"><i class="bi bi-search"></i></span>
+                <input class="form-control" placeholder="Tìm username…"
+                       @bind="_search" @bind:event="oninput" />
+            </div>
+        }
+    </div>
+
+    @* Outlier panel *@
+    @if (_showOutliers && _outliers.Count > 0)
+    {
+        <div class="mt-2 p-2" style="background:#0f172a;border-radius:6px;max-height:180px;overflow-y:auto">
+            @* Group theo loại *@
+            @foreach (var grp in _outliers.GroupBy(a => a.AlertType))
+            {
+                var (icon, color, label) = grp.Key switch {
+                    "under_visit" => ("bi-shop",                "#f59e0b", "Thiếu outlet"),
+                    "no_order"    => ("bi-cart-x",              "#ef4444", "Không đơn hàng"),
+                    "late_start"  => ("bi-alarm",               "#f97316", "Đi trễ"),
+                    "early_end"   => ("bi-box-arrow-right",     "#a78bfa", "Về sớm"),
+                    "long_stay"   => ("bi-hourglass-split",     "#06b6d4", "Ở lâu 1 outlet"),
+                    _             => ("bi-exclamation-triangle","#94a3b8", grp.Key)
+                };
+                <div class="mb-1">
+                    <span class="badge me-1" style="background:@color;font-size:.68rem">
+                        <i class="bi @icon me-1"></i>@label (@grp.Count())
+                    </span>
+                    @foreach (var al in grp.Take(5))
+                    {
+                        <span class="badge bg-dark border me-1" style="font-size:.68rem;border-color:#334155!important"
+                              role="button" @onclick="() => FlyToOutlierAsync(al)">
+                            @al.UserName — @al.Description
+                        </span>
+                    }
+                    @if (grp.Count() > 5)
+                    {
+                        <span class="badge bg-secondary" style="font-size:.65rem">+@(grp.Count()-5)</span>
+                    }
+                </div>
+            }
+        </div>
+    }
+
+    @if (!string.IsNullOrEmpty(_error))
+    {
+        <div class="alert alert-danger mt-2 mb-0 py-1 px-2" style="font-size:.82rem">
+            <i class="bi bi-exclamation-triangle me-1"></i>@_error
+        </div>
+    }
+</div>
+
+@* ══ LAYOUT ═══════════════════════════════════════════ *@
+<div class="map-layout">
+
+    @* ── Map ── *@
+    <div class="map-container">
+        <div id="territory-map-canvas"></div>
+
+        @if (!_mapReady)
+        {
+            <div class="map-placeholder">
+                <div class="text-center text-muted">
+                    <i class="bi bi-map display-1 opacity-25 d-block mb-3"></i>
+                    <p class="mb-0">Chọn ngày và nhấn <strong>Xem bản đồ</strong></p>
+                </div>
+            </div>
+        }
+
+        @if (_loading)
+        {
+            <div class="map-overlay">
+                <div class="spinner-border text-primary" style="width:2.5rem;height:2.5rem"></div>
+                <div class="mt-2 fw-semibold" style="color:#fff">Đang tải dữ liệu…</div>
+            </div>
+        }
+
+        @* Route info floating panel *@
+        @if (_routeInfo != null)
+        {
+            <div class="map-route-panel">
+                <div class="map-route-panel-header">
+                    <div class="d-flex align-items-center gap-2">
+                        <div class="map-route-avatar" style="background:@IndexColor(_routeColorIdx)">
+                            @AvatarText(_routeInfo.UserName)
+                        </div>
+                        <div>
+                            <div class="map-route-name">@_routeInfo.UserName</div>
+                            <div class="map-route-date">@_date.ToString("dd/MM/yyyy")</div>
+                        </div>
+                    </div>
+                    <button class="map-route-close" @onclick="ClearRouteAsync" title="Đóng lộ trình">
+                        <i class="bi bi-x-lg"></i>
+                    </button>
+                </div>
+                <div class="map-route-stats">
+                    <div class="map-route-stat"><i class="bi bi-geo-fill text-success"></i><span>@_routeInfo.Stops điểm GPS</span></div>
+                    <div class="map-route-stat"><i class="bi bi-shop text-warning"></i><span>@_routeInfo.CustomerStops KH</span></div>
+                    <div class="map-route-stat"><i class="bi bi-clock text-primary"></i><span>@_routeInfo.TimeRange</span></div>
+                    <div class="map-route-stat"><i class="bi bi-signpost-2 text-secondary"></i><span>~@_routeInfo.Km km</span></div>
+                    @if (_routeInfo.TotalSales > 0)
+                    {
+                        <div class="map-route-stat map-route-stat--sales">
+                            <i class="bi bi-currency-dollar"></i>
+                            <span>@FormatMoney(_routeInfo.TotalSales)</span>
+                        </div>
+                    }
+                </div>
+            </div>
+        }
+
+        @if (_routeLoading)
+        {
+            <div class="map-overlay" style="background:rgba(15,23,42,.35)">
+                <div class="spinner-border text-white"></div>
+                <div class="mt-2 text-white fw-semibold" style="font-size:.85rem">Đang tải lộ trình…</div>
+            </div>
+        }
+
+        @* Chart panel *@
+        @if (_showChart)
+        {
+            <div class="map-chart-panel">
+                <div class="map-chart-header">
+                    <div class="d-flex align-items-center gap-2 flex-wrap">
+                        <i class="bi bi-bar-chart-fill text-primary"></i>
+                        <span class="fw-bold" style="font-size:.88rem">Doanh số @_date.ToString("dd/MM/yyyy")</span>
+                        @if (_chartTotal > 0)
+                        {
+                            <span class="badge bg-success" style="font-size:.7rem">Tổng: @FormatMoney(_chartTotal)</span>
+                            <span class="badge bg-secondary" style="font-size:.7rem">@_chartData.Count mục</span>
+                        }
+                    </div>
+                    <div class="d-flex align-items-center gap-2">
+                        <select class="form-select form-select-sm chart-ctrl-select"
+                                @bind="_chartGroupBy" @bind:after="RefreshChartAsync">
+                            <option value="route">🗺 Tuyến</option>
+                            <option value="sm">👤 Salesman</option>
+                            <option value="province">🏙 Tỉnh/TP</option>
+                            <option value="channel">📦 Kênh</option>
+                        </select>
+                        <div class="chart-type-group">
+                            @foreach (var (typ, ico, lbl) in ChartTypes)
+                            {
+                                var t = typ;
+                                <button class="chart-type-btn @(_chartType==t?"active":"")" title="@lbl" @onclick="()=>SwitchChartType(t)">
+                                    <i class="bi @ico"></i>
+                                </button>
+                            }
+                        </div>
+                        @if (_chartLoading) { <span class="spinner-border spinner-border-sm text-primary"></span> }
+                        <button class="btn btn-sm btn-outline-secondary p-1" @onclick="()=>_showChart=false"><i class="bi bi-x-lg"></i></button>
+                    </div>
+                </div>
+                <div class="map-chart-body">
+                    @if (_chartLoading)
+                    {
+                        <div class="d-flex align-items-center justify-content-center h-100 text-muted">
+                            <div class="spinner-border me-2"></div>Đang tải…
+                        </div>
+                    }
+                    else if (_chartData.Count == 0)
+                    {
+                        <div class="d-flex align-items-center justify-content-center h-100 text-muted">
+                            <i class="bi bi-inbox me-2"></i>Không có dữ liệu
+                        </div>
+                    }
+                    else
+                    {
+                        <div class="chart-scroll-wrap"><canvas id="tm-sales-chart"></canvas></div>
+                    }
+                </div>
+            </div>
+        }
+
+        @* Product Panel *@
+        @if (_showProductPanel)
+        {
+            <div class="map-ps-panel">
+                <div class="map-ps-header">
+                    <i class="bi bi-box-seam-fill text-warning me-1"></i>
+                    <span class="fw-bold me-2" style="font-size:.85rem">Phân tích sản phẩm</span>
+                    <select class="form-select form-select-sm ps-select" @bind="_psYear" disabled="@_psLoading">
+                        @for (int y = DateTime.Today.Year; y >= DateTime.Today.Year-4; y--)
+                        { var yy = y; <option value="@yy">@yy</option> }
+                    </select>
+                    <select class="form-select form-select-sm ps-select" @bind="_psPeriodType" @bind:after="OnPsPeriodTypeChanged" disabled="@_psLoading">
+                        <option value="year">Cả năm</option>
+                        <option value="quarter">Quý</option>
+                        <option value="month">Tháng</option>
+                    </select>
+                    @if (_psPeriodType == "quarter")
+                    {
+                        <select class="form-select form-select-sm ps-select" @bind="_psPeriodValue" disabled="@_psLoading">
+                            <option value="1">Q1</option><option value="2">Q2</option>
+                            <option value="3">Q3</option><option value="4">Q4</option>
+                        </select>
+                    }
+                    else if (_psPeriodType == "month")
+                    {
+                        <select class="form-select form-select-sm ps-select" @bind="_psPeriodValue" disabled="@_psLoading">
+                            @for (int m = 1; m <= 12; m++) { <option value="@m">Tháng @m</option> }
+                        </select>
+                    }
+                    <select class="form-select form-select-sm ps-select" @bind="_psGroupBy" disabled="@_psLoading">
+                        <option value="route">🗺 Tuyến</option>
+                        <option value="province">🏙 Tỉnh/TP</option>
+                        <option value="sm">👤 SM</option>
+                    </select>
+                    <select class="form-select form-select-sm ps-select" @bind="_psTopN" disabled="@_psLoading">
+                        <option value="5">Top 5</option>
+                        <option value="10">Top 10</option>
+                        <option value="15">Top 15</option>
+                    </select>
+                    <button class="btn btn-sm btn-warning d-flex align-items-center gap-1"
+                            @onclick="LoadProductDataAsync" disabled="@_psLoading">
+                        @if (_psLoading) { <span class="spinner-border spinner-border-sm"></span> }
+                        else { <i class="bi bi-search"></i> }
+                        <span>Phân tích</span>
+                    </button>
+                    @if (_psData.Count > 0)
+                    {
+                        <div class="ps-metric-toggle">
+                            <button class="@(_psMetric=="qty"?"active":"")" @onclick='()=>SwitchPsMetricAsync("qty")'><i class="bi bi-boxes me-1"></i>SL</button>
+                            <button class="@(_psMetric=="amount"?"active":"")" @onclick='()=>SwitchPsMetricAsync("amount")'><i class="bi bi-currency-dollar me-1"></i>DS</button>
+                        </div>
+                    }
+                    <button class="btn btn-sm btn-outline-secondary ms-auto p-1" @onclick="()=>_showProductPanel=false"><i class="bi bi-x-lg"></i></button>
+                </div>
+                <div class="map-ps-body">
+                    <div class="map-ps-area-wrap">
+                        @if (_psLoading)
+                        {
+                            <div class="map-ps-placeholder"><div class="spinner-border text-warning"></div></div>
+                        }
+                        else if (_psData.Count == 0)
+                        {
+                            <div class="map-ps-placeholder text-muted">
+                                <i class="bi bi-box-seam display-6 opacity-25 d-block mb-2"></i>
+                                Chọn kỳ và nhấn <strong>Phân tích</strong>
+                            </div>
+                        }
+                        else { <canvas id="tm-ps-area"></canvas> }
+                    </div>
+                    <div class="map-ps-trend-wrap">
+                        @if (_psData.Count > 0)
+                        {
+                            <div class="d-flex align-items-center gap-2 mb-1 flex-shrink-0">
+                                <i class="bi bi-graph-up-arrow text-warning" style="font-size:.85rem"></i>
+                                <span style="font-size:.78rem;font-weight:700">Xu hướng</span>
+                                <select class="form-select form-select-sm ps-select" style="width:auto;max-width:190px"
+                                        @bind="_psSelectedProd" @bind:after="LoadPsTrendAsync">
+                                    @foreach (var cd in PsTopProducts)
+                                    {
+                                        var lbl = _psProductNames.TryGetValue(cd, out var n) && n != cd ? $"{cd} – {n}" : cd;
+                                        <option value="@cd">@lbl</option>
+                                    }
+                                </select>
+                            </div>
+                            @if (_psTrendLoading)
+                            {
+                                <div class="map-ps-placeholder" style="min-height:80px">
+                                    <div class="spinner-border spinner-border-sm text-warning"></div>
+                                </div>
+                            }
+                            else
+                            {
+                                <div class="map-ps-trend-chart"><canvas id="tm-ps-trend"></canvas></div>
+                            }
+                            @if (_psForecast != null)
+                            {
+                                <div class="d-flex align-items-center gap-1 mb-1 flex-shrink-0">
+                                    <span class="algo-badge @_psForecast.AlgorithmBadgeClass">
+                                        <i class="bi @_psForecast.AlgorithmIcon"></i>
+                                        @(_psForecast.IsSSA ? "ML.NET SSA" : "Linear Regression")
+                                    </span>
+                                    <span class="algo-detail">@_psForecast.AlgorithmLabel</span>
+                                </div>
+                            }
+                            @if (_psPredictions.Count > 0)
+                            {
+                                <div class="ps-pred-cards mt-1">
+                                    @foreach (var pred in _psPredictions)
+                                    {
+                                        <div class="ps-pred-card ps-pred-card--@pred.Signal">
+                                            <div class="ps-pred-period">@pred.Label</div>
+                                            <div class="ps-pred-val" style="font-size:.85rem">
+                                                @(_psMetric=="amount" ? FormatMoney(pred.Amount) : pred.Qty.ToString("N0"))
+                                                <span class="ps-pred-unit">@(_psMetric=="amount"?"đ":"SP")</span>
+                                            </div>
+                                            <div class="ps-pred-signal">
+                                                <i class="bi @pred.SignalIcon me-1"></i>@pred.SignalText
+                                            </div>
+                                        </div>
+                                    }
+                                </div>
+                            }
+                        }
+                        else
+                        {
+                            <div class="map-ps-placeholder text-muted" style="font-size:.8rem">
+                                <i class="bi bi-arrow-left-circle me-1"></i>Tải dữ liệu để xem xu hướng
+                            </div>
+                        }
+                    </div>
+                </div>
+                @if (_psStrategyRowsCache.Count > 0)
+                {
+                    <div class="map-ps-strategy">
+                        <table class="ps-strategy-table">
+                            <thead>
+                                <tr>
+                                    <th>Khu vực</th>
+                                    <th>SP bán chạy nhất</th>
+                                    <th class="text-end">Số lượng</th>
+                                    <th class="text-end">Doanh số</th>
+                                    <th>Xu hướng</th>
+                                    <th>Gợi ý</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                @foreach (var row in _psStrategyRowsCache)
+                                {
+                                    <tr>
+                                        <td><span class="ps-area-badge">@row.Area</span></td>
+                                        <td><span class="ps-prod-badge" title="@row.TopCD">@row.TopName</span></td>
+                                        <td class="text-end fw-semibold">@row.Qty.ToString("N0")</td>
+                                        <td class="text-end">@FormatMoney(row.Amount)</td>
+                                        <td>
+                                            <span class="ps-trend-badge ps-trend-badge--@row.TrendClass">
+                                                <i class="bi @row.TrendIcon me-1"></i>@row.TrendText
+                                            </span>
+                                        </td>
+                                        <td class="ps-suggest-cell">@row.Suggestion</td>
+                                    </tr>
+                                }
+                            </tbody>
+                        </table>
+                    </div>
+                }
+            </div>
+        }
+    </div>
+
+    @* ── SM sidebar (right) ── *@
+    @if (_locations.Count > 0)
+    {
+        <div class="map-sidebar">
+            <div class="map-sidebar-header">
+                <i class="bi bi-list-ul me-1"></i>Salesman
+                <span class="badge bg-primary ms-1">@FilteredLocations.Count()</span>
+                @if (_geocodingStarted && _geocodedCount < _locations.Count)
+                {
+                    <span class="badge bg-secondary ms-1" style="font-size:.62rem">
+                        <span class="spinner-border spinner-border-sm me-1" style="width:.55rem;height:.55rem;border-width:1px"></span>
+                        @_geocodedCount/@_locations.Count
+                    </span>
+                }
+                @if (_routeInfo != null)
+                {
+                    <button class="btn btn-xs btn-outline-danger ms-auto py-0 px-1" style="font-size:.65rem"
+                            @onclick="ClearRouteAsync">
+                        <i class="bi bi-x"></i> Xoá lộ trình
+                    </button>
+                }
+            </div>
+            <div class="map-sidebar-body">
+                @{ int idx = 0; }
+                @foreach (var loc in FilteredLocations)
+                {
+                    var c       = IndexColor(idx);
+                    var isRoute = _routeInfo?.UserName == loc.UserName;
+                    _addresses.TryGetValue(loc.UserName, out var addr);
+
+                    <div class="map-sidebar-item @(isRoute ? "map-sidebar-item--active" : "")"
+                         @onclick="() => FlyToAsync(loc)">
+                        <div class="map-sidebar-dot" style="background:@c"></div>
+                        <div class="map-sidebar-info">
+                            <div class="d-flex align-items-center gap-1">
+                                <div class="map-sidebar-name">@loc.UserName</div>
+                                <button class="map-route-btn @(isRoute?"map-route-btn--active":"")"
+                                        title="@(isRoute?"Đang xem lộ trình":"Xem lộ trình")"
+                                        @onclick:stopPropagation="true"
+                                        @onclick="() => ShowRouteAsync(loc, idx)">
+                                    @if (_routeLoading && _routeLoadingUser == loc.UserName)
+                                    {
+                                        <span class="spinner-border spinner-border-sm" style="width:.7rem;height:.7rem;border-width:1.5px"></span>
+                                    }
+                                    else { <i class="bi bi-signpost-2-fill"></i> }
+                                </button>
+                            </div>
+                            <div class="map-sidebar-time"><i class="bi bi-clock me-1"></i>@loc.Checktime.ToString("HH:mm:ss")</div>
+                            @if (addr != null)
+                            {
+                                <div class="map-sidebar-addr" title="@addr">@addr</div>
+                            }
+                            else if (_geocodingStarted)
+                            {
+                                <div class="map-sidebar-addr map-sidebar-addr--loading">Đang lấy địa chỉ…</div>
+                            }
+                            @if (_sales.TryGetValue(loc.UserName, out var sale) && sale > 0)
+                            {
+                                <div class="map-sidebar-sales"><i class="bi bi-graph-up-arrow me-1"></i>@FormatMoney(sale)</div>
+                            }
+                        </div>
+                        <i class="bi bi-chevron-right text-muted" style="font-size:.65rem;flex-shrink:0"></i>
+                    </div>
+                    idx++;
+                }
+            </div>
+        </div>
+    }
+</div>
+
+<style>
+    .tm-kpi-sidebar { width:260px; min-width:220px; }
+    .map-kpi-item   { background:#0f172a; border:1px solid #334155; border-radius:8px;
+                      padding:10px 12px; margin-bottom:6px; }
+    .map-kpi-name   { font-size:11px; font-weight:600; color:#e2e8f0; max-width:150px;
+                      overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+    .map-kpi-progress { height:4px; background:#334155; border-radius:2px; overflow:hidden; margin:4px 0; }
+    .map-kpi-bar    { height:100%; border-radius:2px; transition:width .3s; }
+    .map-legend     { padding:10px 14px; border-top:1px solid #334155; }
+    .map-legend-title { font-size:10px; color:#64748b; text-transform:uppercase; margin-bottom:5px; }
+    .map-legend-item  { display:flex; align-items:center; gap:6px; font-size:11px; color:#94a3b8; margin-bottom:2px; }
+    .map-legend-dot   { width:10px; height:10px; border-radius:50%; flex-shrink:0; }
+    .map-stat-chip  { background:#0f172a; border:1px solid #334155; border-radius:6px;
+                      padding:3px 8px; text-align:center; }
+    .map-stat-val   { display:block; font-size:12px; font-weight:700; color:#f1f5f9; }
+    .map-stat-lbl   { display:block; font-size:9px; color:#64748b; }
+    .tree-node      { display:flex; align-items:center; gap:4px; padding:4px 8px;
+                      font-size:.75rem; color:#cbd5e1; transition:background .15s; }
+    .tree-node:hover { background:#1e293b; }
+    .tree-toggle    { cursor:pointer; padding:2px 4px; flex-shrink:0; color:#64748b; }
+    .tree-toggle:hover { color:#94a3b8; }
+    .tree-node span.flex-grow-1 { cursor:pointer; }
+    .tree-node span.flex-grow-1:hover { color:#f1f5f9; }
+    .tree-node--l0  { padding-left:10px; font-weight:600; color:#e2e8f0; }
+    .tree-node--l1  { padding-left:20px; }
+    .tree-node--l2  { padding-left:32px; }
+    .tree-node--l3  { padding-left:44px; }
+    .tree-node--l4  { padding-left:56px; font-size:.72rem; }
+    .tree-node--l5  { padding-left:68px; font-size:.7rem; color:#94a3b8; }
+    .text-orange    { color:#f97316; }
+</style>
+
+@code {
+    // ── State ─────────────────────────────────────────
+    private DateTime _date         = DateTime.Today;
+    private bool     _loading;
+    private bool     _mapReady;
+    private bool     _geocodingStarted;
+    private int      _geocodedCount;
+    private string   _error  = "";
+    private string   _search = "";
+    private IReadOnlyList<SalesmanLocation>     _locations = [];
+    private Dictionary<string, string>          _addresses = new(StringComparer.OrdinalIgnoreCase);
+    private Dictionary<string, decimal>         _sales     = new(StringComparer.OrdinalIgnoreCase);
+    private DotNetObjectReference<TerritoryMap>? _dotNetRef;
+
+    // Calendar picker
+    private bool _showDatePicker;
+    private int  _calYear;
+    private int  _calMonth;
+
+    // Territory data
+    private IReadOnlyList<TerritoryPolygonPoint> _polygons = [];
+    private IReadOnlyList<TerritoryOutlet>        _outlets  = [];
+
+    // Route state
+    private RouteInfo? _routeInfo;
+    private bool       _routeLoading;
+    private string?    _routeLoadingUser;
+    private int        _routeColorIdx;
+
+    private sealed record RouteInfo(string UserName, int Stops, string TimeRange, double Km, int CustomerStops, decimal TotalSales);
+
+    // Chart state
+    private bool   _showChart      = false;
+    private bool   _chartLoading   = false;
+    private bool   _chartNeedsDraw = false;
+    private string _chartGroupBy   = "route";
+    private string _chartType      = "bar-v";
+    private decimal _chartTotal    = 0;
+    private IReadOnlyList<SalesAreaItem> _chartData = [];
+
+    private static readonly (string Type, string Icon, string Label)[] ChartTypes =
+    [
+        ("bar-v",    "bi-bar-chart-fill",  "Cột dọc"),
+        ("pie",      "bi-pie-chart-fill",  "Biểu đồ tròn"),
+        ("doughnut", "bi-circle-half",     "Donut"),
+    ];
+
+    // Product analysis state
+    private bool   _showProductPanel = false;
+    private bool   _psLoading        = false;
+    private bool   _psTrendLoading   = false;
+    private bool   _psAreaNeedsDraw  = false;
+    private bool   _psTrendNeedsDraw = false;
+    private int    _psYear           = DateTime.Today.Year;
+    private string _psPeriodType     = "month";
+    private int    _psPeriodValue    = DateTime.Today.Month;
+    private string _psGroupBy        = "route";
+    private int    _psTopN           = 10;
+    private string _psMetric         = "qty";
+    private string _psSelectedProd   = "";
+    private IReadOnlyList<ProductAreaItem>   _psData        = [];
+    private IReadOnlyList<ProductTrendPoint> _psTrendPoints = [];
+    private List<PsPrediction>               _psPredictions = [];
+    private ForecastResult?                  _psForecast;
+    private Dictionary<string, string>       _psProductNames     = new();
+    private List<PsStrategyRow>              _psStrategyRowsCache = [];
+
+    private sealed record PsPrediction(string Label, long Qty, decimal Amount,
+        string Signal, string SignalIcon, string SignalText);
+    private sealed record PsStrategyRow(string Area, string TopCD, string TopName,
+        long Qty, decimal Amount, string TrendClass, string TrendIcon,
+        string TrendText, string Suggestion);
+
+    private List<string> PsTopProducts =>
+        _psData.Select(d => d.InventoryCD).Distinct().ToList();
+
+
+
+    // Feature 3: Outlier
+    private bool _showOutliers   = false;
+    private int  _outlierCount   = 0;
+    private IReadOnlyList<OutlierAlert> _outliers = [];
+
+    // Feature 4: Replay
+    private bool _replaying = false;
+    private IReadOnlyList<SalesmanRoutePoint> _replayRoutePoints = [];
+
+    // Feature 5: Tree filter
+    private string? _selectedTreeLabel = null;
+    private string? _selectedTreeType  = null;
+    private string? _selectedTreeId    = null;
+    private bool    _showTreeFilter    = false;
+    private HashSet<string> _expandedNodes = [];
+    private IReadOnlyList<SmTreeNode>  _smTree   = [];
+    private IReadOnlyDictionary<string, SmGroupKeys> _smGroups =
+        new Dictionary<string, SmGroupKeys>(StringComparer.OrdinalIgnoreCase);
+    private IReadOnlyList<MapGroupItem> _groups = [];
+
+    // Legend
+    private static readonly (string Label, string Color)[] LegendItems =
+    [
+        ("≥ 80%", "#16a34a"),
+        ("60–80%", "#65a30d"),
+        ("40–60%", "#d97706"),
+        ("20–40%", "#dc2626"),
+        ("< 20%",  "#991b1b"),
+    ];
+
+    private static readonly string[] Colors = [
+        "#2563eb","#dc2626","#16a34a","#d97706","#7c3aed",
+        "#0891b2","#be185d","#15803d","#b45309","#4f46e5"
+    ];
+    private static string IndexColor(int i) => Colors[i % Colors.Length];
+
+    private IEnumerable<SalesmanLocation> FilteredLocations =>
+        string.IsNullOrWhiteSpace(_search)
+            ? _locations
+            : _locations.Where(l =>
+                l.UserName.Contains(_search, StringComparison.OrdinalIgnoreCase) ||
+                (_addresses.TryGetValue(l.UserName, out var a) &&
+                 a.Contains(_search, StringComparison.OrdinalIgnoreCase)));
+
+    // ── Init ──────────────────────────────────────────
+    protected override void OnInitialized()
+    {
+        _dotNetRef = DotNetObjectReference.Create(this);
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        // ── Product charts ─────────────────────────────
+        if (_psAreaNeedsDraw && _psData.Count > 0)
+        {
+            _psAreaNeedsDraw = false;
+            try
+            {
+                var json = JsonSerializer.Serialize(_psData,
+                    new JsonSerializerOptions { PropertyNamingPolicy = JsonNamingPolicy.CamelCase });
+                await JS.InvokeVoidAsync("productChartInterop.renderAreaChart", "tm-ps-area", json, _psMetric);
+            }
+            catch { }
+            return;
+        }
+        if (_psTrendNeedsDraw && _psTrendPoints.Count > 0)
+        {
+            _psTrendNeedsDraw = false;
+            try
+            {
+                var actual = _psTrendPoints.Select(p => new { label = $"T{p.Month}/{p.Year}", qty = p.TotalQty, amount = p.TotalAmount });
+                var predicted = _psForecast != null
+                    ? _psForecast.Labels.Select((lbl, i) => new
+                    {
+                        label       = lbl,
+                        qty         = (long)_psForecast.Qty.Predicted[i],
+                        amount      = (decimal)_psForecast.Amount.Predicted[i],
+                        qtyLower    = (long)_psForecast.Qty.Lower[i],
+                        qtyUpper    = (long)_psForecast.Qty.Upper[i],
+                        amountLower = (decimal)_psForecast.Amount.Lower[i],
+                        amountUpper = (decimal)_psForecast.Amount.Upper[i]
+                    })
+                    : Enumerable.Empty<object>();
+                var psName  = _psTrendPoints.FirstOrDefault()?.InventoryName ?? _psSelectedProd;
+                var payload = new { inventoryCD = _psSelectedProd, inventoryName = psName, isSSA = _psForecast?.IsSSA, actual, predicted };
+                var json    = JsonSerializer.Serialize(payload, new JsonSerializerOptions { PropertyNamingPolicy = JsonNamingPolicy.CamelCase });
+                await JS.InvokeVoidAsync("productChartInterop.renderTrendChart", "tm-ps-trend", json, _psMetric);
+            }
+            catch { }
+            return;
+        }
+
+        // ── Sales chart ─────────────────────────────────
+        if (_chartNeedsDraw && _chartData.Count > 0)
+        {
+            _chartNeedsDraw = false;
+            try
+            {
+                var json  = JsonSerializer.Serialize(_chartData, new JsonSerializerOptions { PropertyNamingPolicy = JsonNamingPolicy.CamelCase });
+                var title = _chartGroupBy switch { "sm" => "Doanh số theo Salesman", "province" => "Doanh số theo Tỉnh/TP", "channel" => "Doanh số theo Kênh", _ => "Doanh số theo Tuyến" };
+                await JS.InvokeVoidAsync("chartInterop.render", "tm-sales-chart", json, title, _chartType);
+            }
+            catch { }
+            return;
+        }
+
+        if (!firstRender) return;
+        try
+        {
+            await Task.Delay(60);
+            await JS.InvokeVoidAsync("territoryMapInterop.init", "territory-map-canvas", 16.0, 106.0, 6);
+            await JS.InvokeVoidAsync("territoryMapInterop.setDotNetRef", _dotNetRef);
+            await JS.InvokeVoidAsync("chartInterop.setDotNetRef", _dotNetRef);
+            _mapReady = true;
+            StateHasChanged();
+        }
+        catch (Exception ex)
+        {
+            _error = "Lỗi khởi tạo bản đồ: " + ex.Message;
+            StateHasChanged();
+        }
+    }
+
+    // ── Main load ─────────────────────────────────────
+    private async Task LoadAsync()
+    {
+        _loading          = true;
+        _error            = "";
+        _geocodingStarted = false;
+        _geocodedCount    = 0;
+        _addresses.Clear();
+        _sales.Clear();
+        _routeInfo        = null;
+        _replaying        = false;
+        StateHasChanged();
+
+        try
+        {
+            // Load song song — gộp SM+Tree thành 1 call, song song với sales+territory+outliers
+            var tSmTree   = Repo.GetSalesmanLocationsWithTreeAsync(_date);
+            var tSales    = Repo.GetDailySalesBySmAsync(_date);
+            var tPolygons = Repo.GetTerritoryPolygonsAsync();
+            var tOutlets  = Repo.GetOutletsAsync(5000);
+            var tOutliers = Repo.GetOutlierAlertsAsync(_date);
+
+            await Task.WhenAll(tSmTree, tSales, tPolygons, tOutlets, tOutliers);
+
+            var smResult  = tSmTree.Result;
+            _locations    = smResult.Locations;
+            _smTree       = smResult.Tree;
+            _smGroups     = smResult.SmGroups;
+            _sales        = new Dictionary<string, decimal>(tSales.Result, StringComparer.OrdinalIgnoreCase);
+            _polygons     = tPolygons.Result;
+            _outlets      = tOutlets.Result;
+            _selectedTreeLabel = null; _selectedTreeType = null; _selectedTreeId = null;
+            _expandedNodes.Clear();
+            _outliers     = tOutliers.Result;
+            _outlierCount = _outliers.Count;
+
+            // Render territory layers
+            await RenderTerritoryLayersAsync();
+
+            // Render SM markers
+            if (_locations.Count == 0)
+            {
+                _error = $"Không có dữ liệu SM cho ngày {_date:dd/MM/yyyy}";
+                await JS.InvokeVoidAsync("territoryMapInterop.addMarkersJson", "[]");
+            }
+            else
+            {
+                var payload = _locations.Select(l =>
+                {
+                    _sales.TryGetValue(l.UserName, out var sale);
+                    return new { userName = l.UserName, checktime = l.Checktime.ToString("dd/MM/yyyy HH:mm:ss"),
+                                 lat = l.Lattitude, lng = l.Longtitude, totalSales = sale };
+                });
+                var json = JsonSerializer.Serialize(payload, new JsonSerializerOptions { PropertyNamingPolicy = null });
+
+                await JS.InvokeVoidAsync("territoryMapInterop.addMarkersJson", json);
+                await Task.Delay(120);
+                await JS.InvokeVoidAsync("territoryMapInterop.invalidateSize");
+
+                _geocodingStarted = true;
+                _ = JS.InvokeVoidAsync("territoryMapInterop.startGeocoding", json, _dotNetRef);
+            }
+        }
+        catch (Exception ex) { _error = ex.Message; }
+        finally { _loading = false; StateHasChanged(); }
+    }
+
+    private async Task RenderTerritoryLayersAsync()
+    {
+        var polygonJson = JsonSerializer.Serialize(_polygons.Select(p => new
+        {
+            territory = p.Territory, renderOrder = p.RenderOrder, lat = p.Lat, lng = p.Lng
+        }));
+
+        var outletJson = JsonSerializer.Serialize(_outlets.Select(o => new
+        {
+            outletName = o.OutletName, address = o.Address, route = o.Route, lat = o.Lat, lng = o.Lng
+        }));
+
+        await JS.InvokeVoidAsync("territoryMapInterop.renderTerritories",
+            JsonSerializer.Deserialize<object>(polygonJson),
+            new { });
+
+        await JS.InvokeVoidAsync("territoryMapInterop.renderOutlets",
+            JsonSerializer.Deserialize<object>(outletJson));
+
+    }
+
+    // ── Geocoding callback ────────────────────────────
+    [JSInvokable]
+    public Task UpdateAddressAsync(string userName, string address)
+    {
+        _addresses[userName] = address;
+        _geocodedCount++;
+        if (_geocodedCount % 5 == 0 || _geocodedCount == _locations.Count)
+            return InvokeAsync(StateHasChanged);
+        return Task.CompletedTask;
+    }
+
+    // ── Route popup button ────────────────────────────
+    [JSInvokable]
+    public async Task ShowRouteByNameAsync(string userName)
+    {
+        var loc = _locations.FirstOrDefault(l => l.UserName.Equals(userName, StringComparison.OrdinalIgnoreCase));
+        if (loc == null) return;
+        var idx = _locations.Select((l, i) => (l, i))
+                            .FirstOrDefault(x => x.l.UserName.Equals(userName, StringComparison.OrdinalIgnoreCase)).i;
+        await ShowRouteAsync(loc, idx);
+    }
+
+    private async Task ShowRouteAsync(SalesmanLocation loc, int colorIdx)
+    {
+        if (_routeInfo?.UserName == loc.UserName) { await ClearRouteAsync(); return; }
+
+        _routeLoading     = true;
+        _routeLoadingUser = loc.UserName;
+        _routeColorIdx    = colorIdx;
+        _replaying        = false;
+        StateHasChanged();
+
+        try
+        {
+            var route = await Repo.GetSalesmanRouteWithSalesAsync(loc.UserName, _date);
+            if (route.Count == 0) { _error = $"Không có dữ liệu lộ trình cho {loc.UserName}"; return; }
+
+            _replayRoutePoints = route;
+
+            var pts = route.Select(r => new
+            {
+                userName  = r.UserName,
+                checktime = r.Checktime.ToString("HH:mm:ss"),
+                lat       = r.Lattitude,
+                lng       = r.Longtitude,
+                visit     = r.Visit == null ? null : new
+                {
+                    customerCD   = r.Visit.CustomerCD,
+                    locationName = r.Visit.LocationName,
+                    address      = r.Visit.Address,
+                    routeCode    = r.Visit.RouteCode,
+                    orderAmount  = r.Visit.OrderAmount,
+                    startTime    = r.Visit.OrderDate.ToString("HH:mm:ss"),
+                    endTime      = r.Visit.EndTime?.ToString("HH:mm:ss") ?? ""
+                }
+            });
+            var json = JsonSerializer.Serialize(pts, new JsonSerializerOptions { PropertyNamingPolicy = null });
+            await JS.InvokeVoidAsync("territoryMapInterop.drawRoute", json);
+
+            var km = 0.0;
+            for (int i = 1; i < route.Count; i++)
+                km += Haversine(route[i-1].Lattitude, route[i-1].Longtitude, route[i].Lattitude, route[i].Longtitude);
+
+            var custStops  = route.Count(r => r.Visit != null);
+            var totalSales = route.Where(r => r.Visit != null).Sum(r => r.Visit!.OrderAmount);
+            var timeRange  = route.Count >= 2
+                ? $"{route[0].Checktime:HH:mm} → {route[^1].Checktime:HH:mm}"
+                : route[0].Checktime.ToString("HH:mm");
+
+            _routeInfo = new RouteInfo(loc.UserName, route.Count, timeRange, Math.Round(km, 1), custStops, totalSales);
+        }
+        catch (Exception ex) { _error = ex.Message; }
+        finally { _routeLoading = false; _routeLoadingUser = null; StateHasChanged(); }
+    }
+
+    private async Task ClearRouteAsync()
+    {
+        _routeInfo = null;
+        _replaying = false;
+        StateHasChanged();
+        try { await JS.InvokeVoidAsync("territoryMapInterop.clearRoute"); } catch { }
+        try { await JS.InvokeVoidAsync("territoryMapInterop.stopReplay"); } catch { }
+    }
+
+    private async Task FlyToAsync(SalesmanLocation loc)
+    {
+        try { await JS.InvokeVoidAsync("territoryMapInterop.flyTo", loc.Lattitude, loc.Longtitude); } catch { }
+    }
+
+    // ── Chart callbacks ────────────────────────────────
+    [JSInvokable]
+    public async Task FlyToChartItemAsync(string label)
+    {
+        try
+        {
+            List<double[]> points;
+            if (_chartGroupBy == "sm")
+            {
+                var loc = _locations.FirstOrDefault(l => l.UserName.Equals(label, StringComparison.OrdinalIgnoreCase));
+                if (loc == null) return;
+                points = [[loc.Lattitude, loc.Longtitude]];
+            }
+            else
+            {
+                var smList = await Repo.GetSmsByGroupAsync(_date, _chartGroupBy, label);
+                points = _locations
+                    .Where(l => smList.Contains(l.UserName, StringComparer.OrdinalIgnoreCase))
+                    .Select(l => new double[] { l.Lattitude, l.Longtitude })
+                    .ToList();
+            }
+            if (points.Count == 0) return;
+            var json = JsonSerializer.Serialize(points);
+            await JS.InvokeVoidAsync("territoryMapInterop.fitBoundsToPoints", json);
+        }
+        catch { }
+    }
+
+    private async Task SwitchChartType(string type)
+    {
+        _chartType = type;
+        if (_chartData.Count > 0) { _chartNeedsDraw = true; StateHasChanged(); }
+    }
+
+    private async Task ToggleChartAsync()
+    {
+        _showChart = !_showChart;
+        if (_showChart) { _showProductPanel = false; if (_chartData.Count == 0) await RefreshChartAsync(); }
+    }
+
+    private async Task RefreshChartAsync()
+    {
+        _chartLoading   = true;
+        _chartNeedsDraw = false;
+        StateHasChanged();
+        try
+        {
+            _chartData  = await Repo.GetSalesByAreaAsync(_date, _chartGroupBy);
+            _chartTotal = _chartData.Sum(d => d.TotalAmount);
+        }
+        catch (Exception ex) { _error = $"Chart: {ex.Message}"; _chartData = []; }
+        finally
+        {
+            _chartLoading = false;
+            // Giới hạn Top 30 để chart không bị quá tải
+            if (_chartData.Count > 30)
+                _chartData = _chartData.Take(30).ToList().AsReadOnly();
+            if (_chartData.Count > 0) _chartNeedsDraw = true;
+            StateHasChanged();
+        }
+    }
+
+
+    // ── Feature 3: Outlier alert ──────────────────────
+    private async Task ToggleOutlierAsync()
+    {
+        _showOutliers = !_showOutliers;
+        if (_showOutliers && _outliers.Count == 0 && _locations.Count > 0)
+        {
+            try { _outliers = await Repo.GetOutlierAlertsAsync(_date); _outlierCount = _outliers.Count; }
+            catch { }
+        }
+        StateHasChanged();
+    }
+
+    private async Task FlyToOutlierAsync(OutlierAlert al)
+    {
+        // Tìm vị trí SM từ _locations nếu alert không có tọa độ
+        var loc = _locations.FirstOrDefault(l =>
+            l.UserName.Equals(al.UserName, StringComparison.OrdinalIgnoreCase));
+        var lat = al.Lat != 0 ? al.Lat : loc?.Lattitude ?? 0;
+        var lng = al.Lng != 0 ? al.Lng : loc?.Longtitude ?? 0;
+        if (lat != 0 && lng != 0)
+            await JS.InvokeVoidAsync("territoryMapInterop.flyTo", lat, lng);
+    }
+
+    // ── Feature 4: Replay ─────────────────────────────
+    private async Task ToggleReplayAsync()
+    {
+        if (_replayRoutePoints.Count == 0 || _routeInfo == null) return;
+
+        if (_replaying)
+        {
+            _replaying = false;
+            await JS.InvokeVoidAsync("territoryMapInterop.stopReplay");
+        }
+        else
+        {
+            _replaying = true;
+            var pts = _replayRoutePoints.Select(r => new
+            {
+                lat       = r.Lattitude,
+                lng       = r.Longtitude,
+                checktime = r.Checktime.ToString("HH:mm:ss"),
+                visit     = r.Visit == null ? null : (object)new
+                {
+                    customerCD   = r.Visit.CustomerCD,
+                    locationName = r.Visit.LocationName,
+                    address      = r.Visit.Address,
+                    routeCode    = r.Visit.RouteCode,
+                    orderAmount  = r.Visit.OrderAmount,
+                    startTime    = r.Visit.OrderDate.ToString("HH:mm:ss"),
+                    endTime      = r.Visit.EndTime?.ToString("HH:mm:ss") ?? ""
+                }
+            });
+            var json = JsonSerializer.Serialize(pts, new JsonSerializerOptions { PropertyNamingPolicy = null });
+            await JS.InvokeVoidAsync("territoryMapInterop.startReplay", json, 600, _dotNetRef);
+        }
+        StateHasChanged();
+    }
+
+    [JSInvokable]
+    public Task OnReplayFinished()
+    {
+        _replaying = false;
+        return InvokeAsync(StateHasChanged);
+    }
+
+    // ── Feature 5: Group filter ───────────────────────
+    private static string NodeLabel(SmTreeNode n) => $"{n.Name} ({n.SmCount})";
+
+    private void ToggleExpand(string id)
+    {
+        if (!_expandedNodes.Add(id)) _expandedNodes.Remove(id);
+        StateHasChanged();
+    }
+
+    private async Task ToggleTreeFilterAsync()
+    {
+        _showTreeFilter = !_showTreeFilter;
+        StateHasChanged();
+    }
+
+    private async Task SelectTreeNodeAsync(string? filterType, string? filterId, string? label)
+    {
+        _showTreeFilter    = false;
+        _selectedTreeType  = filterType;
+        _selectedTreeId    = filterId;
+        _selectedTreeLabel = label;
+
+        if (filterType == null)
+        {
+            await JS.InvokeVoidAsync("territoryMapInterop.filterMarkers", (string?)null);
+            StateHasChanged();
+            return;
+        }
+
+        // Filter client-side từ _smGroups — không cần query DB
+        var matched = _smGroups
+            .Where(kv => filterType switch {
+                "stlvl0"      => kv.Value.Stlvl0 == filterId,
+                "stlvl1"      => kv.Value.Stlvl1 == filterId,
+                "stlvl2"      => kv.Value.Stlvl2 == filterId,
+                "ss"          => kv.Value.SsId   == filterId,
+                "distributor" => kv.Value.DistId  == filterId,
+                "route"       => kv.Value.RouteId == filterId,
+                _             => false
+            })
+            .Select(kv => kv.Key)
+            .ToList();
+
+        if (matched.Count == 0)
+        {
+            await JS.InvokeVoidAsync("territoryMapInterop.filterMarkers", (string?)null);
+            _error = $"Không có SM cho: {label}";
+            StateHasChanged();
+            return;
+        }
+
+        var names = JsonSerializer.Serialize(matched);
+        await JS.InvokeVoidAsync("territoryMapInterop.filterMarkers", names);
+        StateHasChanged();
+    }
+
+    // ── Product panel ─────────────────────────────────
+    private async Task ToggleProductPanelAsync()
+    {
+        _showProductPanel = !_showProductPanel;
+        if (_showProductPanel) _showChart = false;
+        StateHasChanged();
+    }
+
+    private void OnPsPeriodTypeChanged()
+    {
+        _psPeriodValue = _psPeriodType == "quarter" ? 1 : DateTime.Today.Month;
+    }
+
+    private async Task LoadProductDataAsync()
+    {
+        _psLoading = true; _psAreaNeedsDraw = false; _psTrendNeedsDraw = false;
+        _psData = []; _psTrendPoints = []; _psPredictions = [];
+        try { await JS.InvokeVoidAsync("productChartInterop.destroyAll"); } catch { }
+        StateHasChanged();
+        try
+        {
+            int? q = _psPeriodType == "quarter" ? _psPeriodValue : null;
+            int? m = _psPeriodType == "month"   ? _psPeriodValue : null;
+            _psData = await Repo.GetProductSalesByAreaAsync(_psYear, q, m, _psGroupBy, _psTopN);
+            if (_psData.Count > 0) { RebuildPsCache(); _psSelectedProd = PsTopProducts.FirstOrDefault() ?? ""; _psAreaNeedsDraw = true; }
+            else _error = "Không có dữ liệu sản phẩm cho kỳ đã chọn.";
+        }
+        catch (Exception ex) { _error = ex.Message; }
+        finally
+        {
+            _psLoading = false;
+            StateHasChanged();
+            if (!string.IsNullOrEmpty(_psSelectedProd)) await LoadPsTrendAsync();
+        }
+    }
+
+    private async Task SwitchPsMetricAsync(string metric)
+    {
+        _psMetric = metric;
+        if (_psData.Count > 0) { RebuildPsCache(); _psAreaNeedsDraw = true; _psTrendNeedsDraw = _psTrendPoints.Count > 0; }
+        StateHasChanged();
+    }
+
+    private async Task LoadPsTrendAsync()
+    {
+        if (string.IsNullOrEmpty(_psSelectedProd)) return;
+        _psTrendLoading = true; _psTrendNeedsDraw = false; _psPredictions = [];
+        StateHasChanged();
+        try
+        {
+            _psTrendPoints = await Repo.GetProductTrendAsync([_psSelectedProd], 13);
+            if (_psTrendPoints.Count > 0)
+            {
+                _psForecast    = await Task.Run(() => Forecaster.Forecast(_psTrendPoints, 3));
+                _psPredictions = BuildPsPredictions(_psForecast);
+                _psTrendNeedsDraw = true;
+            }
+        }
+        catch (Exception ex) { _error = ex.Message; }
+        finally { _psTrendLoading = false; StateHasChanged(); }
+    }
+
+    private void RebuildPsCache()
+    {
+        _psProductNames = _psData.GroupBy(d => d.InventoryCD).ToDictionary(g => g.Key, g => g.First().InventoryName);
+        if (_psData.Count == 0) { _psStrategyRowsCache = []; return; }
+        bool byAmount = _psMetric == "amount";
+        var areaRank = _psData.GroupBy(d => d.AreaLabel)
+            .OrderByDescending(g => g.Sum(d => byAmount ? (double)d.TotalAmount : d.TotalQty))
+            .Select((g, i) => (g.Key, i)).ToDictionary(x => x.Key, x => x.i);
+        int total = areaRank.Count;
+        _psStrategyRowsCache = _psData.GroupBy(d => d.AreaLabel).Select(g =>
+        {
+            var top  = g.OrderByDescending(d => byAmount ? (double)d.TotalAmount : d.TotalQty).First();
+            var rank = areaRank.TryGetValue(g.Key, out var r) ? r : 0;
+            var name = top.InventoryName;
+            string tc, ti, tt, sg;
+            if (rank <= 1)
+            {
+                tc = "up";   ti = "bi-arrow-up-circle-fill";   tt = "Tăng trưởng";
+                sg = "Đẩy mạnh " + name;
+            }
+            else if (rank >= total - 2)
+            {
+                tc = "down"; ti = "bi-arrow-down-circle-fill"; tt = "Cần chú ý";
+                sg = "Khuyến mãi " + name;
+            }
+            else
+            {
+                tc = "flat"; ti = "bi-dash-circle-fill";       tt = "Ổn định";
+                sg = "Mở rộng " + name;
+            }
+            return new PsStrategyRow(g.Key, top.InventoryCD, top.InventoryName,
+                g.Sum(d => d.TotalQty), g.Sum(d => d.TotalAmount), tc, ti, tt, sg);
+        }).OrderByDescending(r => byAmount ? (double)r.Amount : r.Qty).ToList();
+    }
+
+    private static List<PsPrediction> BuildPsPredictions(ForecastResult fc)
+    {
+        var result = new List<PsPrediction>();
+        for (int i = 0; i < fc.Labels.Count; i++)
+        {
+            var predQ = (long)fc.Qty.Predicted[i];
+            var predA = (decimal)fc.Amount.Predicted[i];
+            var loQ   = (long)fc.Qty.Lower[i];
+            var hiQ   = (long)fc.Qty.Upper[i];
+            var sig   = predQ > hiQ * 0.9f ? "up" : predQ < loQ * 1.1f ? "down" : "flat";
+            if (i > 0)
+            {
+                var prev = (long)fc.Qty.Predicted[i-1];
+                if (predQ > prev * 1.03f) sig = "up";
+                else if (predQ < prev * 0.97f) sig = "down";
+                else sig = "flat";
+            }
+            string icon, txt;
+            if (sig == "up")       { icon = "bi-arrow-up-right-circle-fill";   txt = "Tăng"; }
+            else if (sig == "down"){ icon = "bi-arrow-down-right-circle-fill"; txt = "Giảm"; }
+            else                   { icon = "bi-dash-circle-fill";              txt = "Ổn định"; }
+            result.Add(new PsPrediction(fc.Labels[i], predQ, predA, sig, icon, txt));
+        }
+        return result;
+    }
+
+    // ── Calendar ──────────────────────────────────────
+    private void ToggleDatePicker()
+    {
+        if (_showDatePicker) { _showDatePicker = false; return; }
+        _calYear = _date.Year; _calMonth = _date.Month; _showDatePicker = true;
+    }
+
+    private void SelectCalDate(DateTime d) { _date = d.Date; _calYear = d.Year; _calMonth = d.Month; _showDatePicker = false; }
+    private void GoToToday() { _date = DateTime.Today; _calYear = DateTime.Today.Year; _calMonth = DateTime.Today.Month; _showDatePicker = false; }
+    private void CalPrevMonth() { if (_calMonth==1){_calMonth=12;_calYear--;}else _calMonth--; }
+    private void CalNextMonth() { if (_calMonth==12){_calMonth=1;_calYear++;}else _calMonth++; }
+
+    // ── Helpers ───────────────────────────────────────
+    private static string FormatMoney(decimal v) => v switch
+    {
+        >= 1_000_000_000 => (v/1_000_000_000m).ToString("F1") + " tỷ",
+        >= 1_000_000     => (v/1_000_000m).ToString("F1") + " triệu",
+        >= 1_000         => (v/1_000m).ToString("F1") + " nghìn",
+        _                => v.ToString("N0")
+    };
+
+    private static string AvatarText(string name)
+    {
+        if (string.IsNullOrWhiteSpace(name)) return "??";
+        var letters = name.Where(char.IsLetterOrDigit).TakeLast(2).ToArray();
+        return letters.Length > 0 ? new string(letters).ToUpper() : name[..Math.Min(2, name.Length)].ToUpper();
+    }
+
+    private static string CoverageColor(decimal rate) => rate switch
+    {
+        >= 80 => "#16a34a",
+        >= 60 => "#65a30d",
+        >= 40 => "#d97706",
+        >= 20 => "#dc2626",
+        _     => "#991b1b"
+    };
+
+    private static double Haversine(double lat1, double lon1, double lat2, double lon2)
+    {
+        const double R = 6371;
+        var dLat = (lat2-lat1)*Math.PI/180;
+        var dLon = (lon2-lon1)*Math.PI/180;
+        var a = Math.Sin(dLat/2)*Math.Sin(dLat/2)+Math.Cos(lat1*Math.PI/180)*Math.Cos(lat2*Math.PI/180)*Math.Sin(dLon/2)*Math.Sin(dLon/2);
+        return R*2*Math.Atan2(Math.Sqrt(a),Math.Sqrt(1-a));
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        _dotNetRef?.Dispose();
+        try { await JS.InvokeVoidAsync("territoryMapInterop.destroy"); } catch { }
+        try { await JS.InvokeVoidAsync("productChartInterop.destroyAll"); } catch { }
+    }
+}

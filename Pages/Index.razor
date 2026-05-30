@@ -189,7 +189,7 @@
 
         await Task.Delay(400);
 
-        var ok = Auth.Login(_username, _password);
+        var ok = await Auth.LoginAsync(_username, _password);
         _loading = false;
 
         if (ok)

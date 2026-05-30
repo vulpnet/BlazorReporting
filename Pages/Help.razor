@@ -16,6 +16,7 @@
         </div>
         <div class="ms-auto d-flex gap-2 flex-wrap">
             <a class="btn btn-outline-secondary btn-sm" href="/map"><i class="bi bi-geo-alt me-1"></i>Bản đồ</a>
+            <a class="btn btn-outline-info btn-sm"      href="/territory-map"><i class="bi bi-map me-1"></i>Territory</a>
             <a class="btn btn-outline-warning btn-sm"   href="/product-sales"><i class="bi bi-box-seam me-1"></i>Sản phẩm</a>
             <a class="btn btn-primary btn-sm"           href="/report"><i class="bi bi-table me-1"></i>Báo cáo</a>
         </div>
@@ -242,7 +243,211 @@
         </div>
     </section>
 
-    @* ══ 5. Phân tích Sản phẩm ════════════════════════════════════ *@
+    @* ══ 5. Territory Performance ════════════════════════════════ *@
+    <section id="territory" class="mb-5">
+        <h4 class="section-heading"><i class="bi bi-map-fill me-2 text-info"></i>Territory Performance <code class="small">/territory-map</code></h4>
+
+        <div class="card shadow-sm border-0 mb-3">
+            <div class="card-header fw-semibold bg-info text-white">
+                <i class="bi bi-info-circle me-1"></i>Tổng quan
+            </div>
+            <div class="card-body small">
+                <p class="mb-2">
+                    Trang bản đồ chuyên sâu kết hợp <strong>vị trí Salesman theo ngày</strong> với các tính năng phân tích nâng cao:
+                    lọc theo cấu trúc tổ chức, xem lộ trình, phân tích cảnh báo, replay hành trình.
+                    Dữ liệu lấy từ <code>pp_GetSalemanLastLocation</code> và <code>pp_GetVisitSMTracking</code>.
+                </p>
+            </div>
+        </div>
+
+        @* Toolbar *@
+        <div class="card shadow-sm border-0 mb-3">
+            <div class="card-header fw-semibold" style="background:#0e7490;color:#fff">
+                <i class="bi bi-sliders me-1"></i>Thanh công cụ (Toolbar)
+            </div>
+            <div class="card-body">
+                <table class="table table-sm table-hover align-middle small mb-0">
+                    <thead class="table-dark"><tr><th>Điều khiển</th><th>Chức năng</th></tr></thead>
+                    <tbody>
+                        <tr><td><strong>📅 Chọn ngày</strong></td><td>Calendar popup — chọn ngày để xem vị trí SM. Giống /map.</td></tr>
+                        <tr><td><strong>Xem bản đồ</strong></td><td>Tải toàn bộ dữ liệu: vị trí SM + cây tổ chức + cảnh báo. Tất cả chạy song song — chỉ 1 lần gọi DB cho SM+cây.</td></tr>
+                        <tr><td><strong>Bộ lọc cây 🌳</strong></td><td>Dropdown dạng cây (xem bên dưới) — lọc SM theo cấu trúc tổ chức.</td></tr>
+                        <tr><td><i class="bi bi-exclamation-triangle-fill text-warning"></i> <strong>Alert</strong></td><td>Cảnh báo bất thường — badge đỏ hiển thị số lượng. Click để mở/đóng panel.</td></tr>
+                        <tr><td><i class="bi bi-play-circle-fill text-purple"></i> <strong>Replay</strong></td><td>Xuất hiện sau khi đã xem lộ trình 1 SM — phát animation hành trình.</td></tr>
+                        <tr><td><strong>🔍 Tìm kiếm</strong></td><td>Lọc danh sách SM trong sidebar theo tên username.</td></tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        @* Tree filter *@
+        <div class="card shadow-sm border-0 mb-3">
+            <div class="card-header fw-semibold bg-secondary text-white">
+                <i class="bi bi-diagram-3-fill me-1"></i>Bộ lọc cây tổ chức
+            </div>
+            <div class="card-body small">
+                <p class="mb-2">Click nút <strong>— Tất cả —</strong> → dropdown cây xổ xuống với 6 cấp độ:</p>
+                <table class="table table-sm table-hover align-middle mb-3">
+                    <thead class="table-secondary"><tr><th>Cấp</th><th>Ý nghĩa</th><th>Màu badge</th></tr></thead>
+                    <tbody>
+                        <tr><td><strong>STLvl0</strong></td><td>Cấp cao nhất — ngành hàng (vd: BEVERAGE)</td><td><span class="badge bg-primary">Xanh đậm</span></td></tr>
+                        <tr><td><strong>STLvl1</strong></td><td>Vùng (vd: BEV-MEKONG)</td><td><span class="badge bg-info text-dark">Xanh nhạt</span></td></tr>
+                        <tr><td><strong>STLvl2</strong></td><td>Khu vực (vd: BEV-MEKONG1)</td><td><span class="badge bg-success">Xanh lá</span></td></tr>
+                        <tr><td><strong>Sales Sup</strong></td><td>Giám sát bán hàng</td><td><span class="badge bg-warning text-dark">Vàng</span></td></tr>
+                        <tr><td><strong>NPP (Distributor)</strong></td><td>Nhà phân phối</td><td><span class="badge bg-secondary">Xám</span></td></tr>
+                        <tr><td><strong>Route (Tuyến)</strong></td><td>Tuyến bán hàng cụ thể</td><td><span class="badge bg-dark">Đen</span></td></tr>
+                    </tbody>
+                </table>
+                <ul class="ps-3 mb-0">
+                    <li>Click <strong>▶ / ▼</strong> bên trái tên → expand/collapse nhánh con.</li>
+                    <li>Click <strong>tên node</strong> → filter markers trên bản đồ <strong>ngay lập tức</strong> (không gọi DB — client-side từ dữ liệu đã load).</li>
+                    <li>Click <strong>"Tất cả SM"</strong> → hiện lại toàn bộ markers.</li>
+                    <li>Load ngày mới → cây reset về trạng thái đóng.</li>
+                </ul>
+            </div>
+        </div>
+
+        @* Route *@
+        <div class="card shadow-sm border-0 mb-3">
+            <div class="card-header fw-semibold" style="background:#4f46e5;color:#fff">
+                <i class="bi bi-signpost-2-fill me-1"></i>Lộ trình Salesman
+            </div>
+            <div class="card-body small">
+                <p class="mb-2">Click nút <i class="bi bi-signpost-2-fill text-primary"></i> trên thẻ SM → hệ thống tải lộ trình từ <code>pp_GetVisitSMTracking</code> (giống DMS2.0).</p>
+                <div class="row g-3">
+                    <div class="col-md-6">
+                        <h6 class="fw-bold">Dữ liệu trên bản đồ</h6>
+                        <ul class="ps-3 mb-0">
+                            <li>Polyline xanh — đường di chuyển theo thứ tự thời gian</li>
+                            <li>▶ Điểm <span class="text-success fw-bold">xanh lá</span> — xuất phát</li>
+                            <li>■ Điểm <span class="text-danger fw-bold">đỏ</span> — kết thúc</li>
+                            <li>🏪 Điểm <span class="text-warning fw-bold">cam</span> — cửa hàng KH đã ghé thăm</li>
+                        </ul>
+                    </div>
+                    <div class="col-md-6">
+                        <h6 class="fw-bold">Popup cửa hàng (click marker 🏪)</h6>
+                        <ul class="ps-3 mb-0">
+                            <li>🏪 Tên cửa hàng</li>
+                            <li>📋 Mã KH</li>
+                            <li>📍 Địa chỉ</li>
+                            <li>🗺 Tuyến</li>
+                            <li>💰 Doanh số đơn hàng</li>
+                            <li>⏱ Giờ vào → Giờ ra</li>
+                            <li>🕐 Thời gian viếng thăm (phút)</li>
+                        </ul>
+                    </div>
+                </div>
+                <div class="alert alert-light border mt-3 mb-0 py-2 small">
+                    <strong>Nguồn dữ liệu:</strong> RouteCD + DistributorID lấy từ <code>VisitPlanHistory</code> → truyền vào <code>pp_GetVisitSMTracking</code>.
+                    Thông tin cửa hàng merge từ <code>OrderHeader</code> + <code>Outlets</code>.
+                </div>
+            </div>
+        </div>
+
+        @* Replay *@
+        <div class="card shadow-sm border-0 mb-3">
+            <div class="card-header fw-semibold" style="background:#7c3aed;color:#fff">
+                <i class="bi bi-play-circle-fill me-1"></i>Replay lộ trình (Animation)
+            </div>
+            <div class="card-body small">
+                <p class="mb-2">Sau khi xem lộ trình, nút <span class="badge" style="background:#7c3aed">▶ Replay</span> xuất hiện trên thẻ SM trong sidebar.</p>
+                <div class="row g-3">
+                    <div class="col-md-6">
+                        <ul class="ps-3 mb-0">
+                            <li>Marker 🏍️ di chuyển theo thứ tự thời gian thực</li>
+                            <li>Bản đồ tự động pan theo marker</li>
+                            <li>Mỗi lần đến <strong>cửa hàng</strong> → popup tự bật lên</li>
+                            <li>Popup tự đóng khi di chuyển sang điểm tiếp theo</li>
+                        </ul>
+                    </div>
+                    <div class="col-md-6">
+                        <h6 class="fw-bold">Thanh điều khiển Replay</h6>
+                        <ul class="ps-3 mb-0">
+                            <li><strong>Tốc độ:</strong> 0.5× / 1× / 2× / 4×</li>
+                            <li><strong>⏸ Pause / ▶ Play</strong> — tạm dừng/tiếp tục</li>
+                            <li><strong>⏹ Stop</strong> — dừng hẳn, ẩn marker 🏍️</li>
+                            <li>Bộ đếm điểm hiện tại / tổng</li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        @* Alerts *@
+        <div class="card shadow-sm border-0 mb-3">
+            <div class="card-header fw-semibold bg-warning text-dark">
+                <i class="bi bi-exclamation-triangle-fill me-1"></i>Cảnh báo bất thường (Alert)
+            </div>
+            <div class="card-body small">
+                <p class="mb-2">Hệ thống tự động phát hiện 5 loại bất thường từ <code>pp_ReportSMVisitSummary</code> và <code>OrderHeader</code>:</p>
+                <table class="table table-sm table-hover align-middle mb-3">
+                    <thead class="table-secondary"><tr><th>Loại</th><th>Điều kiện phát hiện</th><th>Ý nghĩa</th></tr></thead>
+                    <tbody>
+                        <tr>
+                            <td><span class="badge bg-warning text-dark"><i class="bi bi-shop me-1"></i>Thiếu outlet</span></td>
+                            <td>Số outlet viếng thăm &lt; 80% target</td>
+                            <td>SM chưa hoàn thành tuyến trong ngày</td>
+                        </tr>
+                        <tr>
+                            <td><span class="badge bg-danger"><i class="bi bi-cart-x me-1"></i>Không đơn</span></td>
+                            <td>Ghé thăm ≥ 1 outlet nhưng 0 đơn hàng</td>
+                            <td>SM có mặt nhưng không chốt được đơn</td>
+                        </tr>
+                        <tr>
+                            <td><span class="badge" style="background:#f97316"><i class="bi bi-alarm me-1"></i>Đi trễ</span></td>
+                            <td>Outlet đầu tiên bắt đầu sau 8:30 sáng</td>
+                            <td>Xuất phát muộn hơn giờ quy định</td>
+                        </tr>
+                        <tr>
+                            <td><span class="badge" style="background:#a78bfa"><i class="bi bi-box-arrow-right me-1"></i>Về sớm</span></td>
+                            <td>Outlet cuối kết thúc trước 16:00</td>
+                            <td>Kết thúc công việc quá sớm</td>
+                        </tr>
+                        <tr>
+                            <td><span class="badge" style="background:#06b6d4"><i class="bi bi-hourglass-split me-1"></i>Ở lâu</span></td>
+                            <td>Thời gian tại 1 outlet &gt; 60 phút</td>
+                            <td>Dừng quá lâu tại 1 địa điểm</td>
+                        </tr>
+                    </tbody>
+                </table>
+                <ul class="ps-3 mb-0">
+                    <li>Click vào <strong>badge SM</strong> trong panel → bản đồ fly-to vị trí SM đó.</li>
+                    <li>Panel cảnh báo tự động load khi nhấn nút Alert lần đầu sau khi có dữ liệu.</li>
+                    <li>Số badge đỏ trên nút Alert = tổng số cảnh báo phát hiện được.</li>
+                </ul>
+            </div>
+        </div>
+
+        @* Sidebar + chart + product *@
+        <div class="row g-3 mb-3">
+            <div class="col-md-6">
+                <div class="card h-100 shadow-sm border-0">
+                    <div class="card-header fw-semibold bg-dark text-white"><i class="bi bi-list-ul me-1"></i>Sidebar SM</div>
+                    <div class="card-body small">
+                        <ul class="ps-3 mb-0">
+                            <li>Danh sách SM đang hiển thị trên bản đồ</li>
+                            <li>Click thẻ SM → fly-to vị trí trên bản đồ</li>
+                            <li>Click <i class="bi bi-signpost-2-fill text-primary"></i> → vẽ lộ trình</li>
+                            <li>Hiển thị: username · giờ check-in cuối · địa chỉ (reverse geocode dần) · doanh số ngày</li>
+                            <li>Nút <i class="bi bi-file-earmark-excel text-success"></i> → xuất danh sách SM ra CSV</li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-6">
+                <div class="card h-100 shadow-sm border-0">
+                    <div class="card-header fw-semibold bg-primary text-white"><i class="bi bi-bar-chart-fill me-1"></i>Biểu đồ &amp; Phân tích sản phẩm</div>
+                    <div class="card-body small">
+                        <p class="mb-1"><strong>📊 Doanh số:</strong> panel trượt lên — nhóm theo Tuyến / SM / Tỉnh. Click slice → fly-to khu vực.</p>
+                        <p class="mb-0"><strong>📦 Sản phẩm:</strong> phân tích Top N sản phẩm × khu vực, xu hướng ML.NET SSA, bảng chiến lược — giống trang /map.</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+    </section>
+
+    @* ══ 6. Phân tích Sản phẩm ════════════════════════════════════ *@
     <section id="product-sales" class="mb-5">
         <h4 class="section-heading"><i class="bi bi-box-seam-fill me-2 text-warning"></i>Phân tích Sản phẩm <code class="small">/product-sales</code></h4>
         <div class="card shadow-sm border-0 mb-3">
@@ -879,9 +1084,10 @@ SELECT N'Tổng hợp doanh số', 'vw_Sales', 'View', NULL;</code></pre>
     @* ══ Footer ════════════════════════════════════════════════════ *@
     <div class="text-center py-3 border-top d-flex justify-content-center gap-2 flex-wrap">
         <a href="#" class="btn btn-outline-secondary btn-sm"><i class="bi bi-arrow-up me-1"></i>Đầu trang</a>
-        <a href="/map"           class="btn btn-outline-success btn-sm"><i class="bi bi-geo-alt me-1"></i>Bản đồ</a>
-        <a href="/product-sales" class="btn btn-outline-warning btn-sm"><i class="bi bi-box-seam me-1"></i>Sản phẩm</a>
-        <a href="/report"          class="btn btn-primary btn-sm"><i class="bi bi-table me-1"></i>Báo cáo</a>
+        <a href="/map"             class="btn btn-outline-success btn-sm"><i class="bi bi-geo-alt me-1"></i>Bản đồ SM</a>
+        <a href="/territory-map"  class="btn btn-outline-info btn-sm"><i class="bi bi-map me-1"></i>Territory</a>
+        <a href="/product-sales"  class="btn btn-outline-warning btn-sm"><i class="bi bi-box-seam me-1"></i>Sản phẩm</a>
+        <a href="/report"         class="btn btn-primary btn-sm"><i class="bi bi-table me-1"></i>Báo cáo</a>
         <a href="/sales-strategy" class="btn btn-sm" style="background:#7c3aed;color:#fff"><i class="bi bi-robot me-1"></i>Chiến lược</a>
     </div>
 
@@ -893,7 +1099,8 @@ SELECT N'Tổng hợp doanh số', 'vw_Sales', 'View', NULL;</code></pre>
         ("Tổng quan",        "overview",       "bi-info-circle",       "#4f46e5"),
         ("Đăng nhập",        "login",          "bi-shield-lock",       "#16a34a"),
         ("Báo cáo",          "report",         "bi-table",             "#2563eb"),
-        ("Bản đồ",           "map",            "bi-geo-alt",           "#16a34a"),
+        ("Bản đồ SM",        "map",            "bi-geo-alt",           "#16a34a"),
+        ("Territory Perf",   "territory",      "bi-map",               "#0e7490"),
         ("Phân tích SP",     "product-sales",  "bi-box-seam",          "#d97706"),
         ("AI Chatbot",       "chatbot",        "bi-robot",             "#7c3aed"),
         ("URL Links",        "url-params",     "bi-link-45deg",        "#0891b2"),
@@ -905,9 +1112,10 @@ SELECT N'Tổng hợp doanh số', 'vw_Sales', 'View', NULL;</code></pre>
 
     private static readonly (string Icon, string Title, string Sub, string Bg)[] _overviewCards =
     [
-        ("bi-table",         "Báo cáo linh hoạt",   "SP · View · Table · Pivot · Export",       "#f0f9ff"),
-        ("bi-geo-alt-fill",  "Bản đồ số",            "GPS · Lộ trình · Doanh số · Địa chỉ",     "#f0fdf4"),
-        ("bi-box-seam-fill", "Phân tích Sản phẩm",  "ML.NET SSA · Khu vực · Dự đoán 3 tháng", "#fffbeb"),
-        ("bi-robot",         "AI Chatbot",           "Ollama local · Điều hướng · Lịch sử",     "#faf5ff"),
+        ("bi-table",         "Báo cáo linh hoạt",   "SP · View · Table · Pivot · Export",              "#f0f9ff"),
+        ("bi-geo-alt-fill",  "Bản đồ Salesman",      "GPS · Lộ trình · Doanh số · Địa chỉ",            "#f0fdf4"),
+        ("bi-map-fill",      "Territory Performance","Cây tổ chức · Cảnh báo · Replay · Alert",         "#ecfeff"),
+        ("bi-box-seam-fill", "Phân tích Sản phẩm",  "ML.NET SSA · Khu vực · Dự đoán 3 tháng",        "#fffbeb"),
+        ("bi-robot",         "AI Chatbot",           "Ollama local · Điều hướng · Lịch sử",            "#faf5ff"),
     ];
 }

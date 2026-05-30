@@ -84,6 +84,35 @@ public interface IDataRepository
         IReadOnlyList<string> products, int historyMonths = 12,
         CancellationToken ct = default);
 
+    // ── Map filter / compare ──────────────────────────────────────
+
+    /// <summary>Danh sách các nhóm (SS/Distributor) có salesman trong ngày để filter.</summary>
+    Task<IReadOnlyList<MapGroupItem>> GetMapGroupsAsync(DateTime date, CancellationToken ct = default);
+
+    /// <summary>Cây tổ chức SM: STLvl0→STLvl1→STLvl2→SS→Distributor→Route</summary>
+    Task<IReadOnlyList<SmTreeNode>> GetSmTreeAsync(DateTime date, CancellationToken ct = default);
+
+    /// <summary>Load vị trí SM + cây tổ chức trong 1 SP call.</summary>
+    Task<SmLocationResult> GetSalesmanLocationsWithTreeAsync(DateTime date, CancellationToken ct = default);
+
+    /// <summary>Vị trí cuối ngày của salesman thuộc nhóm cụ thể.</summary>
+    Task<IReadOnlyList<SalesmanLocation>> GetSalesmanLocationsByGroupAsync(
+        DateTime date, string groupType, string groupId, CancellationToken ct = default);
+
+    /// <summary>Outlier alert: SM có vị trí xa tuyến, check-in bất thường.</summary>
+    Task<IReadOnlyList<OutlierAlert>> GetOutlierAlertsAsync(DateTime date, CancellationToken ct = default);
+
+    // ── Territory Performance Map ─────────────────────────────────
+
+    /// <summary>Toàn bộ điểm polygon của tất cả territories.</summary>
+    Task<IReadOnlyList<TerritoryPolygonPoint>> GetTerritoryPolygonsAsync(CancellationToken ct = default);
+
+    /// <summary>Danh sách outlet có tọa độ (giới hạn maxRows để tránh quá tải browser).</summary>
+    Task<IReadOnlyList<TerritoryOutlet>> GetOutletsAsync(int maxRows = 5000, CancellationToken ct = default);
+
+    /// <summary>KPI territory theo tháng: coverage, revenue từ pp_ReportSalesAssessment.</summary>
+    Task<IReadOnlyList<TerritoryKpi>> GetTerritoryKpiAsync(DateTime fromDate, CancellationToken ct = default);
+
     /// <summary>
     /// Lịch sử doanh số theo tháng nhóm theo Tỉnh/TP × Sản phẩm.
     /// Dùng để train ML.NET chiến lược nhập/xuất hàng theo khu vực.
@@ -140,7 +169,9 @@ public sealed record CustomerVisit(
     string   LocationName,
     string   RouteCode,
     decimal  OrderAmount,
-    DateTime OrderDate);
+    DateTime OrderDate,
+    DateTime? EndTime = null,
+    string   Address  = "");
 
 /// <summary>Điểm GPS trên lộ trình, có thể kèm thông tin KH nếu tọa độ trùng nhau.</summary>
 public sealed record SalesmanRoutePoint(
@@ -149,3 +180,62 @@ public sealed record SalesmanRoutePoint(
     double        Lattitude,
     double        Longtitude,
     CustomerVisit? Visit = null);
+
+// ── Map filter / compare models ───────────────────────────────────
+
+public sealed record MapGroupItem(string GroupType, string GroupId, string GroupName, int SmCount);
+
+/// <summary>Node trong cây lọc SM. FilterType: stlvl0|stlvl1|stlvl2|ss|distributor|route</summary>
+public sealed record SmTreeNode(
+    string FilterType,
+    string Id,
+    string Name,
+    string ParentId,
+    int    SmCount);
+
+/// <summary>Kết quả gộp: vị trí SM + cây tổ chức + lookup map</summary>
+public sealed class SmLocationResult
+{
+    public IReadOnlyList<SalesmanLocation> Locations { get; init; } = [];
+    public IReadOnlyList<SmTreeNode>       Tree      { get; init; } = [];
+    /// <summary>SM → (stlvl0, stlvl1, stlvl2, ssId, distId, routeId)</summary>
+    public IReadOnlyDictionary<string, SmGroupKeys> SmGroups { get; init; }
+        = new Dictionary<string, SmGroupKeys>(StringComparer.OrdinalIgnoreCase);
+}
+
+public sealed record SmGroupKeys(
+    string Stlvl0, string Stlvl1, string Stlvl2,
+    string SsId, string DistId, string RouteId);
+
+public sealed record OutlierAlert(
+    string   UserName,
+    string   AlertType,   // "early" | "late" | "far" | "idle"
+    string   Description,
+    double   Lat,
+    double   Lng,
+    DateTime Checktime);
+
+// ── Territory Performance Map models ──────────────────────────────
+
+public sealed record TerritoryPolygonPoint(
+    string Territory,
+    int    RenderOrder,
+    double Lat,
+    double Lng);
+
+public sealed record TerritoryOutlet(
+    string  OutletName,
+    string  Address,
+    string  Route,
+    double  Lat,
+    double  Lng);
+
+public sealed record TerritoryKpi(
+    string  TerritoryCode,
+    string  TerritoryName,
+    string  RegionName,
+    string  AreaName,
+    decimal Revenue,
+    int     TotalOutlet,
+    int     VisitedOutlet,
+    decimal CoverageRate);   // 0–100
