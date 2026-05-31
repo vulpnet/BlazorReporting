@@ -1,0 +1,142 @@
+@page "/account/roles"
+@attribute [NavMenu(Title="Quản lý Role", Icon="bi-shield-shaded", Group="Quản trị", GroupOrder=90, Order=10)]
+@using BlazorReporting.Services
+@inject AuthService Auth
+@inject UserManagementService UserSvc
+@inject NavigationManager Nav
+
+<PageTitle>Quản lý Role</PageTitle>
+
+<div class="container-fluid mt-3">
+    <h5 class="mb-3"><i class="bi bi-shield-shaded me-2"></i>Quản lý Role</h5>
+
+    @if (_loading)
+    {
+        <div class="text-center py-4"><span class="spinner-border text-primary"></span></div>
+    }
+    else
+    {
+        <SortableGrid @ref="_grid" Items="_roles" Context="r" MinWidth="600px" DefaultPageSize="20">
+            <ToolbarContent>
+                <button class="btn btn-sm btn-primary" @onclick="() => OpenAdd()">
+                    <i class="bi bi-plus-lg me-1"></i>Thêm Role
+                </button>
+            </ToolbarContent>
+            <Columns>
+                <GridColumn TItem="RoleVM" Title="ID"        Value="@(x => x.ID)"           Align="end" />
+                <GridColumn TItem="RoleVM" Title="Role Name" Value="@(x => x.RoleName)" />
+                <GridColumn TItem="RoleVM" Title="Mô tả"     Value="@(x => x.Description)" />
+                <GridColumn TItem="RoleVM" Title="Ứng dụng"  Value="@(x => x.ApplicationCD)" />
+            </Columns>
+            <RowTemplate>
+                <td class="text-end">@r.ID</td>
+                <td><strong>@r.RoleName</strong></td>
+                <td>@r.Description</td>
+                <td>@r.ApplicationCD</td>
+            </RowTemplate>
+            <ActionColumn Context="r">
+                <button class="btn btn-sm btn-outline-primary" @onclick="() => OpenEdit(r)">
+                    <i class="bi bi-pencil"></i>
+                </button>
+            </ActionColumn>
+        </SortableGrid>
+    }
+</div>
+
+@if (_showModal)
+{
+    <div class="modal fade show d-block" tabindex="-1" style="background:rgba(0,0,0,.4)">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">@(_editId == 0 ? "Thêm Role mới" : "Sửa Role")</h5>
+                    <button type="button" class="btn-close" @onclick="CloseModal"></button>
+                </div>
+                <div class="modal-body">
+                    @if (!string.IsNullOrEmpty(_modalMsg))
+                    {
+                        <div class="alert @(_modalOk ? "alert-success" : "alert-danger")">@_modalMsg</div>
+                    }
+                    <div class="mb-2">
+                        <label class="form-label">Role Name *</label>
+                        <input class="form-control" @bind="_fRoleName" />
+                    </div>
+                    <div class="mb-2">
+                        <label class="form-label">Mô tả</label>
+                        <input class="form-control" @bind="_fDescription" />
+                    </div>
+                    <div class="mb-2">
+                        <label class="form-label">Ứng dụng</label>
+                        <select class="form-select" @bind="_fAppCd">
+                            <option value="">-- Chọn --</option>
+                            <option value="DMS">DMS</option>
+                            <option value="ETOOLS">ETOOLS</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button class="btn btn-secondary" @onclick="CloseModal">Hủy</button>
+                    <button class="btn btn-primary" @onclick="SaveAsync" disabled="@_saving">
+                        @if (_saving) { <span class="spinner-border spinner-border-sm me-1"></span> }
+                        Lưu
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+}
+
+@code {
+    private SortableGrid<RoleVM>? _grid;
+    private List<RoleVM> _roles = new();
+    private bool _loading = true, _showModal, _saving;
+    private int _editId;
+    private string _fRoleName = "", _fDescription = "", _fAppCd = "";
+    private string _modalMsg = "";
+    private bool _modalOk;
+
+    protected override async Task OnInitializedAsync()
+    {
+        if (!Auth.IsLoggedIn) { Nav.NavigateTo("/", replace: true); return; }
+        await LoadAsync();
+    }
+
+    private async Task LoadAsync()
+    {
+        _loading = true;
+        _roles = await UserSvc.GetRolesAsync();
+        _loading = false;
+    }
+
+    private void OpenAdd()
+    {
+        _editId = 0; _fRoleName = ""; _fDescription = ""; _fAppCd = "";
+        _modalMsg = ""; _showModal = true;
+    }
+
+    private void OpenEdit(RoleVM r)
+    {
+        _editId = r.ID; _fRoleName = r.RoleName; _fDescription = r.Description; _fAppCd = r.ApplicationCD ?? "";
+        _modalMsg = ""; _showModal = true;
+    }
+
+    private void CloseModal() => _showModal = false;
+
+    private async Task SaveAsync()
+    {
+        if (string.IsNullOrWhiteSpace(_fRoleName)) { _modalMsg = "Vui lòng nhập tên Role."; return; }
+        _saving = true; _modalMsg = "";
+        if (_editId == 0)
+        {
+            var created = await UserSvc.AddRoleAsync(_fRoleName, _fDescription, null, _fAppCd);
+            if (created is not null) { _roles.Add(created); _modalOk = true; _modalMsg = "Thêm Role thành công."; }
+        }
+        else
+        {
+            var updated = new RoleVM(_editId, _fRoleName, _fDescription, null, _fAppCd);
+            var ok = await UserSvc.UpdateRoleAsync(updated);
+            if (ok) { var idx = _roles.FindIndex(x=>x.ID==_editId); if(idx>=0) _roles[idx]=updated; _modalOk=true; _modalMsg="Cập nhật thành công."; }
+        }
+        _saving = false;
+    }
+}

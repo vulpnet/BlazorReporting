@@ -1,0 +1,231 @@
+@page "/user"
+@attribute [NavMenu(Title="Người dùng", Icon="bi-people-fill", Group="Quản trị", GroupOrder=90, Order=30)]
+@using BlazorReporting.Services
+@inject AuthService Auth
+@inject UserManagementService UserSvc
+@inject NavigationManager Nav
+
+<PageTitle>Quản lý người dùng</PageTitle>
+
+<div class="container-fluid mt-3">
+    <div class="d-flex align-items-center mb-3">
+        <h5 class="mb-0"><i class="bi bi-people-fill me-2"></i>Quản lý người dùng</h5>
+    </div>
+
+    @if (!string.IsNullOrEmpty(_statusMsg))
+    {
+        <div class="alert @(_statusOk ? "alert-success" : "alert-danger") py-2 alert-dismissible">
+            @_statusMsg
+            <button type="button" class="btn-close" @onclick="ClearStatus"></button>
+        </div>
+    }
+
+    @if (_loading)
+    {
+        <div class="text-center py-5"><span class="spinner-border text-primary"></span></div>
+    }
+    else
+    {
+        <SortableGrid @ref="_grid" Items="_users" Context="u" MinWidth="900px" DefaultPageSize="20">
+                <ToolbarContent>
+                    <button class="btn btn-sm btn-primary" @onclick="OpenAdd">
+                        <i class="bi bi-person-plus me-1"></i>Thêm
+                    </button>
+                </ToolbarContent>
+                <Columns>
+                    <GridColumn TItem="UserVM" Title="Username"   Value="@(x => x.UserName)" />
+                    <GridColumn TItem="UserVM" Title="Họ tên"     Value="@(x => x.FullName)" />
+                    <GridColumn TItem="UserVM" Title="Email"      Value="@(x => x.Email)" />
+                    <GridColumn TItem="UserVM" Title="Điện thoại" Value="@(x => x.Phone)" />
+                    <GridColumn TItem="UserVM" Title="Role"       Value="@(x => x.RoleName)" />
+                    <GridColumn TItem="UserVM" Title="Loại TK"    Value="@(x => x.ApplicationCD)" />
+                    <GridColumn TItem="UserVM" Title="Trạng thái" Value="@(x => x.IsConfirmed ? "Active" : "Inactive")" Align="center" />
+                </Columns>
+                <RowTemplate>
+                    <td><i class="bi bi-person me-1 text-secondary"></i>@u.UserName</td>
+                    <td>@u.FullName</td>
+                    <td>@u.Email</td>
+                    <td>@u.Phone</td>
+                    <td><span class="badge bg-info text-dark">@u.RoleName</span></td>
+                    <td>@u.ApplicationCD</td>
+                    <td class="text-center">
+                        @if (u.IsConfirmed)
+                        { <span class="badge bg-success">Active</span> }
+                        else
+                        { <span class="badge bg-secondary">Inactive</span> }
+                    </td>
+                </RowTemplate>
+                <ActionColumn Context="u">
+                    <button class="btn btn-xs btn-outline-primary me-1" title="Sửa" @onclick="() => OpenEdit(u)">
+                        <i class="bi bi-pencil"></i>
+                    </button>
+                    @if (u.IsConfirmed)
+                    {
+                        <button class="btn btn-xs btn-outline-warning me-1" title="Inactive" @onclick="() => SetActiveAsync(u, false)">
+                            <i class="bi bi-person-dash"></i>
+                        </button>
+                    }
+                    else
+                    {
+                        <button class="btn btn-xs btn-outline-success me-1" title="Active" @onclick="() => SetActiveAsync(u, true)">
+                            <i class="bi bi-person-check"></i>
+                        </button>
+                    }
+                    <button class="btn btn-xs btn-outline-secondary" title="Reset mật khẩu" @onclick="() => ResetPassAsync(u.UserName)">
+                        <i class="bi bi-arrow-counterclockwise"></i>
+                    </button>
+                </ActionColumn>
+            </SortableGrid>
+    }
+</div>
+
+@* Modal thêm/sửa User *@
+@if (_showModal)
+{
+    <div class="modal fade show d-block" tabindex="-1" style="background:rgba(0,0,0,.4)">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">@(_isAdd ? "Thêm người dùng" : "Sửa người dùng")</h5>
+                    <button type="button" class="btn-close" @onclick="() => _showModal = false"></button>
+                </div>
+                <div class="modal-body">
+                    @if (!string.IsNullOrEmpty(_modalMsg))
+                    {
+                        <div class="alert @(_modalOk ? "alert-success" : "alert-danger") py-2">@_modalMsg</div>
+                    }
+                    <div class="row g-2">
+                        <div class="col-6">
+                            <label class="form-label">Username *</label>
+                            <input class="form-control" @bind="_fUsername" disabled="@(!_isAdd)" />
+                        </div>
+                        <div class="col-6">
+                            <label class="form-label">Họ tên *</label>
+                            <input class="form-control" @bind="_fFullName" />
+                        </div>
+                        <div class="col-6">
+                            <label class="form-label">Email *</label>
+                            <input class="form-control" type="email" @bind="_fEmail" />
+                        </div>
+                        <div class="col-6">
+                            <label class="form-label">Điện thoại</label>
+                            <input class="form-control" @bind="_fPhone" />
+                        </div>
+                        <div class="col-6">
+                            <label class="form-label">Role *</label>
+                            <select class="form-select" @bind="_fRoleId">
+                                <option value="0">-- Chọn Role --</option>
+                                @foreach (var r in _roles)
+                                {
+                                    <option value="@r.ID">@r.RoleName</option>
+                                }
+                            </select>
+                        </div>
+                        <div class="col-6">
+                            <label class="form-label">Loại tài khoản *</label>
+                            <select class="form-select" @bind="_fAppCd">
+                                <option value="ETOOLS">ETOOLS</option>
+                                <option value="DMS">DMS</option>
+                            </select>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button class="btn btn-secondary" @onclick="() => _showModal = false">Hủy</button>
+                    <button class="btn btn-primary" @onclick="SaveUserAsync" disabled="@_saving">
+                        @if (_saving) { <span class="spinner-border spinner-border-sm me-1"></span> }
+                        Lưu
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+}
+
+@code {
+    private SortableGrid<UserVM>? _grid;
+    private List<UserVM> _users = new();
+    private List<RoleVM> _roles = new();
+    private bool _loading = true, _showModal, _saving, _isAdd;
+    private string _statusMsg = "", _modalMsg = "";
+    private bool _statusOk, _modalOk;
+    private string _fUsername = "", _fFullName = "", _fEmail = "", _fPhone = "", _fAppCd = "ETOOLS";
+    private int _fRoleId;
+
+    private void ClearStatus() => _statusMsg = "";
+
+    protected override async Task OnInitializedAsync()
+    {
+        if (!Auth.IsLoggedIn) { Nav.NavigateTo("/", replace: true); return; }
+        await Task.WhenAll(LoadUsersAsync(), LoadRolesAsync());
+    }
+
+    private async Task LoadUsersAsync()
+    {
+        _loading = true;
+        _users = await UserSvc.GetUsersAsync(Auth.UserName);
+        _loading = false;
+    }
+
+    private async Task LoadRolesAsync()
+        => _roles = await UserSvc.GetRolesAsync();
+
+    private void OpenAdd()
+    {
+        _isAdd = true; _fUsername = ""; _fFullName = ""; _fEmail = ""; _fPhone = ""; _fRoleId = 0; _fAppCd = "ETOOLS";
+        _modalMsg = ""; _showModal = true;
+    }
+
+    private void OpenEdit(UserVM u)
+    {
+        _isAdd = false;
+        _fUsername = u.UserName; _fFullName = u.FullName; _fEmail = u.Email; _fPhone = u.Phone;
+        _fRoleId = u.RoleID; _fAppCd = u.ApplicationCD;
+        _modalMsg = ""; _showModal = true;
+    }
+
+    private async Task SetActiveAsync(UserVM u, bool active)
+    {
+        var ok = await UserSvc.ActiveUserAsync(u.UserName, active);
+        if (ok)
+        {
+            var idx = _users.FindIndex(x => x.UserName == u.UserName);
+            if (idx >= 0) { u.IsConfirmed = active; _users[idx] = u; }
+            _statusOk = true;
+            _statusMsg = $"{(active ? "Active" : "Inactive")} người dùng {u.UserName} thành công.";
+        }
+    }
+
+    private async Task ResetPassAsync(string username)
+    {
+        var email = await UserSvc.GetUserEmailAsync(username);
+        _statusOk = !string.IsNullOrEmpty(email);
+        _statusMsg = string.IsNullOrEmpty(email)
+            ? $"Không tìm thấy email của {username}."
+            : $"Chức năng gửi email reset cần cấu hình SMTP. Email: {email}";
+    }
+
+    private async Task SaveUserAsync()
+    {
+        _modalMsg = "";
+        if (string.IsNullOrWhiteSpace(_fUsername) || string.IsNullOrWhiteSpace(_fEmail) || _fRoleId == 0)
+        { _modalMsg = "Vui lòng nhập đầy đủ thông tin bắt buộc."; return; }
+
+        _saving = true;
+        if (_isAdd)
+        {
+            var newUser = new UserVM { UserName=_fUsername, FullName=_fFullName, Email=_fEmail, Phone=_fPhone, RoleID=_fRoleId, IsConfirmed=true, ApplicationCD=_fAppCd };
+            var (ok, msg) = await UserSvc.AddUserAsync(newUser, "");
+            _modalOk = ok; _modalMsg = msg;
+            if (ok) _users.Add(newUser);
+        }
+        else
+        {
+            var updated = new UserVM { UserName=_fUsername, FullName=_fFullName, Email=_fEmail, Phone=_fPhone, RoleID=_fRoleId, RoleName=_roles.FirstOrDefault(r=>r.ID==_fRoleId)?.RoleName??"", IsConfirmed=true, ApplicationCD=_fAppCd };
+            var (ok, msg) = await UserSvc.UpdateUserAsync(updated);
+            _modalOk = ok; _modalMsg = msg;
+            if (ok) { var idx = _users.FindIndex(x=>x.UserName==_fUsername); if(idx>=0) _users[idx]=updated; }
+        }
+        _saving = false;
+    }
+}

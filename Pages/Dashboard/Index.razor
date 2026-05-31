@@ -1,0 +1,462 @@
+@page "/dashboard"
+@attribute [NavMenu(Title="Dashboard", Icon="bi-speedometer2", Group="Tổng quan", GroupOrder=5, Order=10)]
+@using BlazorReporting.Services
+@using System.Text.Json
+@inject AuthService Auth
+@inject DashboardService DashSvc
+@inject DataMaskingService Mask
+@inject NavigationManager Nav
+@inject IJSRuntime JS
+@implements IAsyncDisposable
+
+<PageTitle>Dashboard</PageTitle>
+
+<div class="container-fluid mt-3">
+
+    @* ── Toolbar ── *@
+    <div class="d-flex align-items-center flex-wrap gap-2 mb-3">
+        <h5 class="mb-0"><i class="bi bi-speedometer2 me-2"></i>Dashboard</h5>
+        <div class="ms-auto d-flex gap-2 align-items-center flex-wrap">
+            <input type="date" class="form-control form-control-sm" style="width:150px"
+                   @bind="_date" @bind:after="LoadAsync" />
+            <button class="btn btn-sm btn-outline-secondary" @onclick="LoadAsync" disabled="@_loading">
+                <i class="bi bi-arrow-clockwise me-1"></i>Làm mới
+            </button>
+        </div>
+    </div>
+
+    @if (_loading)
+    {
+        <div class="text-center py-5"><span class="spinner-border text-primary"></span></div>
+    }
+    else if (_error != null)
+    {
+        <div class="alert alert-danger"><i class="bi bi-exclamation-triangle me-2"></i>@_error</div>
+    }
+    else
+    {
+        @* ── Summary Row — Doanh số & Viếng thăm ── *@
+        <div class="row g-3 mb-3">
+            @* Doanh số chỉ tiêu tháng *@
+            <div class="col-6 col-lg-3">
+                <div class="card border-0 shadow-sm h-100" style="border-left:4px solid #4f46e5 !important">
+                    <div class="card-body py-3">
+                        <div class="text-muted small mb-1"><i class="bi bi-bullseye me-1 text-primary"></i>Chỉ tiêu doanh số tháng</div>
+                        <div class="fw-bold fs-5">@_kpi.TargetMonth.ToString("N0") VND</div>
+                    </div>
+                </div>
+            </div>
+            @* Doanh số trong tháng *@
+            <div class="col-6 col-lg-3">
+                <div class="card border-0 shadow-sm h-100" style="border-left:4px solid #16a34a !important">
+                    <div class="card-body py-3">
+                        <div class="text-muted small mb-1"><i class="bi bi-graph-up-arrow me-1 text-success"></i>Doanh số trong tháng</div>
+                        <div class="fw-bold fs-5 text-success">@_kpi.AchievedMonth.ToString("N0") VND</div>
+                        @if (_kpi.TargetMonth > 0)
+                        {
+                            <div class="progress mt-1" style="height:5px">
+                                <div class="progress-bar bg-success" style="width:@(Math.Min(_kpi.AchievedMonthPct,100))%"></div>
+                            </div>
+                        }
+                    </div>
+                </div>
+            </div>
+            @* % Chỉ tiêu *@
+            <div class="col-6 col-lg-3">
+                <div class="card border-0 shadow-sm h-100" style="border-left:4px solid #0891b2 !important">
+                    <div class="card-body py-3">
+                        <div class="text-muted small mb-1"><i class="bi bi-percent me-1 text-info"></i>% Đạt chỉ tiêu tháng</div>
+                        <div class="fw-bold fs-5 text-info">@(_kpi.AchievedMonthPct.ToString("N2")) %</div>
+                    </div>
+                </div>
+            </div>
+            @* Doanh số hôm nay *@
+            <div class="col-6 col-lg-3">
+                <div class="card border-0 shadow-sm h-100" style="border-left:4px solid #d97706 !important">
+                    <div class="card-body py-3">
+                        <div class="text-muted small mb-1"><i class="bi bi-calendar-day me-1 text-warning"></i>Doanh số hôm nay</div>
+                        <div class="fw-bold fs-5 text-warning">@_kpi.RevenueToday.ToString("N0") VND</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        @* ── Visit & Order summary ── *@
+        <div class="row g-3 mb-3">
+            <div class="col-6 col-md-3">
+                <div class="card border-start border-4 border-primary shadow-sm">
+                    <div class="card-body py-2">
+                        <div class="text-muted small"><i class="bi bi-shop me-1"></i>Số CH cần viếng thăm</div>
+                        <div class="fw-bold fs-5">@_kpi.TotalVisitPlan.ToString("N0")</div>
+                    </div>
+                </div>
+            </div>
+            <div class="col-6 col-md-3">
+                <div class="card border-start border-4 border-success shadow-sm">
+                    <div class="card-body py-2">
+                        <div class="text-muted small"><i class="bi bi-check-circle me-1"></i>Số CH đã viếng thăm</div>
+                        <div class="fw-bold fs-5 text-success">@_kpi.TotalOutletVisited.ToString("N0")</div>
+                        @if (_kpi.TotalVisitPlan > 0)
+                        {
+                            var pct = _kpi.TotalOutletVisited * 100m / _kpi.TotalVisitPlan;
+                            <div class="progress mt-1" style="height:4px">
+                                <div class="progress-bar bg-success" style="width:@(Math.Min(pct,100))%"></div>
+                            </div>
+                            <div class="text-muted" style="font-size:.7rem">@pct.ToString("N1")%</div>
+                        }
+                    </div>
+                </div>
+            </div>
+            <div class="col-6 col-md-3">
+                <div class="card border-start border-4 border-danger shadow-sm">
+                    <div class="card-body py-2">
+                        <div class="text-muted small"><i class="bi bi-x-circle me-1"></i>Số CH chưa thăm</div>
+                        <div class="fw-bold fs-5 text-danger">@((_kpi.TotalVisitPlan - _kpi.TotalOutletVisited).ToString("N0"))</div>
+                    </div>
+                </div>
+            </div>
+            <div class="col-6 col-md-3">
+                <div class="card border-start border-4 border-warning shadow-sm">
+                    <div class="card-body py-2">
+                        <div class="text-muted small"><i class="bi bi-cart me-1"></i>Số đơn hàng</div>
+                        <div class="fw-bold fs-5">@_kpi.TotalOrder.ToString("N0")</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        @* ── KPI Cards — SM Status ── *@
+        <div class="row g-3 mb-3">
+            @foreach (var card in KpiCards)
+            {
+                <div class="col-6 col-md-4 col-xl-2">
+                    <div class="card border-0 shadow-sm h-100">
+                        <div class="card-body text-center py-3">
+                            <i class="bi @card.Icon opacity-25 mb-1" style="font-size:1.6rem;color:@card.Color"></i>
+                            <div class="fw-bold" style="font-size:1.8rem;color:@card.Color">@card.Value</div>
+                            <div class="small text-muted">@card.Label</div>
+                            <div style="font-size:.68rem;color:#9ca3af">(@card.Sub)</div>
+                        </div>
+                    </div>
+                </div>
+            }
+        </div>
+
+
+        @* ── Charts row ── *@
+        <div class="row g-3 mb-3">
+            @* Doughnut — SM Status *@
+            <div class="col-md-4">
+                <div class="card shadow-sm h-100">
+                    <div class="card-header py-2 fw-semibold small">
+                        <i class="bi bi-pie-chart-fill me-1 text-primary"></i>Trạng thái Nhân viên BH
+                    </div>
+                    <div class="card-body p-2" style="height:240px">
+                        <canvas id="chartSmStatus"></canvas>
+                    </div>
+                </div>
+            </div>
+
+            @* Bar — Doanh thu theo Region *@
+            <div class="col-md-8">
+                <div class="card shadow-sm h-100">
+                    <div class="card-header py-2 fw-semibold small">
+                        <i class="bi bi-bar-chart-fill me-1 text-success"></i>Doanh thu theo khu vực (triệu đồng)
+                    </div>
+                    <div class="card-body p-2" style="height:240px">
+                        <canvas id="chartRevenueByRegion"></canvas>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        @* Charts — VT trong tháng (tách 2 chart) + 2 Pie level *@
+        <div class="row g-3 mb-3">
+            @* Chart 1: Số CH kế hoạch vs đã VT vs đơn hàng theo ngày *@
+            <div class="col-12 col-xl-6">
+                <div class="card shadow-sm h-100">
+                    <div class="card-header py-2 fw-semibold small d-flex align-items-center gap-2">
+                        <i class="bi bi-bar-chart-fill me-1 text-primary"></i>
+                        Số CH viếng thăm & Đơn hàng theo ngày
+                        <span class="badge bg-light text-secondary ms-auto border">@_date.ToString("MM/yyyy")</span>
+                    </div>
+                    <div class="card-body p-2" style="height:260px">
+                        <canvas id="chartVisitCount"></canvas>
+                    </div>
+                    <div class="card-footer py-1 px-3" style="font-size:.72rem;color:#6b7280">
+                        <span class="me-3"><i class="bi bi-circle-fill me-1" style="color:#4f46e5"></i>CH kế hoạch</span>
+                        <span class="me-3"><i class="bi bi-circle-fill me-1" style="color:#16a34a"></i>CH đã viếng thăm</span>
+                        <span><i class="bi bi-circle-fill me-1" style="color:#d97706"></i>Số đơn hàng</span>
+                    </div>
+                </div>
+            </div>
+
+            @* Chart 2: % VT MCP và % SO MCP theo ngày *@
+            <div class="col-12 col-xl-6">
+                <div class="card shadow-sm h-100">
+                    <div class="card-header py-2 fw-semibold small d-flex align-items-center gap-2">
+                        <i class="bi bi-graph-up-arrow me-1 text-success"></i>
+                        Tỷ lệ hoàn thành viếng thăm & có đơn hàng (%)
+                        <span class="badge bg-light text-secondary ms-auto border">@_date.ToString("MM/yyyy")</span>
+                    </div>
+                    <div class="card-body p-2" style="height:260px">
+                        <canvas id="chartVisitPct"></canvas>
+                    </div>
+                    <div class="card-footer py-1 px-3" style="font-size:.72rem;color:#6b7280">
+                        <span class="me-3"><i class="bi bi-circle-fill me-1" style="color:#0891b2"></i>% VT MCP — CH đã thăm / kế hoạch</span>
+                        <span><i class="bi bi-circle-fill me-1" style="color:#7c3aed"></i>% SO MCP — Đơn hàng / kế hoạch</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        @* 2 Pie charts level *@
+        <div class="row g-3 mb-3">
+            <div class="col-md-6">
+                <div class="card shadow-sm">
+                    <div class="card-header py-2 fw-semibold small">
+                        <i class="bi bi-pie-chart-fill me-1 text-info"></i>
+                        Phân bố Nhân viên BH theo mức độ hoàn thành viếng thăm (MTD)
+                    </div>
+                    <div class="card-body p-2" style="height:200px">
+                        <canvas id="chartVisitLevel"></canvas>
+                    </div>
+                    <div class="card-footer py-1 px-3" style="font-size:.72rem;color:#6b7280">
+                        Mỗi phần = số Nhân viên BH đạt tỷ lệ VT trong khoảng đó tính từ đầu tháng
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-6">
+                <div class="card shadow-sm">
+                    <div class="card-header py-2 fw-semibold small">
+                        <i class="bi bi-pie-chart-fill me-1 text-warning"></i>
+                        Phân bố Nhân viên BH theo mức độ có đơn hàng (MTD)
+                    </div>
+                    <div class="card-body p-2" style="height:200px">
+                        <canvas id="chartOrderLevel"></canvas>
+                    </div>
+                    <div class="card-footer py-1 px-3" style="font-size:.72rem;color:#6b7280">
+                        Mỗi phần = số Nhân viên BH đạt tỷ lệ SO MCP trong khoảng đó tính từ đầu tháng
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        @* Bar — Doanh thu theo Distributor Top 10 *@
+        <div class="row g-3 mb-3">
+            <div class="col-12">
+                <div class="card shadow-sm">
+                    <div class="card-header py-2 fw-semibold small">
+                        <i class="bi bi-bar-chart-steps me-1 text-warning"></i>Top 10 Distributor theo doanh thu MTD (triệu đồng)
+                    </div>
+                    <div class="card-body p-2" style="height:260px">
+                        <canvas id="chartRevenueByDist"></canvas>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        @* ── Data Table ── *@
+        <div class="card shadow-sm">
+            <div class="card-header py-2 fw-semibold small">
+                <i class="bi bi-table me-1"></i>Chi tiết Nhân viên BH
+            </div>
+            <div class="card-body p-2">
+                <SortableGrid @ref="_detailGrid" Items="DetailData" Context="r"
+                              MinWidth="1300px" MaxHeight="520px" DefaultPageSize="20">
+                    <Columns>
+                        <GridColumn TItem="SalesAssessmentRow" Title="Region"      Value="@(x => x.RegionName)" />
+                        <GridColumn TItem="SalesAssessmentRow" Title="Area"        Value="@(x => x.AreaName)" />
+                        <GridColumn TItem="SalesAssessmentRow" Title="Nhân viên BH"         Value="@(x => x.SalesmanName)" />
+                        <GridColumn TItem="SalesAssessmentRow" Title="Giám sát"          Value="@(x => x.SaleSupName)" />
+                        <GridColumn TItem="SalesAssessmentRow" Title="NPP" Value="@(x => x.DistributorName)" />
+                        <GridColumn TItem="SalesAssessmentRow" Title="Đồng bộ"    Value="@(x => x.FirstSyncTime.HasValue ? x.FirstSyncTime.Value.ToString("HH:mm") : "Chưa")" Align="center" />
+                        <GridColumn TItem="SalesAssessmentRow" Title="CH Kế hoạch"   Value="@(x => x.OutletMustVisit)" Align="end" />
+                        <GridColumn TItem="SalesAssessmentRow" Title="Đã Visit"   Value="@(x => x.OutletVisited)"   Align="end" />
+                        <GridColumn TItem="SalesAssessmentRow" Title="% Viếng thăm"       Value="@(x => x.OutletMustVisit > 0 ? x.OutletVisited * 100m / x.OutletMustVisit : 0m)" Align="end" />
+                        <GridColumn TItem="SalesAssessmentRow" Title="Đơn hàng"   Value="@(x => x.OrderCount)"     Align="end" />
+                        <GridColumn TItem="SalesAssessmentRow" Title="DT hôm nay" Value="@(x => x.TotalAmount)"    Align="end" />
+                        <GridColumn TItem="SalesAssessmentRow" Title="DT tháng"   Value="@(x => x.MTDTotalAmount)" Align="end" />
+                        <GridColumn TItem="SalesAssessmentRow" Title="% KH tháng" Value="@(x => x.Visit_MCP)"      Align="end" />
+                    </Columns>
+                    <RowTemplate>
+                            @{
+                                var visitPct = r.OutletMustVisit > 0 ? r.OutletVisited * 100m / r.OutletMustVisit : 0m;
+                                var pctColor = visitPct >= 80 ? "text-success" : visitPct >= 50 ? "text-warning" : "text-danger";
+                                var mcpColor = r.Visit_MCP >= 80 ? "text-success" : r.Visit_MCP >= 50 ? "text-warning" : "text-danger";
+                            }
+                            <td class="text-nowrap small">@r.RegionName</td>
+                            <td class="text-nowrap small">@r.AreaName</td>
+                            <td class="text-nowrap fw-semibold">@r.SalesmanName</td>
+                            <td class="text-nowrap small text-muted">@r.SaleSupName</td>
+                            <td class="text-nowrap small">@r.DistributorName</td>
+                            <td class="text-center">
+                                @if (r.FirstSyncTime.HasValue)
+                                { <span class="badge bg-success">@r.FirstSyncTime.Value.ToString("HH:mm")</span> }
+                                else
+                                { <span class="badge bg-secondary">Chưa sync</span> }
+                            </td>
+                            <td class="text-end">@r.OutletMustVisit</td>
+                            <td class="text-end @(r.OutletVisited>=r.OutletMustVisit&&r.OutletMustVisit>0?"text-success fw-bold":"")">@r.OutletVisited</td>
+                            <td class="text-end"><span class="@pctColor fw-semibold">@visitPct.ToString("N0")%</span></td>
+                            <td class="text-end">@r.OrderCount</td>
+                            <td class="text-end small">@((r.TotalAmount/1_000_000m).ToString("N1"))M</td>
+                            <td class="text-end small">@((r.MTDTotalAmount/1_000_000m).ToString("N1"))M</td>
+                            <td class="text-end"><span class="@mcpColor">@r.Visit_MCP.ToString("N1")%</span></td>
+                    </RowTemplate>
+                </SortableGrid>
+            </div>
+        </div>
+    }
+</div>
+
+@code {
+    private List<SalesAssessmentRow> _data = new();
+    private List<LevelSlice> _visitLevel = new();
+    private List<LevelSlice> _orderLevel = new();
+    private DashboardKpi _kpi = new();
+    private bool _loading = true;
+    private string? _error;
+    private DateTime _date = DateTime.Today;
+    private SortableGrid<SalesAssessmentRow>? _detailGrid;
+
+    // S2: Data masking — Nhân viên BH chi xem chinh minh; NPP chi xem NPP minh
+    private IEnumerable<SalesAssessmentRow> DetailData =>
+        Mask.FilterBySalesman(
+            Mask.FilterByDistributor(
+                _data.Where(r => r.IsMCP == 1),
+                r => r.DistributorID.ToString()),
+            r => r.SalesmanID);
+
+    // KPI card model
+    private record KpiCard(string Label, string Sub, string Value, string Icon, string Color);
+    private IEnumerable<KpiCard> KpiCards => new[]
+    {
+        new KpiCard("Tổng Nhân viên BH",       "hôm nay",   _kpi.TotalSM.ToString(),         "bi-people-fill",      "#4f46e5"),
+        new KpiCard("Đã đồng bộ",     "hôm nay",   _kpi.TotalSMHasSync.ToString(),  "bi-cloud-check-fill", "#16a34a"),
+        new KpiCard("Chưa đồng bộ",   "hôm nay",   _kpi.TotalSMNotSync.ToString(),  "bi-cloud-slash-fill", "#dc2626"),
+        new KpiCard("Đang bán hàng",  "hôm nay",   _kpi.TotalSMHasVisit.ToString(), "bi-shop",             "#0891b2"),
+        new KpiCard("Chưa bán hàng",  "hôm nay",   _kpi.TotalSMNotVisit.ToString(), "bi-clock-history",    "#d97706"),
+        new KpiCard("Đã có đơn hàng", "hôm nay",   _kpi.TotalSMHasOrder.ToString(), "bi-cart-check-fill",  "#7c3aed"),
+    };
+
+
+    protected override async Task OnInitializedAsync()
+    {
+        if (!Auth.IsLoggedIn) { Nav.NavigateTo("/", replace: true); return; }
+        await LoadAsync();
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (!_loading && _error == null)
+            await RenderChartsAsync();
+    }
+
+    private async Task LoadAsync()
+    {
+        _loading = true; _error = null;
+        try
+        {
+            // 2 SP chạy song song
+            var tKpi    = DashSvc.GetKpiAsync(_date, Auth.UserName);
+            var tDetail = DashSvc.GetSalesAssessmentAsync(_date, Auth.UserName);
+            await Task.WhenAll(tKpi, tDetail);
+
+            _kpi  = tKpi.Result;
+            _data = tDetail.Result;
+
+            // Level bands dùng chung cho Visit + Order (cache 1h)
+            var bands = await DashSvc.GetLevelBandsAsync();
+            _visitLevel = DashSvc.CalcLevelPie(_data, bands, "Visited");
+            _orderLevel = DashSvc.CalcLevelPie(_data, bands, "Order");
+
+        }
+        catch (Exception ex) { _error = ex.Message; }
+        finally { _loading = false; }
+    }
+
+    private async Task RenderChartsAsync()
+    {
+        try
+        {
+            // 1. Doughnut — SM status
+            var smLabels = JsonSerializer.Serialize(new[]{"Đã đồng bộ","Chưa đồng bộ","Đang bán","Chưa bán","Có đơn hàng"});
+            var smValues = JsonSerializer.Serialize(new[]{ _kpi.TotalSMHasSync, _kpi.TotalSMNotSync, _kpi.TotalSMHasVisit, _kpi.TotalSMNotVisit, _kpi.TotalSMHasOrder });
+            var smColors = JsonSerializer.Serialize(new[]{"#16a34a","#dc2626","#0891b2","#d97706","#7c3aed"});
+            await JS.InvokeVoidAsync("dashboardChart.renderDoughnut", "chartSmStatus", smLabels, smValues, smColors);
+
+            // 2. Bar — doanh thu theo Region
+            var byRegion = _data
+                .GroupBy(r => string.IsNullOrEmpty(r.RegionName) ? "Khác" : r.RegionName)
+                .Select(g => new { label = g.Key, value = Math.Round(g.Sum(x => x.MTDTotalAmount) / 1_000_000m, 1) })
+                .OrderByDescending(x => x.value).Take(15).ToList();
+            await JS.InvokeVoidAsync("dashboardChart.renderBar", "chartRevenueByRegion",
+                JsonSerializer.Serialize(byRegion.Select(x => x.label)),
+                JsonSerializer.Serialize(byRegion.Select(x => x.value)),
+                "DThu MTD (triệu đồng)");
+
+            // 3. Bar — Top 10 Distributor
+            var byDist = _data
+                .GroupBy(r => string.IsNullOrEmpty(r.DistributorName) ? "Khác" : r.DistributorName)
+                .Select(g => new { label = g.Key, value = Math.Round(g.Sum(x => x.MTDTotalAmount) / 1_000_000m, 1) })
+                .OrderByDescending(x => x.value).Take(10).ToList();
+            await JS.InvokeVoidAsync("dashboardChart.renderBar", "chartRevenueByDist",
+                JsonSerializer.Serialize(byDist.Select(x => x.label)),
+                JsonSerializer.Serialize(byDist.Select(x => x.value)),
+                "DThu MTD (triệu đồng)");
+
+            // 4a. Bar grouped — số CH kế hoạch vs đã VT vs đơn hàng theo ngày
+            // 4b. Line — % VT MCP và % SO MCP theo ngày
+            var dayPoints = DashSvc.CalcDayChart(_data);
+            if (dayPoints.Any())
+            {
+                var dayLabels = JsonSerializer.Serialize(dayPoints.Select(x => x.Day));
+
+                // Chart 4a: bar grouped (số lượng)
+                await JS.InvokeVoidAsync("dashboardChart.renderVisitCountChart",
+                    "chartVisitCount",
+                    dayLabels,
+                    JsonSerializer.Serialize(dayPoints.Select(x => x.OutletMustVisit)),
+                    JsonSerializer.Serialize(dayPoints.Select(x => x.OutletVisited)),
+                    JsonSerializer.Serialize(dayPoints.Select(x => x.OrderCount)));
+
+                // Chart 4b: line (%)
+                await JS.InvokeVoidAsync("dashboardChart.renderVisitPctChart",
+                    "chartVisitPct",
+                    dayLabels,
+                    JsonSerializer.Serialize(dayPoints.Select(x => x.VisitMCP)),
+                    JsonSerializer.Serialize(dayPoints.Select(x => x.SOMCP)));
+            }
+
+            // 5. Pie — Visit Level (mức độ hoàn thành VT của Nhân viên BH)
+            if (_visitLevel.Any())
+            {
+                await JS.InvokeVoidAsync("dashboardChart.renderPieLevel",
+                    "chartVisitLevel",
+                    JsonSerializer.Serialize(_visitLevel.Select(x => x.Label)),
+                    JsonSerializer.Serialize(_visitLevel.Select(x => x.Count)),
+                    JsonSerializer.Serialize(_visitLevel.Select(x => string.IsNullOrEmpty(x.Color) ? "#94a3b8" : x.Color)),
+                    "");
+            }
+
+            // 6. Pie — Order Level (mức độ có ĐH của Nhân viên BH)
+            if (_orderLevel.Any())
+            {
+                await JS.InvokeVoidAsync("dashboardChart.renderPieLevel",
+                    "chartOrderLevel",
+                    JsonSerializer.Serialize(_orderLevel.Select(x => x.Label)),
+                    JsonSerializer.Serialize(_orderLevel.Select(x => x.Count)),
+                    JsonSerializer.Serialize(_orderLevel.Select(x => string.IsNullOrEmpty(x.Color) ? "#94a3b8" : x.Color)),
+                    "");
+            }
+        }
+        catch { /* JS chưa sẵn sàng — bỏ qua */ }
+    }
+
+
+    public async ValueTask DisposeAsync()
+    {
+        try { await JS.InvokeVoidAsync("dashboardChart.destroyAll"); } catch { }
+    }
+}

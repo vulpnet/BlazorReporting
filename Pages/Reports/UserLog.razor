@@ -1,0 +1,53 @@
+@page "/report/user-log"
+@attribute [NavMenu(Title="Nhật ký người dùng", Icon="bi-clock-history", Group="Báo cáo", GroupOrder=20, Order=110)]
+@using BlazorReporting.Services
+@inject AuthService Auth
+@inject ReportService RptSvc
+@inject NavigationManager Nav
+<PageTitle>User Log</PageTitle>
+<div class="container-fluid mt-3">
+    <h5 class="mb-3"><i class="bi bi-clock-history me-2"></i>User Log</h5>
+    <div class="card shadow-sm mb-3"><div class="card-body py-2">
+        <div class="d-flex gap-2 flex-wrap align-items-end">
+            <div><label class="form-label small mb-1">Từ ngày</label><input type="date" class="form-control form-control-sm" style="width:150px" @bind="_from"/></div>
+            <div><label class="form-label small mb-1">Đến ngày</label><input type="date" class="form-control form-control-sm" style="width:150px" @bind="_to"/></div>
+            <button class="btn btn-sm btn-primary" @onclick="LoadAsync"><i class="bi bi-search me-1"></i>Xem</button>
+            @if (_data.Any()){<span class="text-muted small ms-2">@_data.Count dong</span>}
+        </div>
+    </div></div>
+    @if (_error!=null){<div class="alert alert-danger py-2 alert-dismissible">@_error<button class="btn-close" @onclick="ClearErr"></button></div>}
+    @if (_loading){<div class="text-center py-4"><span class="spinner-border text-primary"></span></div>}
+    else {
+        <SortableGrid Items="_data" Context="r" MinWidth="800px" DefaultPageSize="30">
+            <Columns>
+                <GridColumn TItem="GenericReportRow" Title="Username"  Value="@(x=>x.UserName)"/>
+                <GridColumn TItem="GenericReportRow" Title="Họ tên"    Value="@(x=>x.FullName)"/>
+                <GridColumn TItem="GenericReportRow" Title="Email"     Value="@(x=>x.Email)"/>
+                <GridColumn TItem="GenericReportRow" Title="Phone"     Value="@(x=>x.Phone)"/>
+                <GridColumn TItem="GenericReportRow" Title="Quyen"     Value="@(x=>x.RoleName)"/>
+                <GridColumn TItem="GenericReportRow" Title="Page"      Value="@(x=>x.Page)"/>
+                <GridColumn TItem="GenericReportRow" Title="Ngày"      Value="@(x=>x.VisitDate.HasValue?x.VisitDate.Value.ToString("dd/MM"):"")" Align="center"/>
+                <GridColumn TItem="GenericReportRow" Title="Click"     Value="@(x=>x.Click)" Align="end"/>
+            </Columns>
+            <RowTemplate>
+                <td class="small fw-semibold">@r.UserName</td>
+                <td class="small">@r.FullName</td>
+                <td class="small">@r.Email</td>
+                <td class="small">@r.Phone</td>
+                <td class="small"><span class="badge bg-info text-dark">@r.RoleName</span></td>
+                <td class="small">@r.Page</td>
+                <td class="text-center small">@(r.VisitDate.HasValue?r.VisitDate.Value.ToString("dd/MM"):"—")</td>
+                <td class="text-end">@r.Click</td>
+            </RowTemplate>
+        </SortableGrid>
+    }
+</div>
+@code {
+    private List<GenericReportRow> _data=new(); private bool _loading; private string? _error;
+    private DateTime _from=DateTime.Today.AddDays(-7), _to=DateTime.Today;
+    private void ClearErr() => _error = null;
+    protected override void OnInitialized(){if(!Auth.IsLoggedIn)Nav.NavigateTo("/",replace:true);}
+    private async Task LoadAsync(){_loading=true;_error=null;
+        try{_data=await RptSvc.GetUserLogAsync(_from,_to,Auth.UserName);}
+        catch(Exception ex){_error=ex.Message;}finally{_loading=false;}}
+}

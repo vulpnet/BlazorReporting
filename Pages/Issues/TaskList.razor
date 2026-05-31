@@ -1,0 +1,178 @@
+@page "/issues/tasks"
+@attribute [NavMenu(Title="Quản lý Task", Icon="bi-list-check", Group="Issues", GroupOrder=50, Order=20)]
+@using BlazorReporting.Services
+@inject AuthService Auth
+@inject IssuesService IssueSvc
+@inject NavigationManager Nav
+
+<PageTitle>Quản lý Task</PageTitle>
+
+<div class="container-fluid mt-3">
+    <h5 class="mb-3"><i class="bi bi-list-check me-2"></i>Quản lý Task</h5>
+
+    @if (!string.IsNullOrEmpty(_msg))
+    {
+        <div class="alert @(_ok?"alert-success":"alert-danger") py-2 alert-dismissible">
+            @_msg <button class="btn-close" @onclick="ClearMsg"></button>
+        </div>
+    }
+
+    @if (_loading)
+    {
+        <div class="text-center py-4"><span class="spinner-border text-primary"></span></div>
+    }
+    else
+    {
+        <SortableGrid Items="_data" Context="r" MinWidth="800px" DefaultPageSize="20">
+            <ToolbarContent>
+                <button class="btn btn-sm btn-primary" @onclick="OpenAdd">
+                    <i class="bi bi-plus-lg me-1"></i>Tạo Task
+                </button>
+            </ToolbarContent>
+            <Columns>
+                <GridColumn TItem="TaskRow" Title="Mã Task"   Value="@(x => x.RefNbr)" />
+                <GridColumn TItem="TaskRow" Title="Tiêu đề"   Value="@(x => x.Title)" />
+                <GridColumn TItem="TaskRow" Title="Assign cho" Value="@(x => x.ApplyTo)" />
+                <GridColumn TItem="TaskRow" Title="Từ ngày"   Value="@(x => x.StartDate.HasValue ? x.StartDate.Value.ToString("dd/MM/yyyy") : "")" Align="center" />
+                <GridColumn TItem="TaskRow" Title="Đến ngày"  Value="@(x => x.EndDate.HasValue ? x.EndDate.Value.ToString("dd/MM/yyyy") : "")" Align="center" />
+                <GridColumn TItem="TaskRow" Title="Tạo bởi"   Value="@(x => x.CreatedByID)" />
+                <GridColumn TItem="TaskRow" Title="Trạng thái" Value="@(x => x.Active ? "Active" : "Inactive")" Align="center" />
+            </Columns>
+            <RowTemplate>
+                <td class="small font-monospace">@r.RefNbr</td>
+                <td class="fw-semibold">@r.Title</td>
+                <td class="small">@r.ApplyTo</td>
+                <td class="text-center small">@(r.StartDate.HasValue ? r.StartDate.Value.ToString("dd/MM/yyyy") : "—")</td>
+                <td class="text-center small">@(r.EndDate.HasValue ? r.EndDate.Value.ToString("dd/MM/yyyy") : "—")</td>
+                <td class="small text-muted">@r.CreatedByID</td>
+                <td class="text-center">
+                    <span class="badge @(r.Active?"bg-success":"bg-secondary")">
+                        @(r.Active?"Active":"Inactive")
+                    </span>
+                </td>
+            </RowTemplate>
+            <ActionColumn Context="r">
+                <button class="btn btn-xs btn-outline-primary me-1" @onclick="()=>OpenEdit(r)">
+                    <i class="bi bi-pencil"></i>
+                </button>
+                <button class="btn btn-xs @(r.Active?"btn-outline-warning":"btn-outline-success")"
+                        @onclick="()=>ToggleAsync(r)">
+                    <i class="bi @(r.Active?"bi-pause":"bi-play")"></i>
+                </button>
+            </ActionColumn>
+        </SortableGrid>
+    }
+</div>
+
+@if (_showModal)
+{
+    <div class="modal fade show d-block" tabindex="-1" style="background:rgba(0,0,0,.4)">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">@(_isAdd?"Tạo Task mới":"Sửa Task")</h5>
+                    <button class="btn-close" @onclick="()=>_showModal=false"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="mb-2">
+                        <label class="form-label">Tiêu đề *</label>
+                        <input class="form-control" @bind="_fTitle" />
+                    </div>
+                    <div class="mb-2">
+                        <label class="form-label">Mô tả</label>
+                        <textarea class="form-control" rows="3" @bind="_fDesc"></textarea>
+                    </div>
+                    <div class="row g-2 mb-2">
+                        <div class="col-6">
+                            <label class="form-label">Từ ngày</label>
+                            <input type="date" class="form-control" @bind="_fStart" />
+                        </div>
+                        <div class="col-6">
+                            <label class="form-label">Đến ngày</label>
+                            <input type="date" class="form-control" @bind="_fEnd" />
+                        </div>
+                    </div>
+                    <div class="mb-2">
+                        <label class="form-label">Assign cho</label>
+                        <select class="form-select" @bind="_fApplyTo">
+                            <option value="Seller">Nhân viên BH (Seller)</option>
+                            <option value="AtributeCustomer">Cửa hàng (AtributeCustomer)</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button class="btn btn-secondary" @onclick="()=>_showModal=false">Hủy</button>
+                    <button class="btn btn-primary" @onclick="SaveAsync" disabled="@_saving">
+                        @if (_saving) { <span class="spinner-border spinner-border-sm me-1"></span> }
+                        Lưu
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+}
+
+@code {
+    private List<TaskRow> _data = new();
+    private bool _loading = true, _showModal, _saving, _ok, _isAdd;
+    private string _msg = "", _fTitle = "", _fDesc = "", _fApplyTo = "Seller", _fRefNbr = "";
+    private DateTime _fStart = DateTime.Today, _fEnd = DateTime.Today.AddDays(7);
+
+    private void ClearMsg() => _msg = "";
+
+    protected override async Task OnInitializedAsync()
+    {
+        if (!Auth.IsLoggedIn) { Nav.NavigateTo("/", replace: true); return; }
+        await LoadAsync();
+    }
+
+    private async Task LoadAsync()
+    {
+        _loading = true;
+        _data = await IssueSvc.GetTasksAsync();
+        _loading = false;
+    }
+
+    private void OpenAdd()
+    {
+        _isAdd = true; _fRefNbr = ""; _fTitle = ""; _fDesc = ""; _fApplyTo = "Seller";
+        _fStart = DateTime.Today; _fEnd = DateTime.Today.AddDays(7);
+        _showModal = true;
+    }
+
+    private void OpenEdit(TaskRow r)
+    {
+        _isAdd = false; _fRefNbr = r.RefNbr; _fTitle = r.Title; _fDesc = r.Desc;
+        _fApplyTo = r.ApplyTo;
+        _fStart = r.StartDate ?? DateTime.Today;
+        _fEnd   = r.EndDate   ?? DateTime.Today.AddDays(7);
+        _showModal = true;
+    }
+
+    private async Task SaveAsync()
+    {
+        if (string.IsNullOrWhiteSpace(_fTitle)) { _ok=false; _msg="Vui lòng nhập tiêu đề."; return; }
+        _saving = true;
+        var row = new TaskRow { RefNbr=_fRefNbr, Title=_fTitle, Desc=_fDesc, ApplyTo=_fApplyTo, StartDate=_fStart, EndDate=_fEnd, CreatedByID=Auth.UserName };
+        if (_isAdd)
+        {
+            var refNbr = await IssueSvc.CreateTaskAsync(row, Auth.UserName);
+            row.RefNbr = refNbr; row.Active = true; row.CreatedDateTime = DateTime.Now;
+            _data.Insert(0, row);
+            _ok = true; _msg = $"Tạo task {refNbr} thành công.";
+        }
+        else
+        {
+            var ok = await IssueSvc.UpdateTaskAsync(row);
+            _ok = ok; _msg = ok ? "Cập nhật thành công." : "Có lỗi.";
+            if (ok) { var idx=_data.FindIndex(x=>x.RefNbr==_fRefNbr); if(idx>=0) { _data[idx].Title=_fTitle; _data[idx].Desc=_fDesc; } }
+        }
+        _saving = false; _showModal = false;
+    }
+
+    private async Task ToggleAsync(TaskRow r)
+    {
+        var ok = await IssueSvc.ToggleTaskActiveAsync(r.RefNbr, !r.Active);
+        if (ok) { var idx=_data.FindIndex(x=>x.RefNbr==r.RefNbr); if(idx>=0) _data[idx].Active=!r.Active; }
+    }
+}

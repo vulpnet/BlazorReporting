@@ -51,7 +51,7 @@ public sealed class NavMenuService
             if (!typeof(IComponent).IsAssignableFrom(type)) continue;
 
             var nav = type.GetCustomAttribute<NavMenuAttribute>();
-            if (nav is null) continue;
+            if (nav is null || nav.Hidden) continue;
 
             var route = type.GetCustomAttributes<RouteAttribute>().FirstOrDefault();
             if (route is null) continue;

@@ -1,0 +1,60 @@
+@page "/report/issues-full"
+@attribute [NavMenu(Title="Báo cáo Issues", Icon="bi-exclamation-circle-fill", Group="Báo cáo", GroupOrder=20, Order=100)]
+@using BlazorReporting.Services
+@inject AuthService Auth
+@inject ReportService RptSvc
+@inject NavigationManager Nav
+<PageTitle>Issues Report</PageTitle>
+<div class="container-fluid mt-3">
+    <h5 class="mb-3"><i class="bi bi-exclamation-circle-fill me-2 text-warning"></i>Issues Report</h5>
+    <div class="card shadow-sm mb-3"><div class="card-body py-2">
+        <div class="d-flex gap-2 flex-wrap align-items-end">
+            <div><label class="form-label small mb-1">Từ ngày</label><input type="date" class="form-control form-control-sm" style="width:150px" @bind="_from"/></div>
+            <div><label class="form-label small mb-1">Đến ngày</label><input type="date" class="form-control form-control-sm" style="width:150px" @bind="_to"/></div>
+            <div><label class="form-label small mb-1">Trạng thái</label>
+                <select class="form-select form-select-sm" style="width:140px" @bind="_status">
+                    <option value="0">Chua xu ly</option>
+                    <option value="1">Da xu ly</option>
+                    <option value="-1">Tat ca</option>
+                </select>
+            </div>
+            <button class="btn btn-sm btn-primary" @onclick="LoadAsync"><i class="bi bi-search me-1"></i>Xem</button>
+            @if (_data.Any()){<span class="text-muted small ms-2">@_data.Count dong</span>}
+        </div>
+    </div></div>
+    @if (_error!=null){<div class="alert alert-danger py-2 alert-dismissible">@_error<button class="btn-close" @onclick="ClearErr"></button></div>}
+    @if (_loading){<div class="text-center py-4"><span class="spinner-border text-primary"></span></div>}
+    else {
+        <SortableGrid Items="_data" Context="r" MinWidth="1000px" DefaultPageSize="20">
+            <Columns>
+                <GridColumn TItem="GenericReportRow" Title="Issue ID"    Value="@(x=>x.IssueID)"/>
+                <GridColumn TItem="GenericReportRow" Title="Nhân viên BH"         Value="@(x=>x.SalesmanName)"/>
+                <GridColumn TItem="GenericReportRow" Title="NPP" Value="@(x=>x.DistributorName)"/>
+                <GridColumn TItem="GenericReportRow" Title="Cửa hàng"      Value="@(x=>x.OutletName)"/>
+                <GridColumn TItem="GenericReportRow" Title="Ngày"        Value="@(x=>x.VisitDate.HasValue?x.VisitDate.Value.ToString("dd/MM/yyyy"):"")" Align="center"/>
+                <GridColumn TItem="GenericReportRow" Title="Nội dung"    Value="@(x=>x.Content)"/>
+                <GridColumn TItem="GenericReportRow" Title="Số ảnh"      Value="@(x=>x.ImageCount)" Align="center"/>
+                <GridColumn TItem="GenericReportRow" Title="Trạng thái"  Value="@(x=>x.Status==0?"Chua xu ly":"Da xu ly")" Align="center"/>
+            </Columns>
+            <RowTemplate>
+                <td class="small font-monospace">@r.IssueID</td>
+                <td class="small fw-semibold">@r.SalesmanName</td>
+                <td class="small">@r.DistributorName</td>
+                <td class="small">@r.OutletName</td>
+                <td class="text-center small">@(r.VisitDate.HasValue?r.VisitDate.Value.ToString("dd/MM/yyyy"):"—")</td>
+                <td class="small">@r.Content</td>
+                <td class="text-center">@r.ImageCount</td>
+                <td class="text-center"><span class="badge @(r.Status==0?"bg-warning text-dark":"bg-success")">@(r.Status==0?"Chua":"Da xu ly")</span></td>
+            </RowTemplate>
+        </SortableGrid>
+    }
+</div>
+@code {
+    private List<GenericReportRow> _data=new(); private bool _loading; private string? _error;
+    private int _status=0; private DateTime _from=DateTime.Today.AddDays(-7), _to=DateTime.Today;
+    private void ClearErr() => _error = null;
+    protected override void OnInitialized(){if(!Auth.IsLoggedIn)Nav.NavigateTo("/",replace:true);}
+    private async Task LoadAsync(){_loading=true;_error=null;
+        try{_data=await RptSvc.GetReportIssuesAsync(_from,_to,Auth.UserName,status:_status);}
+        catch(Exception ex){_error=ex.Message;}finally{_loading=false;}}
+}

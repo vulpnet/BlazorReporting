@@ -1,0 +1,167 @@
+@page "/config/shift"
+@attribute [NavMenu(Title="Ca làm việc", Icon="bi-clock-fill", Group="Cấu hình", GroupOrder=80, Order=20)]
+@using BlazorReporting.Services
+@inject AuthService Auth
+@inject ConfigService CfgSvc
+@inject NavigationManager Nav
+
+<PageTitle>Cài đặt ca làm việc</PageTitle>
+
+<div class="container-fluid mt-3">
+    <h5 class="mb-3"><i class="bi bi-clock-fill me-2"></i>Cài đặt ca làm việc (AM/PM)</h5>
+
+    @if (!string.IsNullOrEmpty(_msg))
+    {
+        <div class="alert @(_ok?"alert-success":"alert-danger") py-2 alert-dismissible">
+            @_msg <button class="btn-close" @onclick="ClearMsg"></button>
+        </div>
+    }
+
+    @if (_loading)
+    {
+        <div class="text-center py-4"><span class="spinner-border text-primary"></span></div>
+    }
+    else
+    {
+        <SortableGrid Items="_shifts" Context="s" MinWidth="700px" DefaultPageSize="20">
+            <ToolbarContent>
+                <button class="btn btn-sm btn-primary" @onclick="OpenAdd">
+                    <i class="bi bi-plus-lg me-1"></i>Thêm ca
+                </button>
+            </ToolbarContent>
+            <Columns>
+                <GridColumn TItem="ShiftSettingRow" Title="Mã ca"       Value="@(x => x.ShiftID)" />
+                <GridColumn TItem="ShiftSettingRow" Title="Mô tả (VN)"  Value="@(x => x.DesVN)" />
+                <GridColumn TItem="ShiftSettingRow" Title="Mô tả (EN)"  Value="@(x => x.DesEn)" />
+                <GridColumn TItem="ShiftSettingRow" Title="Giờ bắt đầu" Value="@(x => x.StartTime)" Align="center" />
+                <GridColumn TItem="ShiftSettingRow" Title="Giờ kết thúc" Value="@(x => x.EndTime)" Align="center" />
+                <GridColumn TItem="ShiftSettingRow" Title="Trạng thái"  Value="@(x => x.Active ? "Active" : "Inactive")" Align="center" />
+            </Columns>
+            <RowTemplate>
+                <td><strong>@s.ShiftID</strong></td>
+                <td>@s.DesVN</td>
+                <td>@s.DesEn</td>
+                <td class="text-center">@s.StartTime</td>
+                <td class="text-center">@s.EndTime</td>
+                <td class="text-center">
+                    <span class="badge @(s.Active ? "bg-success" : "bg-secondary")">
+                        @(s.Active ? "Active" : "Inactive")
+                    </span>
+                </td>
+            </RowTemplate>
+            <ActionColumn Context="s">
+                <button class="btn btn-xs btn-outline-primary" @onclick="()=>OpenEdit(s)">
+                    <i class="bi bi-pencil"></i>
+                </button>
+            </ActionColumn>
+        </SortableGrid>
+    }
+</div>
+
+@if (_showModal)
+{
+    <div class="modal fade show d-block" tabindex="-1" style="background:rgba(0,0,0,.4)">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">@(_isAdd ? "Thêm ca" : "Sửa ca — " + _fShiftID)</h5>
+                    <button class="btn-close" @onclick="CloseModal"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="row g-2">
+                        <div class="col-6">
+                            <label class="form-label">Mã ca *</label>
+                            <input class="form-control" @bind="_fShiftID" disabled="@(!_isAdd)" />
+                        </div>
+                        <div class="col-6">
+                            <label class="form-label">Trạng thái</label>
+                            <select class="form-select" @bind="_fActive">
+                                <option value="true">Active</option>
+                                <option value="false">Inactive</option>
+                            </select>
+                        </div>
+                        <div class="col-6">
+                            <label class="form-label">Mô tả tiếng Việt</label>
+                            <input class="form-control" @bind="_fDesVN" />
+                        </div>
+                        <div class="col-6">
+                            <label class="form-label">Mô tả tiếng Anh</label>
+                            <input class="form-control" @bind="_fDesEn" />
+                        </div>
+                        <div class="col-6">
+                            <label class="form-label">Giờ bắt đầu (HH:mm)</label>
+                            <input class="form-control" type="time" @bind="_fStart" />
+                        </div>
+                        <div class="col-6">
+                            <label class="form-label">Giờ kết thúc (HH:mm)</label>
+                            <input class="form-control" type="time" @bind="_fEnd" />
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button class="btn btn-secondary" @onclick="CloseModal">Hủy</button>
+                    <button class="btn btn-primary" @onclick="SaveAsync" disabled="@_saving">
+                        @if (_saving) { <span class="spinner-border spinner-border-sm me-1"></span> }
+                        Lưu
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+}
+
+@code {
+    private List<ShiftSettingRow> _shifts = new();
+    private bool _loading = true, _showModal, _saving, _isAdd, _ok;
+    private string _msg = "", _fShiftID = "", _fDesVN = "", _fDesEn = "";
+    private TimeOnly _fStart = new(8, 0), _fEnd = new(12, 0);
+    private bool _fActive = true;
+
+    private void ClearMsg() => _msg = "";
+    private void CloseModal() => _showModal = false;
+
+    protected override async Task OnInitializedAsync()
+    {
+        if (!Auth.IsLoggedIn) { Nav.NavigateTo("/", replace: true); return; }
+        await LoadAsync();
+    }
+
+    private async Task LoadAsync()
+    {
+        _loading = true;
+        _shifts = await CfgSvc.GetShiftsAsync();
+        _loading = false;
+    }
+
+    private void OpenAdd()
+    {
+        _isAdd = true; _fShiftID = ""; _fDesVN = ""; _fDesEn = "";
+        _fStart = new(8,0); _fEnd = new(12,0); _fActive = true;
+        _showModal = true;
+    }
+
+    private void OpenEdit(ShiftSettingRow s)
+    {
+        _isAdd = false; _fShiftID = s.ShiftID; _fDesVN = s.DesVN; _fDesEn = s.DesEn; _fActive = s.Active;
+        TimeOnly.TryParse(s.StartTime, out _fStart);
+        TimeOnly.TryParse(s.EndTime,   out _fEnd);
+        _showModal = true;
+    }
+
+    private async Task SaveAsync()
+    {
+        if (string.IsNullOrWhiteSpace(_fShiftID)) { _ok=false; _msg="Vui lòng nhập mã ca."; return; }
+        _saving = true;
+        var row = new ShiftSettingRow
+        {
+            ShiftID   = _fShiftID, DesVN = _fDesVN, DesEn = _fDesEn,
+            StartTime = _fStart.ToString("HH:mm"), EndTime = _fEnd.ToString("HH:mm"), Active = _fActive
+        };
+        bool ok = _isAdd
+            ? await CfgSvc.AddShiftAsync(row, Auth.UserName)
+            : await CfgSvc.UpdateShiftAsync(row, Auth.UserName);
+        _ok = ok; _msg = ok ? "Lưu thành công." : "Có lỗi xảy ra.";
+        if (ok) _shifts = await CfgSvc.GetShiftsAsync();
+        _saving = false; _showModal = false;
+    }
+}

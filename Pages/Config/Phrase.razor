@@ -1,0 +1,131 @@
+@page "/config/phrase"
+@attribute [NavMenu(Title="Từ điển ngôn ngữ", Icon="bi-translate", Group="Cấu hình", GroupOrder=80, Order=50)]
+@using BlazorReporting.Services
+@inject AuthService Auth
+@inject ConfigService CfgSvc
+@inject NavigationManager Nav
+
+<PageTitle>Từ điển ngôn ngữ</PageTitle>
+
+<div class="container-fluid mt-3">
+    <h5 class="mb-3"><i class="bi bi-translate me-2"></i>Từ điển đa ngôn ngữ</h5>
+
+    @* Search bar *@
+    <div class="d-flex gap-2 mb-3 flex-wrap align-items-end">
+        <div>
+            <label class="form-label small mb-1">Ngôn ngữ</label>
+            <select class="form-select form-select-sm" style="width:150px" @bind="_filterLang">
+                <option value="">Tất cả</option>
+                @foreach (var l in _languages)
+                {
+                    <option value="@l.LangID">@l.LangName (@l.Code)</option>
+                }
+            </select>
+        </div>
+        <div style="flex:1;min-width:200px;max-width:400px">
+            <label class="form-label small mb-1">Tìm kiếm (code hoặc nội dung)</label>
+            <input class="form-control form-control-sm" placeholder="Nhập từ khóa..." @bind="_search" />
+        </div>
+        <button class="btn btn-sm btn-primary" @onclick="SearchAsync">
+            <i class="bi bi-search me-1"></i>Tìm
+        </button>
+    </div>
+
+    @if (!string.IsNullOrEmpty(_msg))
+    {
+        <div class="alert @(_ok?"alert-success":"alert-danger") py-2 alert-dismissible">
+            @_msg <button class="btn-close" @onclick="ClearMsg"></button>
+        </div>
+    }
+
+    @if (_loading)
+    {
+        <div class="text-center py-4"><span class="spinner-border text-primary"></span></div>
+    }
+    else
+    {
+        <SortableGrid Items="_phrases" Context="p" MinWidth="650px" DefaultPageSize="30">
+            <Columns>
+                <GridColumn TItem="PhraseRow" Title="Phrase Code" Value="@(x => x.PhraseCode)" />
+                <GridColumn TItem="PhraseRow" Title="Ngôn ngữ"    Value="@(x => LangName(x.LanguageID))" Align="center" />
+                <GridColumn TItem="PhraseRow" Title="Nội dung"    Value="@(x => x.PhraseText)" />
+            </Columns>
+            <RowTemplate>
+                <td class="font-monospace small text-muted">@p.PhraseCode</td>
+                <td class="text-center">
+                    <span class="badge bg-info text-dark">@LangName(p.LanguageID)</span>
+                </td>
+                <td>
+                    @if (_editKey == $"{p.PhraseCode}:{p.LanguageID}")
+                    {
+                        <div class="d-flex gap-1">
+                            <input class="form-control form-control-sm" @bind="_editValue" />
+                            <button class="btn btn-xs btn-success" @onclick="()=>SavePhraseAsync(p)">
+                                <i class="bi bi-check"></i>
+                            </button>
+                            <button class="btn btn-xs btn-secondary" @onclick="()=>_editKey=string.Empty">
+                                <i class="bi bi-x"></i>
+                            </button>
+                        </div>
+                    }
+                    else
+                    {
+                        <span>@p.PhraseText</span>
+                    }
+                </td>
+            </RowTemplate>
+            <ActionColumn Context="p">
+                @if (_editKey != $"{p.PhraseCode}:{p.LanguageID}")
+                {
+                    <button class="btn btn-xs btn-outline-primary" @onclick="()=>StartEdit(p)">
+                        <i class="bi bi-pencil"></i>
+                    </button>
+                }
+            </ActionColumn>
+        </SortableGrid>
+    }
+</div>
+
+@code {
+    private List<PhraseRow>    _phrases   = new();
+    private List<LanguageRow>  _languages = new();
+    private bool _loading, _ok;
+    private string _msg = "", _search = "", _editKey = "", _editValue = "";
+    private string _filterLang = "";
+
+    private void ClearMsg() => _msg = "";
+    private string LangName(int id) => _languages.FirstOrDefault(l => l.LangID == id)?.Code ?? id.ToString();
+
+    protected override async Task OnInitializedAsync()
+    {
+        if (!Auth.IsLoggedIn) { Nav.NavigateTo("/", replace: true); return; }
+        _languages = await CfgSvc.GetLanguagesAsync();
+    }
+
+    private async Task SearchAsync()
+    {
+        if (string.IsNullOrWhiteSpace(_search)) return;
+        _loading = true;
+        int? langId = string.IsNullOrEmpty(_filterLang) ? null : int.Parse(_filterLang);
+        _phrases = await CfgSvc.SearchPhrasesAsync(_search, langId);
+        _loading = false;
+    }
+
+    private void StartEdit(PhraseRow p)
+    {
+        _editKey   = $"{p.PhraseCode}:{p.LanguageID}";
+        _editValue = p.PhraseText;
+    }
+
+    private async Task SavePhraseAsync(PhraseRow p)
+    {
+        var ok = await CfgSvc.UpdatePhraseAsync(p.PhraseCode, p.LanguageID, _editValue);
+        _ok = ok; _msg = ok ? "Cập nhật thành công." : "Có lỗi xảy ra.";
+        if (ok)
+        {
+            var idx = _phrases.FindIndex(x => x.PhraseCode == p.PhraseCode && x.LanguageID == p.LanguageID);
+            if (idx >= 0) _phrases[idx] = new PhraseRow { PhraseCode=p.PhraseCode, LanguageID=p.LanguageID, PhraseText=_editValue };
+        }
+        _editKey = "";
+    }
+}

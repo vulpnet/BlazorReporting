@@ -1,0 +1,68 @@
+@page "/report/summary-sales"
+@attribute [NavMenu(Title="Tổng hợp doanh số", Icon="bi-graph-up-arrow", Group="Báo cáo", GroupOrder=20, Order=30)]
+@using BlazorReporting.Services
+@inject AuthService Auth
+@inject ReportService RptSvc
+@inject NavigationManager Nav
+<PageTitle>Summary Sales</PageTitle>
+<div class="container-fluid mt-3">
+    <h5 class="mb-3"><i class="bi bi-graph-up-arrow me-2"></i>Summary Sales</h5>
+    <div class="card shadow-sm mb-3"><div class="card-body py-2">
+        <div class="d-flex gap-2 flex-wrap align-items-end">
+            <div><label class="form-label small mb-1">Từ ngày</label><input type="date" class="form-control form-control-sm" style="width:150px" @bind="_from"/></div>
+            <div><label class="form-label small mb-1">Đến ngày</label><input type="date" class="form-control form-control-sm" style="width:150px" @bind="_to"/></div>
+            <div><label class="form-label small mb-1">Tuyến</label><input class="form-control form-control-sm" style="width:150px" placeholder="RouteCD..." @bind="_route"/></div>
+            <div><label class="form-label small mb-1">Giám sát</label><input class="form-control form-control-sm" style="width:140px" placeholder="SaleSupCD..." @bind="_sup"/></div>
+            <button class="btn btn-sm btn-primary" @onclick="LoadAsync"><i class="bi bi-search me-1"></i>Xem</button>
+            @if (_data.Any()){<span class="text-muted small ms-2">@_data.Count dong</span>}
+        </div>
+    </div></div>
+    @if (_error!=null){<div class="alert alert-danger py-2 alert-dismissible">@_error<button class="btn-close" @onclick="ClearErr"></button></div>}
+    @if (_loading){<div class="text-center py-4"><span class="spinner-border text-primary"></span></div>}
+    else {
+        <SortableGrid Items="_data" Context="r" MinWidth="1000px" DefaultPageSize="20">
+            <Columns>
+                <GridColumn TItem="GenericReportRow" Title="Region"      Value="@(x=>x.STLvl0Name)"/>
+                <GridColumn TItem="GenericReportRow" Title="Area"        Value="@(x=>x.STLvl1Name)"/>
+                <GridColumn TItem="GenericReportRow" Title="NPP" Value="@(x=>x.DistributorName)"/>
+                <GridColumn TItem="GenericReportRow" Title="Tuyến"       Value="@(x=>x.RouteCD)"/>
+                <GridColumn TItem="GenericReportRow" Title="Giám sát"          Value="@(x=>x.SalesSupName)"/>
+                <GridColumn TItem="GenericReportRow" Title="Nhân viên BH"         Value="@(x=>x.SalesmanName)"/>
+                <GridColumn TItem="GenericReportRow" Title="CH Kế hoạch"    Value="@(x=>x.OutletMustVisit)" Align="end"/>
+                <GridColumn TItem="GenericReportRow" Title="Đã viếng thăm"       Value="@(x=>x.OutletVisited)" Align="end"/>
+                <GridColumn TItem="GenericReportRow" Title="Đơn hàng"    Value="@(x=>x.OrderCount)" Align="end"/>
+                <GridColumn TItem="GenericReportRow" Title="Doanh số"    Value="@(x=>x.TotalAmount)" Align="end"/>
+                <GridColumn TItem="GenericReportRow" Title="Doanh số MTD"      Value="@(x=>x.MTDTotalAmount)" Align="end"/>
+                <GridColumn TItem="GenericReportRow" Title="% Viếng thăm"        Value="@(x=>x.VisitMCP)" Align="end"/>
+                <GridColumn TItem="GenericReportRow" Title="% Có đơn"        Value="@(x=>x.SOMCP)" Align="end"/>
+                <GridColumn TItem="GenericReportRow" Title="LPPC"        Value="@(x=>x.LPPC)" Align="end"/>
+            </Columns>
+            <RowTemplate>
+                <td class="small">@r.STLvl0Name</td>
+                <td class="small">@r.STLvl1Name</td>
+                <td class="small">@r.DistributorName</td>
+                <td class="small font-monospace">@r.RouteCD</td>
+                <td class="small text-muted">@r.SalesSupName</td>
+                <td class="fw-semibold small">@r.SalesmanName</td>
+                <td class="text-end">@r.OutletMustVisit</td>
+                <td class="text-end @(r.OutletVisited>=r.OutletMustVisit&&r.OutletMustVisit>0?"text-success fw-bold":"")">@r.OutletVisited</td>
+                <td class="text-end">@r.OrderCount</td>
+                <td class="text-end small">@((r.TotalAmount/1_000_000m).ToString("N2"))M</td>
+                <td class="text-end small text-info">@((r.MTDTotalAmount/1_000_000m).ToString("N2"))M</td>
+                <td class="text-end"><span class="@(r.VisitMCP>=80?"text-success":r.VisitMCP>=50?"text-warning":"text-danger")">@r.VisitMCP.ToString("N1")%</span></td>
+                <td class="text-end small">@r.SOMCP.ToString("N1")%</td>
+                <td class="text-end small">@r.LPPC.ToString("N1")</td>
+            </RowTemplate>
+        </SortableGrid>
+    }
+</div>
+@code {
+    private List<GenericReportRow> _data=new(); private bool _loading; private string? _error;
+    private string _route="",_sup="";
+    private DateTime _from=DateTime.Today.AddDays(-30), _to=DateTime.Today;
+    private void ClearErr() => _error = null;
+    protected override void OnInitialized(){if(!Auth.IsLoggedIn)Nav.NavigateTo("/",replace:true);}
+    private async Task LoadAsync(){_loading=true;_error=null;
+        try{_data=await RptSvc.GetSummarySalesAsync(_from,_to,Auth.UserName,sup:_sup,route:_route);}
+        catch(Exception ex){_error=ex.Message;}finally{_loading=false;}}
+}

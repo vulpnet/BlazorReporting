@@ -1,0 +1,196 @@
+@page "/admin/security"
+@attribute [NavMenu(Title="Bảo mật hệ thống", Icon="bi-shield-lock-fill", Group="Quản trị", GroupOrder=90, Order=5)]
+@using BlazorReporting.Services
+@using BlazorReporting.Pages.Admin
+@using Dapper
+@using Microsoft.Data.SqlClient
+@inject AuthService Auth
+@inject AuditLogService Audit
+@inject DeviceSessionService DeviceSvc
+@inject NavigationManager Nav
+@inject IConfiguration Cfg
+
+<PageTitle>Security Dashboard</PageTitle>
+
+<div class="container-fluid mt-3">
+    <h5 class="mb-3">
+        <i class="bi bi-shield-lock-fill me-2 text-danger"></i>Security Dashboard
+        <span class="badge bg-danger ms-2 small">ISO 27001</span>
+    </h5>
+
+    @if (!string.IsNullOrEmpty(_msg))
+    {
+        <div class="alert alert-info py-2 alert-dismissible">@_msg
+            <button class="btn-close" @onclick="ClearMsg"></button>
+        </div>
+    }
+
+    <ul class="nav nav-tabs mb-3">
+        <li class="nav-item">
+            <button class="nav-link @(_tab==0?"active":"")" @onclick="()=>SetTab(0)">
+                <i class="bi bi-clock-history me-1"></i>Audit Log
+            </button>
+        </li>
+        <li class="nav-item">
+            <button class="nav-link @(_tab==1?"active":"")" @onclick="()=>SetTab(1)">
+                <i class="bi bi-laptop me-1"></i>Active Sessions
+                @if (_sessions.Any()){<span class="badge bg-primary ms-1">@_sessions.Count</span>}
+            </button>
+        </li>
+    </ul>
+
+    @if (_tab == 0)
+    {
+        <div class="card shadow-sm mb-3">
+            <div class="card-body py-2">
+                <div class="d-flex gap-2 flex-wrap align-items-end">
+                    <div><label class="form-label small mb-1">Từ ngày</label>
+                        <input type="date" class="form-control form-control-sm" style="width:150px" @bind="_logFrom"/></div>
+                    <div><label class="form-label small mb-1">Đến ngày</label>
+                        <input type="date" class="form-control form-control-sm" style="width:150px" @bind="_logTo"/></div>
+                    <div><label class="form-label small mb-1">Loại sự kiện</label>
+                        <select class="form-select form-select-sm" style="width:180px" @bind="_logEvent">
+                            <option value="">Tat ca</option>
+                            <option value="LOGIN">Login</option>
+                            <option value="LOGOUT">Logout</option>
+                            <option value="SESSION_TIMEOUT">Session Timeout</option>
+                            <option value="SESSION_KICKED">Session Kicked</option>
+                        </select></div>
+                    <div><label class="form-label small mb-1">Username</label>
+                        <input class="form-control form-control-sm" style="width:150px" @bind="_logUser" placeholder="Lọc..."/></div>
+                    <button class="btn btn-sm btn-primary" @onclick="LoadLogsAsync">
+                        <i class="bi bi-search me-1"></i>Xem
+                    </button>
+                    @if (_logs.Any()){<span class="text-muted small ms-1">@_logs.Count dong</span>}
+                </div>
+            </div>
+        </div>
+
+        @if (_loadingLog){<div class="text-center py-4"><span class="spinner-border text-primary"></span></div>}
+        else {
+            <SortableGrid Items="_logs" Context="r" MinWidth="1000px" DefaultPageSize="30">
+                <Columns>
+                    <GridColumn TItem="AuditLogRow" Title="Thời gian"  Value="@(x=>x.EventTime.ToString("dd/MM HH:mm:ss"))" Align="center" Filterable="false"/>
+                    <GridColumn TItem="AuditLogRow" Title="Username"   Value="@(x=>x.UserName)"/>
+                    <GridColumn TItem="AuditLogRow" Title="Sự kiện"    Value="@(x=>x.EventType)"/>
+                    <GridColumn TItem="AuditLogRow" Title="Chi tiết"   Value="@(x=>x.Detail)"/>
+                    <GridColumn TItem="AuditLogRow" Title="IP"         Value="@(x=>x.IpAddress)" Align="center"/>
+                    <GridColumn TItem="AuditLogRow" Title="Kết quả"    Value="@(x=>x.IsSuccess?"OK":"FAIL")" Align="center"/>
+                </Columns>
+                <RowTemplate>
+                    <td class="text-center small font-monospace">@r.EventTime.ToString("dd/MM HH:mm:ss")</td>
+                    <td class="small fw-semibold">@r.UserName</td>
+                    <td>
+                        <span class="badge @GetEventBadge(r.EventType)" style="font-size:.7rem">@r.EventType</span>
+                    </td>
+                    <td class="small">@r.Detail</td>
+                    <td class="text-center small font-monospace">@r.IpAddress</td>
+                    <td class="text-center">
+                        @if(r.IsSuccess){<i class="bi bi-check-circle-fill text-success"></i>}
+                        else{<i class="bi bi-x-circle-fill text-danger"></i>}
+                    </td>
+                </RowTemplate>
+            </SortableGrid>
+        }
+    }
+    else
+    {
+        <div class="d-flex align-items-center mb-3">
+            <input class="form-control form-control-sm me-2" style="width:200px"
+                   placeholder="Lọc tên đăng nhập..." value="@_sessionFilter"
+                   @oninput="e=>_sessionFilter=e.Value?.ToString()??string.Empty"/>
+            <button class="btn btn-sm btn-outline-secondary" @onclick="LoadSessionsAsync">
+                <i class="bi bi-arrow-clockwise me-1"></i>Refresh
+            </button>
+        </div>
+
+        @if (_loadingSession){<div class="text-center py-4"><span class="spinner-border text-primary"></span></div>}
+        else {
+            <SortableGrid Items="FilteredSessions" Context="s" MinWidth="800px" DefaultPageSize="20">
+                <Columns>
+                    <GridColumn TItem="SessionRow" Title="Username"   Value="@(x=>x.UserName)"/>
+                    <GridColumn TItem="SessionRow" Title="IP"         Value="@(x=>x.IpAddress)" Align="center"/>
+                    <GridColumn TItem="SessionRow" Title="Đăng nhập lúc"  Value="@(x=>x.LoginTime.ToLocalTime().ToString("dd/MM HH:mm"))" Align="center" Filterable="false"/>
+                    <GridColumn TItem="SessionRow" Title="Hoạt động"  Value="@(x=>x.LastActive.ToLocalTime().ToString("HH:mm:ss"))" Align="center" Filterable="false"/>
+                    <GridColumn TItem="SessionRow" Title="Thiết bị"   Value="@(x=>x.DeviceInfo)" Filterable="false"/>
+                </Columns>
+                <RowTemplate>
+                    <td class="fw-semibold small">@s.UserName</td>
+                    <td class="text-center small">@s.IpAddress</td>
+                    <td class="text-center small">@s.LoginTime.ToLocalTime().ToString("dd/MM HH:mm")</td>
+                    <td class="text-center small">@s.LastActive.ToLocalTime().ToString("HH:mm:ss")</td>
+                    <td class="small text-muted" style="max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="@s.DeviceInfo">@s.DeviceInfo</td>
+                </RowTemplate>
+                <ActionColumn Context="s">
+                    <button class="btn btn-xs btn-outline-danger" title="Kick session"
+                            @onclick="()=>KickAsync(s.SessionID, s.UserName)">
+                        <i class="bi bi-x-circle"></i>
+                    </button>
+                </ActionColumn>
+            </SortableGrid>
+        }
+    }
+</div>
+
+@code {
+    private int _tab = 0;
+    private bool _loadingLog, _loadingSession;
+    private string _msg = "";
+    private void ClearMsg() => _msg = "";
+
+    private List<AuditLogRow> _logs = new();
+    private DateTime _logFrom = DateTime.Today.AddDays(-7), _logTo = DateTime.Today;
+    private string _logEvent = "", _logUser = "";
+
+    private List<SessionRow> _sessions = new();
+    private string _sessionFilter = "";
+    private IEnumerable<SessionRow> FilteredSessions =>
+        string.IsNullOrWhiteSpace(_sessionFilter) ? _sessions
+        : _sessions.Where(s => s.UserName.Contains(_sessionFilter, StringComparison.OrdinalIgnoreCase));
+
+    protected override async Task OnInitializedAsync()
+    {
+        // Cho phep Admin, SuperAdmin, dmsadmin xem Security Dashboard
+        var adminRoles = new[]{"Admin","SuperAdmin","dmsadmin","CallCenter"};
+        if (!Auth.IsLoggedIn || !adminRoles.Contains(Auth.Role, StringComparer.OrdinalIgnoreCase))
+        { Nav.NavigateTo("/", replace: true); return; }
+        await LoadLogsAsync();
+    }
+
+    private async Task SetTab(int t) { _tab = t; if (t == 1) await LoadSessionsAsync(); }
+
+    private async Task LoadLogsAsync()
+    {
+        _loadingLog = true;
+        await using var conn = new SqlConnection(Cfg.GetConnectionString("DefaultConnection"));
+        const string logSql = "SELECT TOP 500 EventTime,UserName,EventType,Page,Detail,IpAddress,IsSuccess FROM AppAuditLog WHERE EventTime>=@From AND EventTime<DATEADD(day,1,@To) AND (@Event='' OR EventType=@Event) AND (@User='' OR UserName LIKE '%'+@User+'%') ORDER BY EventTime DESC";
+        _logs = (await conn.QueryAsync<AuditLogRow>(logSql,
+            new { From=_logFrom, To=_logTo, Event=_logEvent, User=_logUser })).ToList();
+        _loadingLog = false;
+    }
+
+    private async Task LoadSessionsAsync()
+    {
+        _loadingSession = true;
+        await using var conn = new SqlConnection(Cfg.GetConnectionString("DefaultConnection"));
+        const string ssSql = "SELECT UserName, SessionID, DeviceInfo, IpAddress, LoginTime, LastActive FROM AppUserSession WHERE IsActive=1 ORDER BY LastActive DESC";
+        _sessions = (await conn.QueryAsync<SessionRow>(ssSql)).ToList();
+        _loadingSession = false;
+    }
+
+    private static string GetEventBadge(string et) => et switch
+    {
+        "LOGIN"           => "bg-success",
+        "LOGOUT"          => "bg-secondary",
+        "SESSION_TIMEOUT" => "bg-warning text-dark",
+        "SESSION_KICKED"  => "bg-danger",
+        _                 => "bg-info text-dark"
+    };
+
+    private async Task KickAsync(string sessionId, string targetUser)
+    {
+        await DeviceSvc.AdminRevokeAsync(sessionId, Auth.UserName);
+        _sessions.RemoveAll(s => s.SessionID == sessionId);
+        _msg = $"Da kick session cua {targetUser}";
+    }
+}

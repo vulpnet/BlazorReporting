@@ -1,0 +1,131 @@
+@page "/config/system"
+@attribute [NavMenu(Title="Tham số hệ thống", Icon="bi-gear-fill", Group="Cấu hình", GroupOrder=80, Order=30)]
+@using BlazorReporting.Services
+@inject AuthService Auth
+@inject ConfigService CfgSvc
+@inject NavigationManager Nav
+
+<PageTitle>Tham số hệ thống</PageTitle>
+
+<div class="container-fluid mt-3">
+    <h5 class="mb-3"><i class="bi bi-gear-fill me-2"></i>Tham số hệ thống Calendar</h5>
+
+    @if (!string.IsNullOrEmpty(_msg))
+    {
+        <div class="alert @(_ok?"alert-success":"alert-danger") py-2 alert-dismissible">
+            @_msg <button class="btn-close" @onclick="ClearMsg"></button>
+        </div>
+    }
+
+    @if (_loading)
+    {
+        <div class="text-center py-4"><span class="spinner-border text-primary"></span></div>
+    }
+    else
+    {
+        <SortableGrid Items="_settings" Context="s" MinWidth="600px" DefaultPageSize="20">
+            <ToolbarContent>
+                <button class="btn btn-sm btn-primary" @onclick="OpenAdd">
+                    <i class="bi bi-plus-lg me-1"></i>Thêm tham số
+                </button>
+            </ToolbarContent>
+            <Columns>
+                <GridColumn TItem="SystemSettingRow" Title="ID"    Value="@(x => x.ID)" />
+                <GridColumn TItem="SystemSettingRow" Title="Mô tả" Value="@(x => x.Desr)" />
+                <GridColumn TItem="SystemSettingRow" Title="Giá trị số" Value="@(x => x.Number)" Align="end" />
+            </Columns>
+            <RowTemplate>
+                <td class="font-monospace"><strong>@s.ID</strong></td>
+                <td>@s.Desr</td>
+                <td class="text-end">@s.Number</td>
+            </RowTemplate>
+            <ActionColumn Context="s">
+                <button class="btn btn-xs btn-outline-primary" @onclick="()=>OpenEdit(s)">
+                    <i class="bi bi-pencil"></i>
+                </button>
+            </ActionColumn>
+        </SortableGrid>
+    }
+</div>
+
+@if (_showModal)
+{
+    <div class="modal fade show d-block" tabindex="-1" style="background:rgba(0,0,0,.4)">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">@(_isAdd ? "Thêm tham số" : "Sửa — " + _fID)</h5>
+                    <button class="btn-close" @onclick="()=>_showModal=false"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="mb-2">
+                        <label class="form-label">ID *</label>
+                        <input class="form-control" @bind="_fID" disabled="@(!_isAdd)" />
+                    </div>
+                    <div class="mb-2">
+                        <label class="form-label">Mô tả</label>
+                        <input class="form-control" @bind="_fDesr" />
+                    </div>
+                    <div class="mb-2">
+                        <label class="form-label">Giá trị số</label>
+                        <input class="form-control" type="number" @bind="_fNumber" />
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button class="btn btn-secondary" @onclick="()=>_showModal=false">Hủy</button>
+                    <button class="btn btn-primary" @onclick="SaveAsync" disabled="@_saving">
+                        @if (_saving) { <span class="spinner-border spinner-border-sm me-1"></span> }
+                        Lưu
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+}
+
+@code {
+    private List<SystemSettingRow> _settings = new();
+    private bool _loading = true, _showModal, _saving, _ok, _isAdd;
+    private string _msg = "", _fID = "", _fDesr = "";
+    private int _fNumber;
+
+    private void ClearMsg() => _msg = "";
+
+    protected override async Task OnInitializedAsync()
+    {
+        if (!Auth.IsLoggedIn) { Nav.NavigateTo("/", replace: true); return; }
+        await LoadAsync();
+    }
+
+    private async Task LoadAsync()
+    {
+        _loading = true;
+        _settings = await CfgSvc.GetSystemSettingsAsync();
+        _loading = false;
+    }
+
+    private void OpenAdd()
+    {
+        _isAdd = true; _fID = ""; _fDesr = ""; _fNumber = 0;
+        _showModal = true;
+    }
+
+    private void OpenEdit(SystemSettingRow s)
+    {
+        _isAdd = false; _fID = s.ID; _fDesr = s.Desr; _fNumber = s.Number;
+        _showModal = true;
+    }
+
+    private async Task SaveAsync()
+    {
+        if (string.IsNullOrWhiteSpace(_fID)) { _ok=false; _msg="Vui lòng nhập ID."; return; }
+        _saving = true;
+        var row = new SystemSettingRow { ID=_fID, Desr=_fDesr, Number=_fNumber };
+        bool ok = _isAdd
+            ? await CfgSvc.AddSystemSettingAsync(row, Auth.UserName)
+            : await CfgSvc.UpdateSystemSettingAsync(row, Auth.UserName);
+        _ok = ok; _msg = ok ? "Lưu thành công." : "Có lỗi xảy ra.";
+        if (ok) _settings = await CfgSvc.GetSystemSettingsAsync();
+        _saving = false; _showModal = false;
+    }
+}

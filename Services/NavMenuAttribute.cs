@@ -11,4 +11,5 @@ public sealed class NavMenuAttribute : Attribute
     public string? Role { get; init; }
     public bool OpenInNewTab { get; init; }
     public string? Badge { get; init; }
+    public bool Hidden { get; init; }
 }

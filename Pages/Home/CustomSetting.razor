@@ -1,0 +1,168 @@
+@page "/home/custom-setting"
+@attribute [NavMenu(Title="Cài màu UI", Icon="bi-palette-fill", Group="Quản trị", GroupOrder=90, Order=50)]
+@using BlazorReporting.Services
+@inject AuthService Auth
+@inject DashboardService DashSvc
+@inject NavigationManager Nav
+
+<PageTitle>Cài đặt màu UI</PageTitle>
+
+<div class="container-fluid mt-3">
+    <h5 class="mb-3"><i class="bi bi-palette-fill me-2"></i>Cài đặt màu UI</h5>
+
+    @if (!string.IsNullOrEmpty(_msg))
+    {
+        <div class="alert @(_ok?"alert-success":"alert-danger") py-2 alert-dismissible">
+            @_msg <button class="btn-close" @onclick="ClearMsg"></button>
+        </div>
+    }
+
+    @if (_loading)
+    {
+        <div class="text-center py-4"><span class="spinner-border text-primary"></span></div>
+    }
+    else
+    {
+        <SortableGrid @ref="_grid" Items="_settings" Context="s" MinWidth="500px" DefaultPageSize="20">
+            <ToolbarContent>
+                <button class="btn btn-sm btn-primary" @onclick="OpenAdd">
+                    <i class="bi bi-plus-lg me-1"></i>Thêm
+                </button>
+            </ToolbarContent>
+            <Columns>
+                <GridColumn TItem="CustomColorSettingRow" Title="Tên setting" Value="@(x => x.SettingName)" />
+                <GridColumn TItem="CustomColorSettingRow" Title="Type"        Value="@(x => x.Type)" />
+                <GridColumn TItem="CustomColorSettingRow" Title="Từ"          Value="@(x => x.ValueFrom)" Align="end" />
+                <GridColumn TItem="CustomColorSettingRow" Title="Đến"         Value="@(x => x.ValueTo)"   Align="end" />
+                <GridColumn TItem="CustomColorSettingRow" Title="Màu"         Value="@(x => x.Color)"     Align="center" Filterable="false" />
+            </Columns>
+            <RowTemplate>
+                <td>@s.SettingName</td>
+                <td>@s.Type</td>
+                <td class="text-end">@s.ValueFrom?.ToString("N2")</td>
+                <td class="text-end">@s.ValueTo?.ToString("N2")</td>
+                <td class="text-center">
+                    <span class="badge" style="background:@s.Color;min-width:70px">@s.Color</span>
+                </td>
+            </RowTemplate>
+            <ActionColumn Context="s">
+                <button class="btn btn-xs btn-outline-primary me-1" @onclick="()=>OpenEdit(s)">
+                    <i class="bi bi-pencil"></i>
+                </button>
+                <button class="btn btn-xs btn-outline-danger" @onclick="()=>DeleteAsync(s.ID)">
+                    <i class="bi bi-trash"></i>
+                </button>
+            </ActionColumn>
+        </SortableGrid>
+    }
+</div>
+
+@if (_showModal)
+{
+    <div class="modal fade show d-block" tabindex="-1" style="background:rgba(0,0,0,.4)">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">@(_editId==0?"Thêm setting":"Sửa setting")</h5>
+                    <button class="btn-close" @onclick="()=>_showModal=false"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="mb-2">
+                        <label class="form-label">Tên setting *</label>
+                        <input class="form-control" @bind="_fName" />
+                    </div>
+                    <div class="mb-2">
+                        <label class="form-label">Type *</label>
+                        <input class="form-control" @bind="_fType" placeholder="vd: Revenue, Visit..." />
+                    </div>
+                    <div class="row g-2 mb-2">
+                        <div class="col-6">
+                            <label class="form-label">Giá trị từ</label>
+                            <input class="form-control" type="number" @bind="_fFrom" />
+                        </div>
+                        <div class="col-6">
+                            <label class="form-label">Giá trị đến</label>
+                            <input class="form-control" type="number" @bind="_fTo" />
+                        </div>
+                    </div>
+                    <div class="mb-2">
+                        <label class="form-label">Màu (hex) *</label>
+                        <div class="d-flex gap-2 align-items-center">
+                            <input class="form-control" @bind="_fColor" placeholder="#FF0000" style="font-family:monospace" />
+                            <input type="color" class="form-control form-control-color"
+                                   value="@_fColor" @oninput="e => _fColor = e.Value?.ToString() ?? _fColor" />
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button class="btn btn-secondary" @onclick="()=>_showModal=false">Hủy</button>
+                    <button class="btn btn-primary" @onclick="SaveAsync" disabled="@_saving">
+                        @if (_saving) { <span class="spinner-border spinner-border-sm me-1"></span> }
+                        Lưu
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+}
+
+@code {
+    private SortableGrid<CustomColorSettingRow>? _grid;
+    private List<CustomColorSettingRow> _settings = new();
+    private bool _loading = true, _showModal, _saving;
+    private int _editId;
+    private string _fName="", _fType="", _fColor="#4CAF50", _msg="";
+    private decimal? _fFrom, _fTo;
+    private bool _ok;
+    private void ClearMsg() => _msg = "";
+
+    protected override async Task OnInitializedAsync()
+    {
+        if (!Auth.IsLoggedIn) { Nav.NavigateTo("/", replace: true); return; }
+        await LoadAsync();
+    }
+
+    private async Task LoadAsync()
+    {
+        _loading = true;
+        _settings = await DashSvc.GetColorSettingsAsync();
+        _loading = false;
+    }
+
+    private void OpenAdd()
+    {
+        _editId=0; _fName=""; _fType=""; _fColor="#4CAF50"; _fFrom=null; _fTo=null;
+        _showModal=true;
+    }
+
+    private void OpenEdit(CustomColorSettingRow s)
+    {
+        _editId=s.ID; _fName=s.SettingName; _fType=s.Type; _fColor=s.Color;
+        _fFrom=s.ValueFrom; _fTo=s.ValueTo; _showModal=true;
+    }
+
+    private async Task SaveAsync()
+    {
+        if (string.IsNullOrWhiteSpace(_fName)||string.IsNullOrWhiteSpace(_fColor))
+        { _ok=false; _msg="Vui lòng nhập đầy đủ thông tin."; return; }
+        _saving=true;
+        var row = new CustomColorSettingRow { ID=_editId, SettingName=_fName, Type=_fType, Color=_fColor, ValueFrom=_fFrom, ValueTo=_fTo };
+        if (_editId==0)
+        {
+            var added = await DashSvc.AddColorSettingAsync(row);
+            if (added!=null) { _settings.Add(added); _ok=true; _msg="Thêm thành công."; }
+        }
+        else
+        {
+            var ok = await DashSvc.UpdateColorSettingAsync(row);
+            if (ok) { var idx=_settings.FindIndex(x=>x.ID==_editId); if(idx>=0) _settings[idx]=row; _ok=true; _msg="Cập nhật thành công."; }
+        }
+        _saving=false; _showModal=false;
+    }
+
+    private async Task DeleteAsync(int id)
+    {
+        var ok = await DashSvc.DeleteColorSettingAsync(id);
+        if (ok) { _settings.RemoveAll(x=>x.ID==id); _ok=true; _msg="Đã xóa."; }
+    }
+}

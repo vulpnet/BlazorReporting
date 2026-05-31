@@ -1,0 +1,57 @@
+@page "/report/sales-daily"
+@attribute [NavMenu(Title="Doanh số ngày MTD", Icon="bi-calendar3", Group="Báo cáo", GroupOrder=20, Order=50)]
+@using BlazorReporting.Services
+@inject AuthService Auth
+@inject ReportService RptSvc
+@inject NavigationManager Nav
+<PageTitle>Sales Daily MTD</PageTitle>
+<div class="container-fluid mt-3">
+    <h5 class="mb-3"><i class="bi bi-calendar3 me-2"></i>Sales Daily MTD</h5>
+    <div class="card shadow-sm mb-3"><div class="card-body py-2">
+        <div class="d-flex gap-2 flex-wrap align-items-end">
+            <div><label class="form-label small mb-1">Từ ngày</label><input type="date" class="form-control form-control-sm" style="width:150px" @bind="_from"/></div>
+            <div><label class="form-label small mb-1">Đến ngày</label><input type="date" class="form-control form-control-sm" style="width:150px" @bind="_to"/></div>
+            <div><label class="form-label small mb-1">Tuyến</label><input class="form-control form-control-sm" style="width:150px" placeholder="RouteCD..." @bind="_route"/></div>
+            <div><label class="form-label small mb-1">Nhân viên BH</label><input class="form-control form-control-sm" style="width:140px" placeholder="SalesmanID..." @bind="_sm"/></div>
+            <button class="btn btn-sm btn-primary" @onclick="LoadAsync"><i class="bi bi-search me-1"></i>Xem</button>
+            @if (_data.Any()){<span class="text-muted small ms-2">@_data.Count dong</span>}
+        </div>
+    </div></div>
+    @if (_error!=null){<div class="alert alert-danger py-2 alert-dismissible">@_error<button class="btn-close" @onclick="ClearErr"></button></div>}
+    @if (_loading){<div class="text-center py-4"><span class="spinner-border text-primary"></span></div>}
+    else {
+        <SortableGrid Items="_data" Context="r" MinWidth="1000px" DefaultPageSize="20">
+            <Columns>
+                <GridColumn TItem="GenericReportRow" Title="Ngày"        Value="@(x=>x.VisitDate.HasValue?x.VisitDate.Value.ToString("dd/MM/yy"):"")" Align="center"/>
+                <GridColumn TItem="GenericReportRow" Title="Nhân viên BH"         Value="@(x=>x.SalesmanName)"/>
+                <GridColumn TItem="GenericReportRow" Title="Tuyến"       Value="@(x=>x.RouteCD)"/>
+                <GridColumn TItem="GenericReportRow" Title="NPP" Value="@(x=>x.DistributorName)"/>
+                <GridColumn TItem="GenericReportRow" Title="Doanh số"    Value="@(x=>x.TotalAmount)" Align="end"/>
+                <GridColumn TItem="GenericReportRow" Title="Doanh số MTD"      Value="@(x=>x.MTDTotalAmount)" Align="end"/>
+                <GridColumn TItem="GenericReportRow" Title="Đơn hàng"    Value="@(x=>x.OrderCount)" Align="end"/>
+                <GridColumn TItem="GenericReportRow" Title="SKU"         Value="@(x=>x.TotalSKU)" Align="end"/>
+                <GridColumn TItem="GenericReportRow" Title="MCP"         Value="@(x=>x.strIsMCP)" Align="center"/>
+            </Columns>
+            <RowTemplate>
+                <td class="text-center small">@(r.VisitDate.HasValue?r.VisitDate.Value.ToString("dd/MM/yy"):"—")</td>
+                <td class="fw-semibold small">@r.SalesmanName</td>
+                <td class="small font-monospace">@r.RouteCD</td>
+                <td class="small">@r.DistributorName</td>
+                <td class="text-end small">@((r.TotalAmount/1_000_000m).ToString("N2"))M</td>
+                <td class="text-end small text-info">@((r.MTDTotalAmount/1_000_000m).ToString("N2"))M</td>
+                <td class="text-end">@r.OrderCount</td>
+                <td class="text-end small">@r.TotalSKU.ToString("N0")</td>
+                <td class="text-center"><span class="badge @(r.strIsMCP=="IsRoute"?"bg-primary":"bg-secondary")" style="font-size:.65rem">@(r.strIsMCP=="IsRoute"?"Dung tuyen":"Ngoai")</span></td>
+            </RowTemplate>
+        </SortableGrid>
+    }
+</div>
+@code {
+    private List<GenericReportRow> _data=new(); private bool _loading; private string? _error;
+    private string _route="",_sm=""; private DateTime _from=DateTime.Today, _to=DateTime.Today;
+    private void ClearErr() => _error = null;
+    protected override void OnInitialized(){if(!Auth.IsLoggedIn)Nav.NavigateTo("/",replace:true);}
+    private async Task LoadAsync(){_loading=true;_error=null;
+        try{_data=await RptSvc.GetSalesDailyToMTDAsync(_from,_to,Auth.UserName,route:_route,salesmanId:_sm);}
+        catch(Exception ex){_error=ex.Message;}finally{_loading=false;}}
+}

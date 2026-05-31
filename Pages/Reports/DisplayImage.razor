@@ -1,0 +1,50 @@
+@page "/report/display-image"
+@attribute [NavMenu(Title="Hình ảnh trưng bày", Icon="bi-images", Group="Báo cáo", GroupOrder=20, Order=160)]
+@using BlazorReporting.Services
+@inject AuthService Auth
+@inject ReportService RptSvc
+@inject NavigationManager Nav
+<PageTitle>Display Image</PageTitle>
+<div class="container-fluid mt-3">
+    <h5 class="mb-3"><i class="bi bi-images me-2"></i>Display Image</h5>
+    <div class="card shadow-sm mb-3"><div class="card-body py-2">
+        <div class="d-flex gap-2 flex-wrap align-items-end">
+            <div><label class="form-label small mb-1">Từ ngày</label><input type="date" class="form-control form-control-sm" style="width:150px" @bind="_from"/></div>
+            <div><label class="form-label small mb-1">Đến ngày</label><input type="date" class="form-control form-control-sm" style="width:150px" @bind="_to"/></div>
+            <div><label class="form-label small mb-1">Giám sát</label><input class="form-control form-control-sm" style="width:140px" placeholder="Giám sát..." @bind="_sup"/></div>
+            <button class="btn btn-sm btn-primary" @onclick="LoadAsync"><i class="bi bi-search me-1"></i>Xem</button>
+            @if (_data.Any()){<span class="text-muted small ms-2">@_data.Count dong</span>}
+        </div>
+    </div></div>
+    @if (_error!=null){<div class="alert alert-danger py-2 alert-dismissible">@_error<button class="btn-close" @onclick="ClearErr"></button></div>}
+    @if (_loading){<div class="text-center py-4"><span class="spinner-border text-primary"></span></div>}
+    else {
+        <SortableGrid Items="_data" Context="r" MinWidth="900px" DefaultPageSize="20">
+            <Columns>
+                <GridColumn TItem="GenericReportRow" Title="Chương trình"     Value="@(x=>x.ProgramName)"/>
+                <GridColumn TItem="GenericReportRow" Title="Nhân viên BH"         Value="@(x=>x.SalesmanName)"/>
+                <GridColumn TItem="GenericReportRow" Title="Cửa hàng"      Value="@(x=>x.OutletName)"/>
+                <GridColumn TItem="GenericReportRow" Title="NPP" Value="@(x=>x.DistributorName)"/>
+                <GridColumn TItem="GenericReportRow" Title="Ngày"        Value="@(x=>x.VisitDate.HasValue?x.VisitDate.Value.ToString("dd/MM/yyyy"):"")" Align="center"/>
+                <GridColumn TItem="GenericReportRow" Title="Số ảnh"      Value="@(x=>x.ImageCount)" Align="center"/>
+            </Columns>
+            <RowTemplate>
+                <td class="small">@r.ProgramName</td>
+                <td class="small fw-semibold">@r.SalesmanName</td>
+                <td class="small">@r.OutletName</td>
+                <td class="small">@r.DistributorName</td>
+                <td class="text-center small">@(r.VisitDate.HasValue?r.VisitDate.Value.ToString("dd/MM/yyyy"):"—")</td>
+                <td class="text-center">@r.ImageCount</td>
+            </RowTemplate>
+        </SortableGrid>
+    }
+</div>
+@code {
+    private List<GenericReportRow> _data=new(); private bool _loading; private string? _error;
+    private string _sup=""; private DateTime _from=DateTime.Today.AddDays(-7), _to=DateTime.Today;
+    private void ClearErr() => _error = null;
+    protected override void OnInitialized(){if(!Auth.IsLoggedIn)Nav.NavigateTo("/",replace:true);}
+    private async Task LoadAsync(){_loading=true;_error=null;
+        try{_data=await RptSvc.GetDisplayImageByOutletAsync(_from,_to,Auth.UserName,supId:_sup);}
+        catch(Exception ex){_error=ex.Message;}finally{_loading=false;}}
+}

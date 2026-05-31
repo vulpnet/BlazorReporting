@@ -1,0 +1,108 @@
+@page "/mcp/detail"
+@attribute [NavMenu(Title="Chi tiết MCP", Icon="bi-geo-alt-fill", Group="MCP", GroupOrder=40, Order=20)]
+@using BlazorReporting.Services
+@inject AuthService Auth
+@inject MCPService McpSvc
+@inject NavigationManager Nav
+
+<PageTitle>Chi tiết MCP theo tuyến</PageTitle>
+
+<div class="container-fluid mt-3">
+    <h5 class="mb-3"><i class="bi bi-geo-alt-fill me-2"></i>Chi tiết MCP theo tuyến</h5>
+
+    @* Filter *@
+    <div class="card shadow-sm mb-3">
+        <div class="card-body py-2">
+            <div class="d-flex gap-2 align-items-end flex-wrap">
+                <div style="min-width:200px">
+                    <label class="form-label small mb-1">Mã tuyến (RouteCD) *</label>
+                    <input class="form-control form-control-sm" placeholder="VD: 100035.RM0004"
+                           @bind="_routeCD" @bind:event="oninput"
+                           @onkeydown="OnKeyDown" />
+                </div>
+                <div>
+                    <label class="form-label small mb-1">Loại hiển thị</label>
+                    <select class="form-select form-select-sm" style="width:150px" @bind="_typeAll">
+                        <option value="1">Chỉ MCP</option>
+                        <option value="0">Tất cả outlet</option>
+                    </select>
+                </div>
+                <button class="btn btn-sm btn-primary" @onclick="LoadAsync"
+                        disabled="@string.IsNullOrWhiteSpace(_routeCD)">
+                    <i class="bi bi-search me-1"></i>Xem
+                </button>
+            </div>
+        </div>
+    </div>
+
+    @if (_loading)
+    {
+        <div class="text-center py-4"><span class="spinner-border text-primary"></span></div>
+    }
+    else if (_searched)
+    {
+        <SortableGrid Items="_data" Context="r" MinWidth="900px" DefaultPageSize="20">
+            <Columns>
+                <GridColumn TItem="OutletMCPRow" Title="Mã cửa hàng"    Value="@(x => x.CustomerID)" />
+                <GridColumn TItem="OutletMCPRow" Title="Tuyến"        Value="@(x => x.RouteCD)" />
+                <GridColumn TItem="OutletMCPRow" Title="T2" Value="@(x => x.Monday)"    Align="center" Filterable="false" />
+                <GridColumn TItem="OutletMCPRow" Title="T3" Value="@(x => x.Tuesday)"   Align="center" Filterable="false" />
+                <GridColumn TItem="OutletMCPRow" Title="T4" Value="@(x => x.Wednesday)" Align="center" Filterable="false" />
+                <GridColumn TItem="OutletMCPRow" Title="T5" Value="@(x => x.Thursday)"  Align="center" Filterable="false" />
+                <GridColumn TItem="OutletMCPRow" Title="T6" Value="@(x => x.Friday)"    Align="center" Filterable="false" />
+                <GridColumn TItem="OutletMCPRow" Title="T7" Value="@(x => x.Saturday)"  Align="center" Filterable="false" />
+                <GridColumn TItem="OutletMCPRow" Title="CN" Value="@(x => x.Sunday)"    Align="center" Filterable="false" />
+                <GridColumn TItem="OutletMCPRow" Title="Tần suất" Value="@(x => x.Frequency)" Align="center" />
+                <GridColumn TItem="OutletMCPRow" Title="Trạng thái" Value="@(x => x.Status)" Align="center" />
+                <GridColumn TItem="OutletMCPRow" Title="Lần VT cuối" Value="@(x => x.LastVisitDate.HasValue ? x.LastVisitDate.Value.ToString("dd/MM/yyyy") : "")" Align="center" />
+            </Columns>
+            <RowTemplate>
+                <td class="font-monospace small">@r.CustomerID</td>
+                <td class="small text-muted">@r.RouteCD</td>
+                <td class="text-center">@DayBadge(r.Monday)</td>
+                <td class="text-center">@DayBadge(r.Tuesday)</td>
+                <td class="text-center">@DayBadge(r.Wednesday)</td>
+                <td class="text-center">@DayBadge(r.Thursday)</td>
+                <td class="text-center">@DayBadge(r.Friday)</td>
+                <td class="text-center">@DayBadge(r.Saturday)</td>
+                <td class="text-center">@DayBadge(r.Sunday)</td>
+                <td class="text-center"><span class="badge bg-secondary">@r.Frequency</span></td>
+                <td class="text-center">
+                    <span class="badge @(r.Status=="A"?"bg-success":"bg-secondary")">@r.Status</span>
+                </td>
+                <td class="text-center small">
+                    @(r.LastVisitDate.HasValue ? r.LastVisitDate.Value.ToString("dd/MM/yyyy") : "-")
+                </td>
+            </RowTemplate>
+        </SortableGrid>
+    }
+</div>
+
+@code {
+    private List<OutletMCPRow> _data = new();
+    private bool _loading, _searched;
+    private string _routeCD = "";
+    private int _typeAll = 1;
+
+    protected override void OnInitialized()
+    {
+        if (!Auth.IsLoggedIn) Nav.NavigateTo("/", replace: true);
+    }
+
+    private async Task LoadAsync()
+    {
+        _loading = true; _searched = false;
+        _data = await McpSvc.GetOutletMCPAsync(_routeCD.Trim(), typeAll: _typeAll);
+        _loading = false; _searched = true;
+    }
+
+    private async Task OnKeyDown(KeyboardEventArgs e)
+    {
+        if (e.Key == "Enter" && !string.IsNullOrWhiteSpace(_routeCD)) await LoadAsync();
+    }
+
+    private MarkupString DayBadge(int val) =>
+        val == 1
+            ? new MarkupString("<i class='bi bi-check-circle-fill text-success'></i>")
+            : new MarkupString("<span class='text-muted'>—</span>");
+}

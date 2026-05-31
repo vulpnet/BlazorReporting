@@ -9,6 +9,10 @@
 @inject ProtectedLocalStorage Store
 @inject IDataRepository Repo
 @inject NavMenuService MenuSvc
+@inject SessionSecurityService SessionSec
+@inject AuditLogService Audit
+@inject LocalizationService L10n
+@inject IJSRuntime JS
 @implements IDisposable
 
 @if (!Auth.IsInitialized)
@@ -21,6 +25,7 @@ else if (!Auth.IsLoggedIn)
 }
 else
 {
+    <CascadingValue Value="L10n" IsFixed="false">
     <div class="dm-shell @(_collapsed ? "is-collapsed" : "") @(_mobileOpen ? "is-mobile-open" : "")">
 
         <Sidebar Collapsed="_collapsed" CollapsedChanged="OnCollapsedChanged" OnLogout="LogoutAsync" />
@@ -42,13 +47,29 @@ else
                     @CurrentTitle
                 </div>
 
-                <a class="btn btn-sm btn-light border" href="/help" target="_blank" title="Hướng dẫn">
+                @* Language switcher *@
+                <div class="d-flex gap-1 align-items-center me-1">
+                    @foreach (var lang in new[]{ ("VI","🇻🇳"), ("EN","🇬🇧"), ("ID","🇮🇩") })
+                    {
+                        var code = lang.Item1; var flag = lang.Item2;
+                        <button class="btn btn-xs @(L10n.CurrentLang==code ? "btn-primary" : "btn-light border")"
+                                style="font-size:.72rem;padding:2px 6px;min-width:36px"
+                                title="@L10n.T("lang."+code)"
+                                @onclick="() => SwitchLang(code)">
+                            @flag
+                        </button>
+                    }
+                </div>
+
+                <a class="btn btn-sm btn-light border" href="/help" target="_blank" title="@L10n.T("topbar.guide")">
                     <i class="bi bi-question-circle"></i>
                 </a>
             </header>
 
             <main class="dm-content">
-                @Body
+                <AppErrorBoundary @ref="_errorBoundary">
+                    @Body
+                </AppErrorBoundary>
             </main>
 
             <footer class="dm-footer">
@@ -56,8 +77,9 @@ else
             </footer>
         </div>
     </div>
+    </CascadingValue>
 
-    <ChatWindow ReportLinks="@_reportLinks" />
+    <ChatWindow @ref="_chatWindow" ReportLinks="@_reportLinks" />
 }
 
 <div id="blazor-error-ui" class="alert alert-danger m-2"
@@ -69,6 +91,9 @@ else
     private IReadOnlyList<ChatNavLink> _reportLinks = [];
     private bool _collapsed;
     private bool _mobileOpen;
+    private AppErrorBoundary? _errorBoundary;
+    private DotNetObjectReference<MainLayout>? _jsRef; // S1
+    private ChatWindow? _chatWindow;
 
     private string CurrentTitle => CurrentItem()?.Title ?? "Trang chủ";
     private string CurrentGroup => CurrentItem()?.Group ?? "";
@@ -85,19 +110,89 @@ else
     protected override void OnInitialized()
     {
         Nav.LocationChanged += OnLocationChanged;
+        Auth.OnAuthChanged    += OnAuthChanged;
+        L10n.OnChanged        += OnLangChanged;
     }
+
+    // S1: bat dau/dung session monitor khi auth thay doi
+    private void OnAuthChanged()
+    {
+        if (Auth.IsLoggedIn)
+        {
+            SessionSec.Start();
+            // Hien loi chao khi login
+            InvokeAsync(async () =>
+            {
+                await Task.Delay(800); // cho layout render xong
+                if (_chatWindow is not null)
+                    await _chatWindow.ShowGreetingAsync();
+                StateHasChanged();
+            });
+        }
+        else
+        {
+            SessionSec.Stop();
+            InvokeAsync(StateHasChanged);
+        }
+    }
+
+    // S1: JS goi khi user co hoat dong
+    [JSInvokable]
+    public void JsRecordActivity() => SessionSec.RecordActivity();
 
     private void OnLocationChanged(object? s, Microsoft.AspNetCore.Components.Routing.LocationChangedEventArgs e)
     {
+        SessionSec.RecordActivity(); // S1: navigate = hoat dong
         _mobileOpen = false;
+        _errorBoundary?.Recover(); // reset lỗi khi navigate sang trang khác
         InvokeAsync(StateHasChanged);
     }
 
-    public void Dispose() => Nav.LocationChanged -= OnLocationChanged;
+    private void OnLangChanged() => InvokeAsync(StateHasChanged);
+
+    private async Task SwitchLang(string lang)
+    {
+        if (L10n.CurrentLang == lang) return;
+        try { await Store.SetAsync("dmspro_lang", lang); } catch { }
+        // Force reload dam bao tat ca component cap nhat voi ngon ngu moi
+        Nav.NavigateTo(Nav.Uri, forceLoad: true);
+    }
+
+    public void Dispose()
+    {
+        Nav.LocationChanged -= OnLocationChanged;
+        Auth.OnAuthChanged  -= OnAuthChanged;
+        L10n.OnChanged      -= OnLangChanged;
+        // S1: dung JS listener va session monitor
+        try { JS.InvokeVoidAsync("sessionInterop.stop"); } catch { }
+        _jsRef?.Dispose();
+        SessionSec.Stop();
+    }
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
         if (!firstRender) return;
+
+        // S1: dang ky JS listener theo doi hoat dong user
+        try
+        {
+            _jsRef = DotNetObjectReference.Create(this);
+            await JS.InvokeVoidAsync("sessionInterop.start", _jsRef);
+        }
+        catch { /* ignore nếu JS chưa sẵn sàng */ }
+
+        // Restore ngon ngu da luu — phai set truoc khi render cac component con
+        try
+        {
+            var savedLang = await Store.GetAsync<string>("dmspro_lang");
+            if (savedLang.Success && !string.IsNullOrEmpty(savedLang.Value)
+                && savedLang.Value != L10n.CurrentLang)
+            {
+                L10n.SetLang(savedLang.Value);
+                StateHasChanged(); // re-render topbar voi ngon ngu dung
+            }
+        }
+        catch { }
 
         if (!Auth.IsInitialized)
         {
@@ -170,13 +265,17 @@ else
                 drafts.Add((name, source, typeStr));
             }
 
-            var spTasks = drafts
-                .Where(d => d.TypeStr == "SP")
-                .ToDictionary(
-                    d => d.Source,
-                    d => Repo.GetSpParametersAsync(d.Source));
-
-            await Task.WhenAll(spTasks.Values);
+            // M1-FIX: batch 5 SP moi lan + timeout 20s tong the, tranh connection pool starvation
+            var spDrafts = drafts.Where(d => d.TypeStr == "SP").ToList();
+            var spTasks  = new Dictionary<string, Task<IReadOnlyList<BlazorReporting.Data.SpParameter>>>();
+            using var cts20 = new CancellationTokenSource(TimeSpan.FromSeconds(20));
+            foreach (var batch in spDrafts.Chunk(5))
+            {
+                var batchTasks = batch.Select(d => (d.Source, Task: Repo.GetSpParametersAsync(d.Source)));
+                try { await Task.WhenAll(batchTasks.Select(x => x.Task)); } catch { /* ignore batch timeout */ }
+                foreach (var (src, task) in batchTasks) spTasks[src] = task;
+                if (cts20.IsCancellationRequested) break;
+            }
 
             var links = drafts.Select(d =>
             {
@@ -217,6 +316,7 @@ else
 
     private async Task LogoutAsync()
     {
+        Audit.Log(Auth.UserName, AuditLogService.LOGOUT, fullName: Auth.FullName, role: Auth.Role); // S3
         try { await Store.DeleteAsync("dmspro_auth"); } catch { }
         Auth.Logout();
         Nav.NavigateTo("/");

@@ -27,10 +27,13 @@ public sealed class AuthService
         {
             const string sql = """
                 SELECT up.UserId, upi.FullName,
-                       m.Password AS HashedPassword
+                       m.Password AS HashedPassword,
+                       ISNULL(r.RoleName, 'User') AS RoleName
                 FROM   UserProfile up
                 JOIN   webpages_Membership m  ON m.UserId = up.UserId
                 LEFT JOIN UserProfileInfo upi ON upi.LoginID = up.UserName
+                LEFT JOIN RoleUser ru         ON ru.UserID = up.UserId
+                LEFT JOIN Role r              ON r.ID = ru.RoleID
                 WHERE  up.UserName = @UserName
                   AND  m.IsConfirmed = 1
                 """;
@@ -41,7 +44,7 @@ public sealed class AuthService
 
             if (!VerifyPassword(password, row.HashedPassword)) return false;
 
-            Apply(username.Trim(), row.FullName ?? username.Trim(), "User", initialized: true);
+            Apply(username.Trim(), row.FullName ?? username.Trim(), row.RoleName ?? "User", initialized: true);
             return true;
         }
         catch
@@ -112,8 +115,9 @@ public sealed class AuthService
 
     private sealed class UserRow
     {
-        public int    UserId        { get; init; }
-        public string? FullName     { get; init; }
+        public int    UserId         { get; init; }
+        public string? FullName      { get; init; }
         public string HashedPassword { get; init; } = "";
+        public string? RoleName      { get; init; }
     }
 }

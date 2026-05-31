@@ -1,0 +1,208 @@
+@page "/config/schedule-submit"
+@attribute [NavMenu(Title="Mở/Đóng lịch", Icon="bi-calendar-check-fill", Group="Cấu hình", GroupOrder=80, Order=40)]
+@using BlazorReporting.Services
+@inject AuthService Auth
+@inject ConfigService CfgSvc
+@inject NavigationManager Nav
+
+<PageTitle>Mở/Đóng ngày nộp lịch</PageTitle>
+
+<div class="container-fluid mt-3">
+    <h5 class="mb-3"><i class="bi bi-calendar-check-fill me-2"></i>Quản lý ngày nộp lịch</h5>
+
+    @* Filter *@
+    <div class="card shadow-sm mb-3">
+        <div class="card-body py-2">
+            <div class="d-flex gap-2 flex-wrap align-items-end">
+                <div>
+                    <label class="form-label small mb-1">Từ ngày</label>
+                    <input type="date" class="form-control form-control-sm" @bind="_fromDate" />
+                </div>
+                <div>
+                    <label class="form-label small mb-1">Đến ngày</label>
+                    <input type="date" class="form-control form-control-sm" @bind="_toDate" />
+                </div>
+                <div>
+                    <label class="form-label small mb-1">Loại ca</label>
+                    <select class="form-select form-select-sm" style="width:130px" @bind="_filterType">
+                        <option value="">Tất cả</option>
+                        <option value="AM">Sáng (AM)</option>
+                        <option value="PM">Chiều (PM)</option>
+                    </select>
+                </div>
+                <div>
+                    <label class="form-label small mb-1">Nhân viên</label>
+                    <input class="form-control form-control-sm" style="width:160px" placeholder="EmployeeID..." @bind="_filterEmp" />
+                </div>
+                <button class="btn btn-sm btn-primary" @onclick="LoadAsync">
+                    <i class="bi bi-search me-1"></i>Tìm
+                </button>
+                <button class="btn btn-sm btn-success ms-auto" @onclick="OpenAdd">
+                    <i class="bi bi-plus-lg me-1"></i>Mở ngày mới
+                </button>
+            </div>
+        </div>
+    </div>
+
+    @if (!string.IsNullOrEmpty(_msg))
+    {
+        <div class="alert @(_ok?"alert-success":"alert-danger") py-2 alert-dismissible">
+            @_msg <button class="btn-close" @onclick="ClearMsg"></button>
+        </div>
+    }
+
+    @if (_loading)
+    {
+        <div class="text-center py-4"><span class="spinner-border text-primary"></span></div>
+    }
+    else
+    {
+        <SortableGrid Items="_items" Context="r" MinWidth="700px" DefaultPageSize="20">
+            <Columns>
+                <GridColumn TItem="ScheduleSubmitRow" Title="Nhân viên"  Value="@(x => x.EmployeeID)" />
+                <GridColumn TItem="ScheduleSubmitRow" Title="Ngày"       Value="@(x => x.Date.ToString("dd/MM/yyyy"))" Align="center" />
+                <GridColumn TItem="ScheduleSubmitRow" Title="Ca"         Value="@(x => x.Type)" Align="center" />
+                <GridColumn TItem="ScheduleSubmitRow" Title="Ghi chú"    Value="@(x => x.Note)" />
+                <GridColumn TItem="ScheduleSubmitRow" Title="Giờ đóng"  Value="@(x => x.CloseTime)" Align="end" />
+                <GridColumn TItem="ScheduleSubmitRow" Title="Trạng thái" Value="@(x => x.Status == 0 ? "Mở" : "Đóng")" Align="center" />
+            </Columns>
+            <RowTemplate>
+                <td class="fw-semibold">@r.EmployeeID</td>
+                <td class="text-center">@r.Date.ToString("dd/MM/yyyy")</td>
+                <td class="text-center"><span class="badge @(r.Type=="AM"?"bg-info text-dark":"bg-warning text-dark")">@r.Type</span></td>
+                <td>@r.Note</td>
+                <td class="text-end">@r.CloseTime</td>
+                <td class="text-center">
+                    <span class="badge @(r.Status==0?"bg-success":"bg-secondary")">
+                        @(r.Status==0?"Mở":"Đóng")
+                    </span>
+                </td>
+            </RowTemplate>
+            <ActionColumn Context="r">
+                @if (r.Status == 0)
+                {
+                    <button class="btn btn-xs btn-outline-danger me-1" title="Đóng ngày" @onclick="()=>CloseAsync(r.ID)">
+                        <i class="bi bi-lock"></i>
+                    </button>
+                }
+                <button class="btn btn-xs btn-outline-secondary" title="Xóa" @onclick="()=>DeleteAsync(r.ID)">
+                    <i class="bi bi-trash"></i>
+                </button>
+            </ActionColumn>
+        </SortableGrid>
+    }
+</div>
+
+@if (_showModal)
+{
+    <div class="modal fade show d-block" tabindex="-1" style="background:rgba(0,0,0,.4)">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">Mở ngày nộp lịch</h5>
+                    <button class="btn-close" @onclick="()=>_showModal=false"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="row g-2">
+                        <div class="col-6">
+                            <label class="form-label">Nhân viên ID *</label>
+                            <input class="form-control" @bind="_fEmp" />
+                        </div>
+                        <div class="col-6">
+                            <label class="form-label">Ca *</label>
+                            <select class="form-select" @bind="_fType">
+                                <option value="AM">Sáng (AM)</option>
+                                <option value="PM">Chiều (PM)</option>
+                            </select>
+                        </div>
+                        <div class="col-6">
+                            <label class="form-label">Từ ngày *</label>
+                            <input type="date" class="form-control" @bind="_fFrom" />
+                        </div>
+                        <div class="col-6">
+                            <label class="form-label">Đến ngày *</label>
+                            <input type="date" class="form-control" @bind="_fTo" />
+                        </div>
+                        <div class="col-6">
+                            <label class="form-label">Giờ đóng (giờ) *</label>
+                            <input type="number" class="form-control" @bind="_fCloseTime" min="1" />
+                        </div>
+                        <div class="col-6">
+                            <label class="form-label">Ghi chú</label>
+                            <input class="form-control" @bind="_fNote" />
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button class="btn btn-secondary" @onclick="()=>_showModal=false">Hủy</button>
+                    <button class="btn btn-success" @onclick="SaveOpenAsync" disabled="@_saving">
+                        @if (_saving) { <span class="spinner-border spinner-border-sm me-1"></span> }
+                        Mở lịch
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+}
+
+@code {
+    private List<ScheduleSubmitRow> _items = new();
+    private bool _loading, _showModal, _saving, _ok;
+    private string _msg = "", _filterType = "", _filterEmp = "";
+    private DateTime _fromDate = DateTime.Today.AddDays(-7), _toDate = DateTime.Today;
+    private string _fEmp = "", _fType = "AM", _fNote = "";
+    private DateTime _fFrom = DateTime.Today, _fTo = DateTime.Today;
+    private int _fCloseTime = 1;
+
+    private void ClearMsg() => _msg = "";
+
+    protected override async Task OnInitializedAsync()
+    {
+        if (!Auth.IsLoggedIn) { Nav.NavigateTo("/", replace: true); return; }
+        await LoadAsync();
+    }
+
+    private async Task LoadAsync()
+    {
+        _loading = true;
+        _items = await CfgSvc.GetScheduleSubmitsAsync(_filterEmp, _fromDate, _toDate, _filterType);
+        _loading = false;
+    }
+
+    private void OpenAdd()
+    {
+        _fEmp=""; _fType="AM"; _fNote=""; _fFrom=DateTime.Today; _fTo=DateTime.Today; _fCloseTime=1;
+        _showModal=true;
+    }
+
+    private async Task SaveOpenAsync()
+    {
+        if (string.IsNullOrWhiteSpace(_fEmp) || _fCloseTime < 1)
+        { _ok=false; _msg="Vui lòng nhập đầy đủ thông tin."; return; }
+
+        _saving = true;
+        int opened = 0;
+        for (var d = _fFrom; d <= _fTo; d = d.AddDays(1))
+        {
+            var row = new ScheduleSubmitRow { EmployeeID=_fEmp, Date=d, Type=_fType, Note=_fNote, CloseTime=_fCloseTime };
+            if (await CfgSvc.OpenScheduleAsync(row, Auth.UserName)) opened++;
+        }
+        _ok=true; _msg=$"Đã mở {opened} ngày thành công.";
+        _items = await CfgSvc.GetScheduleSubmitsAsync(_filterEmp, _fromDate, _toDate, _filterType);
+        _saving=false; _showModal=false;
+    }
+
+    private async Task CloseAsync(int id)
+    {
+        var ok = await CfgSvc.CloseScheduleAsync(id, Auth.UserName);
+        _ok=ok; _msg= ok ? "Đã đóng ngày." : "Có lỗi.";
+        if (ok) { var idx=_items.FindIndex(x=>x.ID==id); if(idx>=0) _items[idx].Status=1; }
+    }
+
+    private async Task DeleteAsync(int id)
+    {
+        var ok = await CfgSvc.DeleteScheduleAsync(id);
+        _ok=ok; _msg= ok ? "Đã xóa." : "Có lỗi.";
+        if (ok) _items.RemoveAll(x=>x.ID==id);
+    }
+}

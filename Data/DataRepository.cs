@@ -1,5 +1,6 @@
 using System.Data;
 using Microsoft.Data.SqlClient;
+using Microsoft.Extensions.Caching.Memory;
 using BlazorReporting.Data.Models;
 using BlazorReporting.Models;
 using BlazorReporting.Services;
@@ -12,14 +13,16 @@ public sealed class DataRepository : IDataRepository
     private readonly ILogger<DataRepository> _log;
     private readonly IConfiguration _cfg;
     private readonly AuthService _auth;
+    private readonly IMemoryCache _cache; // H3: cache location tree
 
-    public DataRepository(IConfiguration cfg, ILogger<DataRepository> log, AuthService auth)
+    public DataRepository(IConfiguration cfg, ILogger<DataRepository> log, AuthService auth, IMemoryCache cache)
     {
         _cs  = cfg.GetConnectionString("DefaultConnection")
                ?? throw new InvalidOperationException("DefaultConnection not configured.");
         _cfg = cfg;
         _log = log;
         _auth = auth;
+        _cache = cache;
     }
 
     // Username hiện tại đăng nhập (dùng cho các SP cần @Username)
@@ -79,7 +82,13 @@ public sealed class DataRepository : IDataRepository
         await using var reader = await cmd.ExecuteReaderAsync(
             CommandBehavior.SequentialAccess, ct);
 
-        return await MaterializeAsync(reader, progress, ct);
+        // C1-FIX: gioi han 100K rows cho SP de tranh OOM
+        const int spMaxRows = 100_000;
+        var result = await MaterializeAsync(reader, progress, ct, maxRows: spMaxRows);
+        if (result.Count >= spMaxRows)
+            _log.LogWarning("[C1] FetchAllAsync SP={SP} dat gioi han {Max} rows. Co the mat data.",
+                config.Source, spMaxRows);
+        return result;
     }
 
     // ══════════════════════════════════════════════════════════════
@@ -169,9 +178,15 @@ public sealed class DataRepository : IDataRepository
     // GetSpParametersAsync
     // ══════════════════════════════════════════════════════════════
 
+    // M2-FIX: static cache — SP parameters khong thay doi trong runtime
+    private static readonly System.Collections.Concurrent.ConcurrentDictionary<string, IReadOnlyList<SpParameter>>
+        _spParamCache = new(StringComparer.OrdinalIgnoreCase);
+
     public async Task<IReadOnlyList<SpParameter>> GetSpParametersAsync(
         string spName, CancellationToken ct = default)
     {
+        if (_spParamCache.TryGetValue(spName, out var cached)) return cached;
+
         await using var conn = new SqlConnection(_cs);
         await conn.OpenAsync(ct);
 
@@ -192,6 +207,8 @@ public sealed class DataRepository : IDataRepository
                 reader.GetString(0).TrimStart('@'),
                 reader.GetString(1),
                 reader.GetBoolean(2)));
+
+        _spParamCache.TryAdd(spName, result);
         return result;
     }
 
@@ -304,26 +321,22 @@ public sealed class DataRepository : IDataRepository
         await using var conn = new SqlConnection(_cs);
         await conn.OpenAsync(ct);
 
-        // Row count (fast — uses COUNT_BIG to avoid int overflow)
-        using var countCmd = conn.CreateCommand();
-        countCmd.CommandText    = $"SELECT COUNT_BIG(1) FROM {src} {whereClause}";
-        countCmd.CommandTimeout = 60;
-        ApplyParams(countCmd, filterParms);
-        var total = (long)(await countCmd.ExecuteScalarAsync(ct))!;
-
-        // Data page
-        using var dataCmd = conn.CreateCommand();
-        dataCmd.CommandText = $"""
+        // H1-FIX: 1 batch SQL tra ve ca data lan total, giam 1 round-trip
+        using var cmd = conn.CreateCommand();
+        cmd.CommandText = $"""
+            SELECT COUNT_BIG(1) FROM {src} {whereClause};
             SELECT * FROM {src}
             {whereClause}
             ORDER BY {orderClause}
-            OFFSET {offset} ROWS FETCH NEXT {config.PageSize} ROWS ONLY
+            OFFSET {offset} ROWS FETCH NEXT {config.PageSize} ROWS ONLY;
             """;
-        dataCmd.CommandTimeout = 120;
-        ApplyParams(dataCmd, filterParms);
+        cmd.CommandTimeout = 120;
+        ApplyParams(cmd, filterParms);
 
-        await using var reader = await dataCmd.ExecuteReaderAsync(
-            CommandBehavior.SequentialAccess, ct);
+        await using var reader = await cmd.ExecuteReaderAsync(ct);
+        var total = 0L;
+        if (await reader.ReadAsync(ct)) total = reader.GetInt64(0);
+        await reader.NextResultAsync(ct);
         var items = await MaterializeAsync(reader, null, ct);
 
         return new PagedResult<Dictionary<string, object?>>
@@ -363,17 +376,17 @@ public sealed class DataRepository : IDataRepository
     private static async Task<List<Dictionary<string, object?>>> MaterializeAsync(
         SqlDataReader reader,
         IProgress<int>? progress,
-        CancellationToken ct)
+        CancellationToken ct,
+        int maxRows = int.MaxValue)
     {
-        // NOTE: SequentialAccess requires reading columns in order.
-        // We switch to Default for dictionary materialisation so we can
-        // access columns by name in any order after reading the schema.
         var schema  = reader.GetColumnSchema();
         var results = new List<Dictionary<string, object?>>();
         int count   = 0;
 
         while (await reader.ReadAsync(ct))
         {
+            if (count >= maxRows) break; // C1-FIX: hard stop
+
             var row = new Dictionary<string, object?>(schema.Count, StringComparer.OrdinalIgnoreCase);
             foreach (var col in schema)
             {
@@ -445,8 +458,17 @@ public sealed class DataRepository : IDataRepository
         {
             if (string.IsNullOrWhiteSpace(term)) continue;
             var p = $"@fw{i++}";
-            conditions.Add($"CAST([{Esc(col)}] AS NVARCHAR(MAX)) LIKE {p}");
-            parms[p] = $"%{term}%";
+            // C2-FIX: exact match dung = (co index), wildcard moi dung CAST/LIKE
+            if (term.StartsWith('='))
+            {
+                conditions.Add($"[{Esc(col)}] = {p}");
+                parms[p] = term[1..];
+            }
+            else
+            {
+                conditions.Add($"CAST([{Esc(col)}] AS NVARCHAR(MAX)) LIKE {p}");
+                parms[p] = $"%{term}%";
+            }
         }
 
         var clause = conditions.Count > 0
@@ -580,36 +602,12 @@ public sealed class DataRepository : IDataRepository
     public async Task<IReadOnlyList<SalesmanRoutePoint>> GetSalesmanRouteWithSalesAsync(
         string userName, DateTime date, CancellationToken ct = default)
     {
-        await using var conn = new SqlConnection(_cs);
-        await conn.OpenAsync(ct);
-
-        // Bước 1: lấy RouteCD + DistributorID (từ VisitPlanHistory, fallback OrderHeader)
+        // H5-FIX: bo buoc query RouteCD rieng (N+1) — pp_GetSmTracking_Local nhan SalesmanID truc tiep
         string? routeCD = null;
         int? distributorID = null;
 
-        const string routeSql = """
-            SELECT TOP 1 RouteID AS RouteCD, DistributorID
-            FROM VisitPlanHistory
-            WHERE CONVERT(date, VisitDate) = @Date AND SalesmanID = @SM
-            UNION ALL
-            SELECT TOP 1 RouteCD, DistributorID
-            FROM OrderHeader
-            WHERE CONVERT(date, VisitDate) = @Date AND SalesmanID = @SM
-            """;
-
-        using (var rc = conn.CreateCommand())
-        {
-            rc.CommandText    = routeSql;
-            rc.CommandTimeout = 15;
-            rc.Parameters.AddWithValue("@Date", date.Date);
-            rc.Parameters.AddWithValue("@SM",   userName);
-            await using var rr = await rc.ExecuteReaderAsync(ct);
-            if (await rr.ReadAsync(ct))
-            {
-                routeCD      = rr["RouteCD"]?.ToString();
-                distributorID= rr["DistributorID"] is DBNull ? null : Convert.ToInt32(rr["DistributorID"]);
-            }
-        }
+        await using var conn = new SqlConnection(_cs);
+        await conn.OpenAsync(ct);
 
         // Bước 2: load OrderHeader để có tên outlet, doanh số, thời gian
         var orderMap = new Dictionary<string, (string Name, string Address, string Route, decimal Amt, DateTime Start, DateTime? End)>(
@@ -643,27 +641,24 @@ public sealed class DataRepository : IDataRepository
                                  or["RouteCD"].ToString()!, Convert.ToDecimal(or["TotalAmt"]), start, end);
             }
         }
-        catch { /* optional */ }
+        catch (Exception ex) { _log.LogDebug(ex, "[M4] OrderHeader lookup optional step failed"); }
 
-        // Bước 3: pp_GetVisitSMTracking — GPS tracking tại từng outlet (giống DMS2.0)
+        // Bước 3: pp_GetSmTracking_Local — 75ms (vs pp_GetVisitSMTracking: 10s)
+        // Index: IX_OrderHeader_SM_Date, IX_SalesmanVisit_SM_Date
         var result = new List<SalesmanRoutePoint>();
         try
         {
             await using var cmd = conn.CreateCommand();
             cmd.CommandType    = CommandType.StoredProcedure;
-            cmd.CommandText    = "pp_GetVisitSMTracking";
-            cmd.CommandTimeout = 60;
-            cmd.Parameters.AddWithValue("@RouteCD",      string.IsNullOrEmpty(routeCD) ? DBNull.Value : (object)routeCD);
-            cmd.Parameters.AddWithValue("@DistributorID",distributorID.HasValue ? (object)distributorID.Value : DBNull.Value);
-            cmd.Parameters.AddWithValue("@VisitDate",    date.Date);
-            cmd.Parameters.AddWithValue("@UserName",     CurrentUser);
+            cmd.CommandText    = "pp_GetSmTracking_Local";
+            cmd.CommandTimeout = 15;
+            cmd.Parameters.AddWithValue("@SalesmanID",    userName);
+            cmd.Parameters.AddWithValue("@VisitDate",     date.Date);
+            cmd.Parameters.AddWithValue("@DistributorID", distributorID.HasValue ? (object)distributorID.Value : 0);
 
             await using var r = await cmd.ExecuteReaderAsync(ct);
             while (await r.ReadAsync(ct))
             {
-                var smId = r["SalesmanID"]?.ToString() ?? "";
-                if (!smId.Equals(userName, StringComparison.OrdinalIgnoreCase)) continue;
-
                 var lat = r["Latitude"]   is DBNull ? 0d : Convert.ToDouble(r["Latitude"]);
                 var lng = r["Longtitude"] is DBNull ? 0d : Convert.ToDouble(r["Longtitude"]);
                 if (lat == 0 && lng == 0) continue;
@@ -674,24 +669,30 @@ public sealed class DataRepository : IDataRepository
                     checktime = date.Date + t;
 
                 CustomerVisit? visit = null;
-                if (r["OutletID"] is not DBNull)
+                var oid = r["OutletID"]?.ToString() ?? "";
+                if (!string.IsNullOrEmpty(oid))
                 {
-                    var oid = r["OutletID"].ToString()!;
-                    orderMap.TryGetValue(oid, out var info);
+                    // SP moi co OutletName + TotalAmt truc tiep
+                    object nameObj; try { nameObj = r["OutletName"]; } catch { nameObj = DBNull.Value; }
+                    object amtObj;  try { amtObj  = r["TotalAmt"];   } catch { amtObj  = DBNull.Value; }
+                    var outletName = nameObj is not DBNull ? nameObj.ToString()! : oid;
+                    var amt        = amtObj  is not DBNull ? Convert.ToDecimal(amtObj) : 0m;
+                    // fallback orderMap neu can
+                    if (outletName == oid) { orderMap.TryGetValue(oid, out var info); if (info.Name != null) outletName = info.Name; }
                     visit = new CustomerVisit(
                         CustomerCD  : oid,
-                        LocationName: info.Name    ?? oid,
-                        RouteCode   : info.Route   ?? routeCD ?? "",
-                        OrderAmount : info.Amt,
-                        OrderDate   : info.Start != default ? info.Start : checktime,
-                        EndTime     : info.End,
-                        Address     : info.Address ?? "");
+                        LocationName: outletName,
+                        RouteCode   : routeCD ?? "",
+                        OrderAmount : amt,
+                        OrderDate   : checktime,
+                        EndTime     : null,
+                        Address     : "");
                 }
 
                 result.Add(new SalesmanRoutePoint(userName, checktime, lat, lng, visit));
             }
         }
-        catch { /* fallback bên dưới */ }
+        catch (Exception ex) { _log.LogDebug(ex, "[M4] SalesmanRoute primary step failed, using fallback"); }
 
         if (result.Count > 0)
             return result.OrderBy(p => p.Checktime).ToList();
@@ -1117,25 +1118,29 @@ public sealed class DataRepository : IDataRepository
                     GroupName : r["GroupName"].ToString()!,
                     SmCount   : Convert.ToInt32(r["SmCount"])));
         }
-        catch { /* ignore — groups are optional */ }
+        catch (Exception ex) { _log.LogDebug(ex, "[M4] SmGroups optional query failed"); }
         return result;
     }
 
     public async Task<SmLocationResult> GetSalesmanLocationsWithTreeAsync(DateTime date, CancellationToken ct = default)
     {
+        // H3-FIX: cache 15 phut theo date+user — trang thai GPS khong doi tung giay
+        var cacheKey = $"sm:locations:{CurrentUser}:{date:yyyyMMdd}";
+        if (_cache.TryGetValue(cacheKey, out SmLocationResult? cached) && cached is not null)
+            return cached;
+
         await using var conn = new SqlConnection(_cs);
         await conn.OpenAsync(ct);
 
         await using var cmd = conn.CreateCommand();
         cmd.CommandType    = CommandType.StoredProcedure;
-        cmd.CommandText    = "pp_GetSalemanLastLocation";
-        cmd.CommandTimeout = 60;
-        cmd.Parameters.AddWithValue("@Username",      CurrentUser);
-        cmd.Parameters.AddWithValue("@SalesupID",     "");
-        cmd.Parameters.AddWithValue("@DistributorID",  0);
-        cmd.Parameters.AddWithValue("@SalesmanID",    "");
-        cmd.Parameters.AddWithValue("@Date",          date.Date);
-        cmd.Parameters.AddWithValue("@Time",           0);
+        cmd.CommandText    = "pp_GetSmLocationForMap"; // nhanh hon 100x vs pp_GetSalemanLastLocation
+        cmd.CommandTimeout = 30;
+        cmd.Parameters.AddWithValue("@Username",       CurrentUser);
+        cmd.Parameters.AddWithValue("@Date",           date.Date);
+        cmd.Parameters.AddWithValue("@SalesupID",      "");
+        cmd.Parameters.AddWithValue("@DistributorID",   0);
+        cmd.Parameters.AddWithValue("@SalesmanID",     "");
 
         var locations = new List<SalesmanLocation>();
         var smGroups  = new Dictionary<string, SmGroupKeys>(StringComparer.OrdinalIgnoreCase);
@@ -1156,14 +1161,19 @@ public sealed class DataRepository : IDataRepository
             var lng    = r["Longtitude"] is DBNull ? 0d : Convert.ToDouble(r["Longtitude"]);
             var t0     = r["STLvl0CD"]?.ToString()   ?? "";
             var t1     = r["STLvl1CD"]?.ToString()   ?? "";
-            var t2     = r["STLvl2CD"]?.ToString()   ?? "";
+            object t2Obj; try { t2Obj = r["STLvl2CD"]; } catch { t2Obj = DBNull.Value; }
+            var t2     = t2Obj is DBNull ? "" : t2Obj?.ToString() ?? "";
             var ssId   = r["SaleSupID"]?.ToString()  ?? "";
             var ssName = r["SaleSupName"]?.ToString() ?? ssId;
-            var dId    = r["DistributorID"] is DBNull ? "" : r["DistributorID"].ToString()!;
+            object dIdObj; try { dIdObj = r["DistributorID"]; } catch { dIdObj = DBNull.Value; }
+            var dId    = dIdObj is DBNull ? "" : dIdObj.ToString()!;
             var dName  = r["DistributorName"]?.ToString() ?? dId;
             var rId    = r["RouteCD"]?.ToString()    ?? "";
             var rName  = r["RouteName"]?.ToString()  ?? rId;
-            var timeObj= r["LastSyncTime"];
+            // pp_GetSmLocationForMap: FirstSyncTime; pp_GetSalemanLastLocation: LastSyncTime
+            object timeObj;
+            try { timeObj = r["LastSyncTime"]; }
+            catch { try { timeObj = r["FirstSyncTime"]; } catch { timeObj = DBNull.Value; } }
 
             if (lat != 0 || lng != 0)
             {
@@ -1194,12 +1204,14 @@ public sealed class DataRepository : IDataRepository
         foreach (var (k,v) in dist)  nodes.Add(new SmTreeNode("distributor",k, v.Name, v.Pss,  v.Sms.Count));
         foreach (var (k,v) in route) nodes.Add(new SmTreeNode("route",      k, v.Name, v.Pdist,v.Sms.Count));
 
-        return new SmLocationResult
+        var result = new SmLocationResult
         {
             Locations = locations,
             Tree      = nodes,
             SmGroups  = smGroups
         };
+        _cache.Set(cacheKey, result, TimeSpan.FromMinutes(15)); // H3-FIX
+        return result;
     }
 
     public async Task<IReadOnlyList<SmTreeNode>> GetSmTreeAsync(DateTime date, CancellationToken ct = default)
@@ -1362,7 +1374,7 @@ public sealed class DataRepository : IDataRepository
             await using var cmd = conn.CreateCommand();
             cmd.CommandType    = CommandType.StoredProcedure;
             cmd.CommandText    = "pp_ReportSMVisitSummary";
-            cmd.CommandTimeout = 60;
+            cmd.CommandTimeout = 10; // gioi han 10s, outlier alert khong quan trong bang map load
             cmd.Parameters.AddWithValue("@FromDate",         date.Date);
             cmd.Parameters.AddWithValue("@ToDate",           date.Date);
             cmd.Parameters.AddWithValue("@Level1ID",         DBNull.Value);
@@ -1427,7 +1439,7 @@ public sealed class DataRepository : IDataRepository
                         lat, lng, endTime.Value));
             }
         }
-        catch { /* ignore */ }
+        catch (Exception ex) { _log.LogDebug(ex, "[M4] Outlier alert query failed, skipping"); }
 
         // ── 2. OrderHeader: ở quá lâu tại 1 outlet (>60 phút) ──
         try
@@ -1449,7 +1461,7 @@ public sealed class DataRepository : IDataRepository
 
             await using var cmd2 = conn.CreateCommand();
             cmd2.CommandText    = longStaySql;
-            cmd2.CommandTimeout = 30;
+            cmd2.CommandTimeout = 10;
             cmd2.Parameters.AddWithValue("@Date", date.Date);
 
             await using var r2 = await cmd2.ExecuteReaderAsync(ct);
@@ -1468,7 +1480,7 @@ public sealed class DataRepository : IDataRepository
                     lat, lng, startTime));
             }
         }
-        catch { /* ignore */ }
+        catch (Exception ex) { _log.LogDebug(ex, "[M4] Outlier alert query failed, skipping"); }
 
         return result;
     }
@@ -1481,8 +1493,9 @@ public sealed class DataRepository : IDataRepository
         await using var conn = new SqlConnection(_cs);
         await conn.OpenAsync(ct);
         await using var cmd = conn.CreateCommand();
-        cmd.CommandText = "SELECT Territory, RenderOrder, Lat, Lng FROM TerritoryPolygon ORDER BY Territory, RenderOrder";
-        await using var r = await cmd.ExecuteReaderAsync(ct);
+        cmd.CommandText    = "SELECT Territory, RenderOrder, Lat, Lng FROM TerritoryPolygon ORDER BY Territory, RenderOrder";
+        cmd.CommandTimeout = 10;
+        await using var r  = await cmd.ExecuteReaderAsync(ct);
         while (await r.ReadAsync(ct))
             result.Add(new TerritoryPolygonPoint(
                 Territory   : r["Territory"].ToString()!,

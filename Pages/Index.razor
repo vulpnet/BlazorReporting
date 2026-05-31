@@ -6,6 +6,9 @@
 @inject AuthService Auth
 @inject NavigationManager Nav
 @inject ProtectedLocalStorage Store
+@inject AuditLogService Audit
+@inject DeviceSessionService DeviceSvc
+@inject IJSRuntime JS
 
 <div class="login-page">
 
@@ -162,11 +165,14 @@
     private bool   _showPass;
     private bool   _focusUser;
     private bool   _focusPass;
+    private string? _deviceInfo; // S4: thu thap device info
 
     // Kiểm tra session ngầm sau khi render — không block UI
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
         if (!firstRender) return;
+        // S4: thu thap user agent de identify device
+        try { _deviceInfo = await JS.InvokeAsync<string>("eval", "navigator.userAgent"); } catch { }
         try
         {
             var result = await Store.GetAsync<AuthSession>("dmspro_auth");
@@ -194,16 +200,23 @@
 
         if (ok)
         {
+            Audit.Log(Auth.UserName, AuditLogService.LOGIN, detail: "Login thanh cong",
+                      fullName: Auth.FullName, role: Auth.Role); // S3
+            // S4: dang ky session, kick session cu neu qua 3 thiet bi
+            var sessionId = await DeviceSvc.RegisterSessionAsync(
+                Auth.UserName, _deviceInfo, Audit.GetClientIp());
             try
             {
                 await Store.SetAsync("dmspro_auth",
                     new AuthSession(Auth.UserName, Auth.FullName, Auth.Role));
+                await Store.SetAsync("dmspro_session", sessionId); // luu session ID
             }
             catch { }
             Nav.NavigateTo("/report", replace: true);
         }
         else
         {
+            Audit.Log(_username, AuditLogService.LOGIN, detail: "Login that bai", isSuccess: false); // S3
             _error    = true;
             _password = "";
             StateHasChanged();

@@ -1,0 +1,174 @@
+@page "/distribution/budget"
+@attribute [NavMenu(Title="Phân bổ Budget", Icon="bi-currency-dollar", Group="Phân phối", GroupOrder=30, Order=20)]
+@using BlazorReporting.Services
+@inject AuthService Auth
+@inject DistributionService DistSvc
+@inject NavigationManager Nav
+
+<PageTitle>Phân bổ Budget</PageTitle>
+
+<div class="container-fluid mt-3">
+    <h5 class="mb-3"><i class="bi bi-currency-dollar me-2"></i>Phân bổ Budget cho Nhân viên BH</h5>
+
+    @if (!string.IsNullOrEmpty(_msg))
+    {
+        <div class="alert @(_ok?"alert-success":"alert-danger") py-2 alert-dismissible">
+            @_msg <button class="btn-close" @onclick="ClearMsg"></button>
+        </div>
+    }
+
+    @if (_loading)
+    {
+        <div class="text-center py-4"><span class="spinner-border text-primary"></span></div>
+    }
+    else
+    {
+        <SortableGrid Items="_assigns" Context="r" MinWidth="900px" DefaultPageSize="20">
+            <ToolbarContent>
+                <button class="btn btn-sm btn-primary" @onclick="OpenAdd">
+                    <i class="bi bi-plus-lg me-1"></i>Phân bổ mới
+                </button>
+            </ToolbarContent>
+            <Columns>
+                <GridColumn TItem="BudgetAssignRow" Title="Nhân viên BH"          Value="@(x => x.SalesmanName)" />
+                <GridColumn TItem="BudgetAssignRow" Title="Giám sát"           Value="@(x => x.SalesSupName)" />
+                <GridColumn TItem="BudgetAssignRow" Title="Budget"       Value="@(x => x.BudgetName)" />
+                <GridColumn TItem="BudgetAssignRow" Title="Chỉ tiêu"     Value="@(x => x.Target)" Align="end" />
+                <GridColumn TItem="BudgetAssignRow" Title="Giá trị Budget" Value="@(x => x.BudgetValue)" Align="end" />
+            </Columns>
+            <RowTemplate>
+                <td class="fw-semibold">@r.SalesmanName <small class="text-muted">(@r.SalesmanCode)</small></td>
+                <td class="small text-muted">@r.SalesSupName</td>
+                <td><span class="badge bg-info text-dark">@r.BudgetName</span></td>
+                <td class="text-end">@r.Target.ToString("N0")</td>
+                <td class="text-end text-success fw-bold">@r.BudgetValue.ToString("N0")</td>
+            </RowTemplate>
+            <ActionColumn Context="r">
+                <button class="btn btn-xs btn-outline-success" title="Duyệt" @onclick="()=>ApproveAsync(r)">
+                    <i class="bi bi-check-circle"></i>
+                </button>
+            </ActionColumn>
+        </SortableGrid>
+    }
+</div>
+
+@if (_showModal)
+{
+    <div class="modal fade show d-block" tabindex="-1" style="background:rgba(0,0,0,.4)">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">Phân bổ Budget mới</h5>
+                    <button class="btn-close" @onclick="()=>_showModal=false"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="row g-2">
+                        <div class="col-6">
+                            <label class="form-label">Mã Nhân viên BH *</label>
+                            <input class="form-control" @bind="_fSalesmanCode" />
+                        </div>
+                        <div class="col-6">
+                            <label class="form-label">Tên Nhân viên BH</label>
+                            <input class="form-control" @bind="_fSalesmanName" />
+                        </div>
+                        <div class="col-6">
+                            <label class="form-label">Mã SS</label>
+                            <input class="form-control" @bind="_fSSCode" />
+                        </div>
+                        <div class="col-6">
+                            <label class="form-label">Tên SS</label>
+                            <input class="form-control" @bind="_fSSName" />
+                        </div>
+                        <div class="col-6">
+                            <label class="form-label">Budget *</label>
+                            <select class="form-select" @bind="_fBudgetCode">
+                                <option value="">-- Chọn Budget --</option>
+                                @foreach (var b in _budgets)
+                                {
+                                    <option value="@b.BudgetCode">@b.BudgetName</option>
+                                }
+                            </select>
+                        </div>
+                        <div class="col-6">
+                            <label class="form-label">Chỉ tiêu</label>
+                            <input class="form-control" type="number" @bind="_fTarget" />
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button class="btn btn-secondary" @onclick="()=>_showModal=false">Hủy</button>
+                    <button class="btn btn-primary" @onclick="SaveAsync" disabled="@_saving">
+                        @if (_saving) { <span class="spinner-border spinner-border-sm me-1"></span> }
+                        Lưu
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+}
+
+@code {
+    private List<BudgetAssignRow> _assigns = new();
+    private List<BudgetRow> _budgets = new();
+    private bool _loading = true, _showModal, _saving, _ok;
+    private string _msg = "", _fSalesmanCode = "", _fSalesmanName = "";
+    private string _fSSCode = "", _fSSName = "", _fBudgetCode = "";
+    private decimal _fTarget;
+
+    private void ClearMsg() => _msg = "";
+
+    protected override async Task OnInitializedAsync()
+    {
+        if (!Auth.IsLoggedIn) { Nav.NavigateTo("/", replace: true); return; }
+        await LoadAsync();
+    }
+
+    private async Task LoadAsync()
+    {
+        _loading = true;
+        var t1 = DistSvc.GetBudgetAssignsAsync(Auth.UserName);
+        var t2 = DistSvc.GetBudgetsAsync(Auth.UserName);
+        await Task.WhenAll(t1, t2);
+        _assigns = t1.Result;
+        _budgets  = t2.Result;
+        _loading = false;
+    }
+
+    private void OpenAdd()
+    {
+        _fSalesmanCode = ""; _fSalesmanName = ""; _fSSCode = ""; _fSSName = "";
+        _fBudgetCode = ""; _fTarget = 0;
+        _showModal = true;
+    }
+
+    private async Task SaveAsync()
+    {
+        if (string.IsNullOrWhiteSpace(_fSalesmanCode) || string.IsNullOrWhiteSpace(_fBudgetCode))
+        { _ok=false; _msg="Vui lòng nhập đầy đủ Nhân viên BH và Budget."; return; }
+
+        _saving = true;
+        var budget = _budgets.FirstOrDefault(b => b.BudgetCode == _fBudgetCode);
+        var row = new BudgetAssignRow
+        {
+            SalesmanCode = _fSalesmanCode, SalesmanName = _fSalesmanName,
+            SalesSupCode = _fSSCode,       SalesSupName = _fSSName,
+            BudgetCode   = _fBudgetCode,   BudgetName   = budget?.BudgetName ?? "",
+            BudgetValue  = budget?.Value ?? 0, Target = _fTarget
+        };
+        var (ok, msg) = await DistSvc.InsertBudgetAssignAsync(row, Auth.UserName);
+        _ok = ok; _msg = msg;
+        if (ok)
+        {
+            _assigns = await DistSvc.GetBudgetAssignsAsync(Auth.UserName);
+            _showModal = false;
+        }
+        _saving = false;
+    }
+
+    private async Task ApproveAsync(BudgetAssignRow r)
+    {
+        var (ok, msg) = await DistSvc.ApproveBudgetAsync(r.SalesmanCode, r.BudgetCode, Auth.UserName);
+        _ok = ok; _msg = msg;
+        if (ok) _assigns = await DistSvc.GetBudgetAssignsAsync(Auth.UserName);
+    }
+}

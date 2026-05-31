@@ -1,0 +1,61 @@
+@page "/report/user-mobility"
+@attribute [NavMenu(Title="Nhân viên BH dùng App", Icon="bi-phone-fill", Group="Báo cáo", GroupOrder=20, Order=150)]
+@using BlazorReporting.Services
+@inject AuthService Auth
+@inject ReportService RptSvc
+@inject NavigationManager Nav
+<PageTitle>User Mobility</PageTitle>
+<div class="container-fluid mt-3">
+    <h5 class="mb-3"><i class="bi bi-phone-fill me-2"></i>Bao cao Nhân viên BH su dung App Mobile</h5>
+    <div class="card shadow-sm mb-3"><div class="card-body py-2">
+        <div class="d-flex gap-2 flex-wrap align-items-end">
+            <div><label class="form-label small mb-1">Từ ngày</label><input type="date" class="form-control form-control-sm" style="width:150px" @bind="_from"/></div>
+            <div><label class="form-label small mb-1">Đến ngày</label><input type="date" class="form-control form-control-sm" style="width:150px" @bind="_to"/></div>
+            <button class="btn btn-sm btn-primary" @onclick="LoadAsync"><i class="bi bi-search me-1"></i>Xem</button>
+            @if (_data.Any()){<span class="text-muted small ms-2">@_data.Count dong</span>}
+        </div>
+    </div></div>
+    @if (_error!=null){<div class="alert alert-danger py-2 alert-dismissible">@_error<button class="btn-close" @onclick="ClearErr"></button></div>}
+    @if (_loading){<div class="text-center py-4"><span class="spinner-border text-primary"></span></div>}
+    else {
+        <SortableGrid Items="_data" Context="r" MinWidth="900px" DefaultPageSize="20">
+            <Columns>
+                <GridColumn TItem="GenericReportRow" Title="Mã NVBH"      Value="@(x=>x.SalesmanCD)"/>
+                <GridColumn TItem="GenericReportRow" Title="Tên NVBH"     Value="@(x=>x.SalesmanName)"/>
+                <GridColumn TItem="GenericReportRow" Title="Giám sát"          Value="@(x=>x.SalesSupName)"/>
+                <GridColumn TItem="GenericReportRow" Title="NPP" Value="@(x=>x.DistributorName)"/>
+                <GridColumn TItem="GenericReportRow" Title="Region"      Value="@(x=>x.STLvl0Name)"/>
+                <GridColumn TItem="GenericReportRow" Title="Area"        Value="@(x=>x.STLvl1Name)"/>
+                <GridColumn TItem="GenericReportRow" Title="SM"          Value="@(x=>x.SM)" Align="center"/>
+                <GridColumn TItem="GenericReportRow" Title="ASM/SS"      Value="@(x=>x.ASM)" Align="center"/>
+                <GridColumn TItem="GenericReportRow" Title="Dang ky"     Value="@(x=>x.Register)" Align="center"/>
+                <GridColumn TItem="GenericReportRow" Title="Dong bo"     Value="@(x=>x.IsSync)" Align="center"/>
+            </Columns>
+            <RowTemplate>
+                <td class="small font-monospace">@r.SalesmanCD</td>
+                <td class="fw-semibold small">@r.SalesmanName</td>
+                <td class="small text-muted">@r.SalesSupName</td>
+                <td class="small">@r.DistributorName</td>
+                <td class="small">@r.STLvl0Name</td>
+                <td class="small">@r.STLvl1Name</td>
+                <td class="text-center">@Check(r.SM)</td>
+                <td class="text-center">@Check(r.ASM)</td>
+                <td class="text-center">@Check(r.Register)</td>
+                <td class="text-center">@Check(r.IsSync)</td>
+            </RowTemplate>
+        </SortableGrid>
+    }
+</div>
+@code {
+    private List<GenericReportRow> _data=new(); private bool _loading; private string? _error;
+    private DateTime _from=DateTime.Today.AddDays(-30), _to=DateTime.Today;
+    private void ClearErr() => _error = null;
+    // SM/ASM = "X" means has role; Register/IsSync = "Y" means active
+    private MarkupString Check(string v) => v == "X" || v == "Y"
+        ? new MarkupString("<i class='bi bi-check-circle-fill text-success'></i>")
+        : new MarkupString("<i class='bi bi-x-circle text-secondary'></i>");
+    protected override void OnInitialized(){if(!Auth.IsLoggedIn)Nav.NavigateTo("/",replace:true);}
+    private async Task LoadAsync(){_loading=true;_error=null;
+        try{_data=await RptSvc.GetUserMobilityAsync(_from,_to,Auth.UserName);}
+        catch(Exception ex){_error=ex.Message;}finally{_loading=false;}}
+}

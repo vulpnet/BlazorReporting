@@ -1,0 +1,41 @@
+@typeparam TItem
+@implements IDisposable
+
+@* Column definition — dùng bên trong SortableGrid *@
+
+@code {
+    [CascadingParameter(Name = null)] private SortableGrid<TItem> Grid { get; set; } = null!;
+
+    [Parameter, EditorRequired] public string Title { get; set; } = "";
+
+    /// Hàm lấy giá trị để sort + filter (string hoặc IComparable)
+    [Parameter] public Func<TItem, object?>? Value { get; set; }
+
+    /// Alignment: "" | "end" | "center"
+    [Parameter] public string Align { get; set; } = "";
+
+    /// Có hiện filter row không (default true)
+    [Parameter] public bool Filterable { get; set; } = true;
+
+    // State
+    internal string FilterValue { get; set; } = "";
+
+    internal string GetString(TItem item)
+    {
+        if (Value is null) return "";
+        return Value(item)?.ToString() ?? "";
+    }
+
+    internal IComparable? GetComparable(TItem item)
+    {
+        if (Value is null) return null;
+        var v = Value(item);
+        return v as IComparable ?? v?.ToString();
+    }
+
+    protected override void OnInitialized()
+        => Grid.RegisterColumn(this);
+
+    public void Dispose()
+        => Grid.UnregisterColumn(this);
+}

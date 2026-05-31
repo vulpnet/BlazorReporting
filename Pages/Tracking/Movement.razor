@@ -1,0 +1,233 @@
+@page "/tracking"
+@attribute [NavMenu(Title="Theo dõi Nhân viên BH", Icon="bi-broadcast-pin", Group="Tracking", GroupOrder=35, Order=10, Hidden=true)]
+@using BlazorReporting.Services
+@using System.Text.Json
+@inject AuthService Auth
+@inject TrackingService TrkSvc
+@inject NavigationManager Nav
+@inject IJSRuntime JS
+@implements IAsyncDisposable
+
+<PageTitle>Theo dõi vị trí Nhân viên BH</PageTitle>
+
+<div class="container-fluid mt-3">
+    <h5 class="mb-3"><i class="bi bi-broadcast-pin me-2"></i>Theo dõi vị trí Nhân viên BH thực tế</h5>
+
+    @* Filter bar *@
+    <div class="card shadow-sm mb-3">
+        <div class="card-body py-2">
+            <div class="d-flex gap-2 flex-wrap align-items-end">
+                <div>
+                    <label class="form-label small mb-1">Ngày</label>
+                    <input type="date" class="form-control form-control-sm" style="width:150px" @bind="_date" />
+                </div>
+                <div>
+                    <label class="form-label small mb-1">SS (tùy chọn)</label>
+                    <input class="form-control form-control-sm" style="width:150px" placeholder="SalesupID..." @bind="_salesupId" />
+                </div>
+                <div>
+                    <label class="form-label small mb-1">Nhân viên BH (tùy chọn)</label>
+                    <input class="form-control form-control-sm" style="width:150px" placeholder="SalesmanID..." @bind="_salesmanId" />
+                </div>
+                <button class="btn btn-sm btn-primary" @onclick="LoadAsync">
+                    <i class="bi bi-search me-1"></i>Xem
+                </button>
+                @if (_data.Any())
+                {
+                    <span class="badge bg-info text-dark ms-2">@_data.Count Nhân viên BH</span>
+                    <span class="badge bg-success ms-1">@_data.Count(x => x.FirstSyncTime.HasValue) đã sync</span>
+                    <span class="badge bg-danger ms-1">@_data.Count(x => !x.FirstSyncTime.HasValue) chưa sync</span>
+                }
+            </div>
+        </div>
+    </div>
+
+    @if (!string.IsNullOrEmpty(_error))
+    {
+        <div class="alert alert-danger py-2">@_error</div>
+    }
+
+    <div class="row g-3">
+        @* Map *@
+        <div class="col-lg-8">
+            <div class="card shadow-sm">
+                <div class="card-header py-2 fw-semibold small d-flex align-items-center gap-2">
+                    <i class="bi bi-map me-1 text-primary"></i>Bản đồ vị trí
+                    @if (_loading) { <span class="spinner-border spinner-border-sm ms-2"></span> }
+                    <span class="text-muted small ms-auto">Click marker để xem chi tiết</span>
+                </div>
+                <div id="trackingMap" style="height:520px;border-radius:0 0 4px 4px"></div>
+            </div>
+        </div>
+
+        @* Danh sách Nhân viên BH *@
+        <div class="col-lg-4">
+            <div class="card shadow-sm h-100">
+                <div class="card-header py-2 fw-semibold small">
+                    <i class="bi bi-list-ul me-1"></i>Danh sách Nhân viên BH
+                </div>
+                <div style="overflow-y:auto;max-height:520px">
+                    @if (_data.Any())
+                    {
+                        @foreach (var sm in _data)
+                        {
+                            var hasGps = sm.Latitude.HasValue && sm.Latitude != 0;
+                            <div class="d-flex align-items-start gap-2 px-3 py-2 border-bottom @(_selected==sm.SalesmanID?"bg-light":"")"
+                                 style="cursor:pointer" @onclick="()=>SelectSM(sm)">
+                                <div class="mt-1">
+                                    @if (sm.FirstSyncTime.HasValue)
+                                    {
+                                        <i class="bi bi-circle-fill text-success" style="font-size:.6rem"></i>
+                                    }
+                                    else
+                                    {
+                                        <i class="bi bi-circle text-secondary" style="font-size:.6rem"></i>
+                                    }
+                                </div>
+                                <div style="min-width:0">
+                                    <div class="fw-semibold small text-truncate">@sm.SalesmanName</div>
+                                    <div class="text-muted" style="font-size:.72rem">@sm.SaleSupName</div>
+                                    <div class="text-muted" style="font-size:.7rem">@sm.RouteName</div>
+                                    @if (sm.FirstSyncTime.HasValue)
+                                    {
+                                        <div style="font-size:.7rem">
+                                            <span class="text-success">Sync: @sm.FirstSyncTime.Value.ToString("HH:mm")</span>
+                                            @if (!string.IsNullOrEmpty(sm.TimeVisit))
+                                            {
+                                                <span class="ms-2 text-primary">VT: @sm.TimeVisit</span>
+                                            }
+                                        </div>
+                                    }
+                                    @if (!hasGps)
+                                    {
+                                        <span class="badge bg-secondary" style="font-size:.65rem">Chưa có GPS</span>
+                                    }
+                                </div>
+                            </div>
+                        }
+                    }
+                    else if (_searched)
+                    {
+                        <div class="text-center text-muted py-4 small">Không có dữ liệu</div>
+                    }
+                </div>
+            </div>
+        </div>
+    </div>
+
+    @* Detail bảng dưới *@
+    @if (_data.Any())
+    {
+        <div class="mt-3">
+            <SortableGrid Items="_data" Context="r" MinWidth="1100px" DefaultPageSize="20">
+                <Columns>
+                    <GridColumn TItem="SMLocationRow" Title="Nhân viên BH"         Value="@(x => x.SalesmanName)" />
+                    <GridColumn TItem="SMLocationRow" Title="Giám sát"          Value="@(x => x.SaleSupName)" />
+                    <GridColumn TItem="SMLocationRow" Title="Tuyến"       Value="@(x => x.RouteCD)" />
+                    <GridColumn TItem="SMLocationRow" Title="NPP" Value="@(x => x.DistributorName)" />
+                    <GridColumn TItem="SMLocationRow" Title="Sync đầu"   Value="@(x => x.FirstSyncTime.HasValue ? x.FirstSyncTime.Value.ToString("HH:mm") : "Chưa")" Align="center" />
+                    <GridColumn TItem="SMLocationRow" Title="Sync cuối"  Value="@(x => x.LastSyncTime.HasValue ? x.LastSyncTime.Value.ToString("HH:mm") : "")" Align="center" />
+                    <GridColumn TItem="SMLocationRow" Title="KM"          Value="@(x => x.TotalDistance)" Align="end" />
+                    <GridColumn TItem="SMLocationRow" Title="T.gian VT"  Value="@(x => x.TimeVisit)" Align="center" />
+                    <GridColumn TItem="SMLocationRow" Title="T.gian di"  Value="@(x => x.TimeMove)" Align="center" />
+                    <GridColumn TItem="SMLocationRow" Title="Outlet hiện tại" Value="@(x => x.OutletName)" />
+                </Columns>
+                <RowTemplate>
+                    <td class="fw-semibold small">@r.SalesmanName</td>
+                    <td class="small text-muted">@r.SaleSupName</td>
+                    <td class="small font-monospace">@r.RouteCD</td>
+                    <td class="small">@r.DistributorName</td>
+                    <td class="text-center">
+                        @if (r.FirstSyncTime.HasValue)
+                        { <span class="badge bg-success">@r.FirstSyncTime.Value.ToString("HH:mm")</span> }
+                        else
+                        { <span class="badge bg-secondary">Chưa</span> }
+                    </td>
+                    <td class="text-center small">@(r.LastSyncTime.HasValue ? r.LastSyncTime.Value.ToString("HH:mm") : "—")</td>
+                    <td class="text-end small">@((r.TotalDistance/1000m).ToString("N1")) km</td>
+                    <td class="text-center small">@r.TimeVisit</td>
+                    <td class="text-center small">@r.TimeMove</td>
+                    <td class="small">@r.OutletName</td>
+                </RowTemplate>
+            </SortableGrid>
+        </div>
+    }
+</div>
+
+@code {
+    private List<SMLocationRow> _data = new();
+    private bool _loading, _searched;
+    private string _error = "", _selected = "";
+    private DateTime _date = DateTime.Today;
+    private string _salesupId = "", _salesmanId = "";
+    private bool _mapReady;
+
+    protected override async Task OnInitializedAsync()
+    {
+        if (!Auth.IsLoggedIn) { Nav.NavigateTo("/", replace: true); return; }
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            await JS.InvokeVoidAsync("mapInterop.init", "trackingMap");
+            _mapReady = true;
+            await LoadAsync();
+        }
+    }
+
+    private async Task LoadAsync()
+    {
+        _loading = true; _error = ""; _searched = false;
+        StateHasChanged();
+        try
+        {
+            _data = await TrkSvc.GetSMLastLocationAsync(Auth.UserName, _date, _salesupId, 0, _salesmanId);
+            _searched = true;
+            if (_mapReady) await PlotMarkersAsync();
+        }
+        catch (Exception ex) { _error = ex.Message; }
+        finally { _loading = false; }
+    }
+
+    private async Task PlotMarkersAsync()
+    {
+        try
+        {
+            await JS.InvokeVoidAsync("mapInterop.clearMarkers");
+            var withGps = _data.Where(x => x.Latitude.HasValue && x.Latitude != 0 &&
+                                           x.Longtitude.HasValue && x.Longtitude != 0).ToList();
+            if (!withGps.Any()) return;
+
+            foreach (var sm in withGps)
+            {
+                var label = sm.SalesmanName.Length > 0 ? sm.SalesmanName[0].ToString() : "?";
+                var color = sm.FirstSyncTime.HasValue ? "#16a34a" : "#6b7280";
+                var popup = $"<b>{sm.SalesmanName}</b><br/>{sm.SaleSupName}<br/>{sm.RouteCD}" +
+                            (sm.FirstSyncTime.HasValue ? $"<br/>Sync: {sm.FirstSyncTime:HH:mm}" : "<br/><i>Chưa sync</i>") +
+                            (!string.IsNullOrEmpty(sm.OutletName) ? $"<br/>Tại: {sm.OutletName}" : "");
+                await JS.InvokeVoidAsync("mapInterop.addMarker",
+                    (double)sm.Latitude!.Value, (double)sm.Longtitude!.Value,
+                    sm.SalesmanID, popup, color, label);
+            }
+            await JS.InvokeVoidAsync("mapInterop.fitMarkers");
+        }
+        catch { }
+    }
+
+    private async Task SelectSM(SMLocationRow sm)
+    {
+        _selected = sm.SalesmanID;
+        if (sm.Latitude.HasValue && sm.Latitude != 0 && _mapReady)
+        {
+            try { await JS.InvokeVoidAsync("mapInterop.flyTo", (double)sm.Latitude.Value, (double)sm.Longtitude!.Value, 15); }
+            catch { }
+        }
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        try { await JS.InvokeVoidAsync("mapInterop.destroy"); } catch { }
+    }
+}

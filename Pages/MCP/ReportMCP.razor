@@ -1,0 +1,92 @@
+@page "/mcp/report"
+@attribute [NavMenu(Title="Báo cáo MCP", Icon="bi-map-fill", Group="MCP", GroupOrder=40, Order=10)]
+@using BlazorReporting.Services
+@inject AuthService Auth
+@inject MCPService McpSvc
+@inject NavigationManager Nav
+
+<PageTitle>Báo cáo Customer MCP</PageTitle>
+
+<div class="container-fluid mt-3">
+    <h5 class="mb-3"><i class="bi bi-map-fill me-2"></i>Báo cáo Customer MCP</h5>
+
+    @* Filter *@
+    <div class="card shadow-sm mb-3">
+        <div class="card-body py-2">
+            <div class="d-flex gap-2 flex-wrap align-items-end">
+                <div>
+                    <label class="form-label small mb-1">Distributor</label>
+                    <select class="form-select form-select-sm" style="width:240px" @bind="_distId">
+                        <option value="0">-- Tất cả --</option>
+                        @foreach (var d in _distributors)
+                        {
+                            <option value="@d.DistributorID">@d.DistributorCode — @d.DistributorName</option>
+                        }
+                    </select>
+                </div>
+                <button class="btn btn-sm btn-primary" @onclick="LoadAsync">
+                    <i class="bi bi-search me-1"></i>Xem
+                </button>
+            </div>
+        </div>
+    </div>
+
+    @if (_loading)
+    {
+        <div class="text-center py-4"><span class="spinner-border text-primary"></span></div>
+    }
+    else
+    {
+        <SortableGrid Items="_data" Context="r" MinWidth="1000px" DefaultPageSize="20">
+            <Columns>
+                <GridColumn TItem="MCPReportRow" Title="Region"       Value="@(x => x.RegionName)" />
+                <GridColumn TItem="MCPReportRow" Title="Area"         Value="@(x => x.AreName)" />
+                <GridColumn TItem="MCPReportRow" Title="NPP"  Value="@(x => x.DistributorName)" />
+                <GridColumn TItem="MCPReportRow" Title="Tuyến"        Value="@(x => x.RouteName)" />
+                <GridColumn TItem="MCPReportRow" Title="Giám sát"           Value="@(x => x.SaleSupName)" />
+                <GridColumn TItem="MCPReportRow" Title="Nhân viên BH"          Value="@(x => x.SalesmanName)" />
+                <GridColumn TItem="MCPReportRow" Title="CH Trong tuyến" Value="@(x => x.CusomerInRoute)" Align="end" />
+                <GridColumn TItem="MCPReportRow" Title="CH Đã phủ"   Value="@(x => x.Covered)" Align="end" />
+                <GridColumn TItem="MCPReportRow" Title="% Coverage"   Value="@(x => x.CusomerInRoute > 0 ? x.Covered * 100m / x.CusomerInRoute : 0m)" Align="end" />
+            </Columns>
+            <RowTemplate>
+                <td class="small">@r.RegionName</td>
+                <td class="small">@r.AreName</td>
+                <td class="small">@r.DistributorName</td>
+                <td class="small">@r.RouteName</td>
+                <td class="small text-muted">@r.SaleSupName</td>
+                <td class="fw-semibold">@r.SalesmanName</td>
+                <td class="text-end">@r.CusomerInRoute</td>
+                <td class="text-end text-success">@r.Covered</td>
+                <td class="text-end">
+                    @{
+                        var pct = r.CusomerInRoute > 0 ? r.Covered * 100m / r.CusomerInRoute : 0m;
+                        var cls = pct >= 80 ? "text-success" : pct >= 50 ? "text-warning" : "text-danger";
+                    }
+                    <span class="@cls fw-semibold">@pct.ToString("N0")%</span>
+                </td>
+            </RowTemplate>
+        </SortableGrid>
+    }
+</div>
+
+@code {
+    private List<MCPReportRow>   _data = new();
+    private List<DistributorRow> _distributors = new();
+    private bool _loading;
+    private int  _distId;
+
+    protected override async Task OnInitializedAsync()
+    {
+        if (!Auth.IsLoggedIn) { Nav.NavigateTo("/", replace: true); return; }
+        _distributors = await McpSvc.GetDistributorsAsync();
+        await LoadAsync();
+    }
+
+    private async Task LoadAsync()
+    {
+        _loading = true;
+        _data = await McpSvc.GetReportMCPAsync(distributorId: _distId);
+        _loading = false;
+    }
+}

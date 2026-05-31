@@ -24,10 +24,11 @@
 
     <div class="dm-sidebar__search">
         <i class="bi bi-search"></i>
-        <input type="text" placeholder="Tìm menu..." @bind="_query" @bind:event="oninput" />
+        <input type="text" placeholder="Tìm menu..." value="@_query"
+               @oninput="OnSearch" />
         @if (!string.IsNullOrEmpty(_query))
         {
-            <button class="dm-search-clear" @onclick="() => _query = string.Empty">
+            <button class="dm-search-clear" @onclick="ClearSearch">
                 <i class="bi bi-x"></i>
             </button>
         }
@@ -36,22 +37,33 @@
     <nav class="dm-sidebar__nav">
         @foreach (var group in FilteredGroups())
         {
+            var isOpen = IsGroupOpen(group.Name);
             <div class="dm-nav-group">
-                <div class="dm-nav-group__label">@group.Name</div>
-                @foreach (var item in group.Items)
+                <div class="dm-nav-group__label @(isOpen ? "is-open" : "")"
+                     @onclick="() => ToggleGroup(group.Name)"
+                     style="cursor:pointer; user-select:none; display:flex; align-items:center; justify-content:space-between">
+                    <span>@group.Name</span>
+                    <i class="bi @(isOpen ? "bi-chevron-down" : "bi-chevron-right") ms-1"
+                       style="font-size:.7rem; opacity:.7; transition:transform .2s"></i>
+                </div>
+
+                @if (isOpen || !string.IsNullOrEmpty(_query))
                 {
-                    var active = IsActive(item.Href);
-                    <a class="dm-nav-item @(active ? "is-active" : "")"
-                       href="@item.Href"
-                       target="@(item.OpenInNewTab ? "_blank" : null)"
-                       title="@item.Title">
-                        <i class="bi @item.Icon"></i>
-                        <span class="dm-nav-item__text">@item.Title</span>
-                        @if (!string.IsNullOrEmpty(item.Badge))
-                        {
-                            <span class="dm-nav-badge">@item.Badge</span>
-                        }
-                    </a>
+                    @foreach (var item in group.Items)
+                    {
+                        var active = IsActive(item.Href);
+                        <a class="dm-nav-item @(active ? "is-active" : "")"
+                           href="@item.Href"
+                           target="@(item.OpenInNewTab ? "_blank" : null)"
+                           title="@item.Title">
+                            <i class="bi @item.Icon"></i>
+                            <span class="dm-nav-item__text">@item.Title</span>
+                            @if (!string.IsNullOrEmpty(item.Badge))
+                            {
+                                <span class="dm-nav-badge">@item.Badge</span>
+                            }
+                        </a>
+                    }
                 }
             </div>
         }
@@ -83,14 +95,36 @@
     private string _query = string.Empty;
     private IReadOnlyList<NavMenuGroup> _groups = Array.Empty<NavMenuGroup>();
 
+    // Track nhóm nào đang mở — mặc định mở nhóm chứa trang hiện tại
+    private HashSet<string> _openGroups = new();
+
     protected override void OnInitialized()
     {
         _groups = MenuSvc.GetMenu(Auth.Role);
         Nav.LocationChanged += OnLocationChanged;
+        OpenActiveGroup();
+    }
+
+    private void OpenActiveGroup()
+    {
+        var current = new Uri(Nav.Uri).AbsolutePath.TrimEnd('/');
+        foreach (var group in _groups)
+        {
+            if (group.Items.Any(i => string.Equals(i.Href.TrimEnd('/'), current, StringComparison.OrdinalIgnoreCase)))
+            {
+                _openGroups.Add(group.Name);
+                return;
+            }
+        }
+        // Mặc định mở group đầu tiên nếu không match
+        if (_groups.Any()) _openGroups.Add(_groups[0].Name);
     }
 
     private void OnLocationChanged(object? s, Microsoft.AspNetCore.Components.Routing.LocationChangedEventArgs e)
-        => InvokeAsync(StateHasChanged);
+    {
+        OpenActiveGroup();
+        InvokeAsync(StateHasChanged);
+    }
 
     public void Dispose() => Nav.LocationChanged -= OnLocationChanged;
 
@@ -100,6 +134,14 @@
         await CollapsedChanged.InvokeAsync(Collapsed);
     }
 
+    private void ToggleGroup(string name)
+    {
+        if (_openGroups.Contains(name)) _openGroups.Remove(name);
+        else _openGroups.Add(name);
+    }
+
+    private bool IsGroupOpen(string name) => _openGroups.Contains(name);
+
     private bool IsActive(string href)
     {
         var current = new Uri(Nav.Uri).AbsolutePath.TrimEnd('/');
@@ -107,6 +149,9 @@
         if (string.IsNullOrEmpty(target)) target = "/";
         return string.Equals(current, target, StringComparison.OrdinalIgnoreCase);
     }
+
+    private void OnSearch(ChangeEventArgs e) => _query = e.Value?.ToString() ?? "";
+    private void ClearSearch() => _query = string.Empty;
 
     private IEnumerable<NavMenuGroup> FilteredGroups()
     {

@@ -3,8 +3,11 @@
 @inject ChatHistoryService History
 @inject SurveyService      Survey
 @inject AuthService        Auth
+@inject NavMenuService     MenuSvc
+@inject LocalizationService L10n
 @inject IJSRuntime         JS
 @inject NavigationManager  Nav
+@implements IDisposable
 
 <div class="cw-root">
 
@@ -22,9 +25,11 @@
 
             @* ── HEADER ── *@
             <div class="cw-header">
-                <div class="cw-header-avatar"><i class="bi bi-robot"></i></div>
+                <div class="cw-header-avatar">
+                    <img src="images/dmspro-ai.svg" alt="DMSPro AI" style="width:36px;height:36px;object-fit:contain"/>
+                </div>
                 <div class="cw-header-info">
-                    <div class="cw-header-title">AI Assistant</div>
+                    <div class="cw-header-title">DMSPro AI</div>
                     <div class="cw-header-sub">
                         @if (_loadingModels)
                         {
@@ -47,10 +52,9 @@
 
                 @if (_models.Count > 0)
                 {
-                    <select class="cw-model-select" @bind="_selectedModel" title="Chọn model">
-                        @foreach (var m in _models)
-                        { <option value="@m.Name">@ShortName(m.Name)</option> }
-                    </select>
+                    <span class="cw-model-select" style="font-size:.7rem;opacity:.7;padding:2px 6px">
+                        @ShortName(_selectedModel)
+                    </span>
                 }
 
                 <div class="cw-header-actions">
@@ -70,7 +74,9 @@
                 @if (_messages.Count == 0 && !_showSurvey)
                 {
                     <div class="cw-empty">
-                        <div class="cw-empty-avatar"><i class="bi bi-robot"></i></div>
+                        <div class="cw-empty-avatar">
+                            <img src="images/dmspro-ai.svg" alt="DMSPro AI" style="width:72px;height:72px;object-fit:contain"/>
+                        </div>
                         <p class="cw-empty-title">Xin chào, @Auth.FullName! 👋</p>
                         <p class="cw-empty-sub">
                             Tôi có thể giúp bạn phân tích dữ liệu, điều hướng báo cáo hoặc bản đồ.
@@ -120,7 +126,7 @@
                     else
                     {
                         <div class="cw-row cw-row--ai">
-                            <div class="cw-ai-avatar"><i class="bi bi-robot"></i></div>
+                            <div class="cw-ai-avatar"><img src="images/dmspro-ai.svg" alt="DMSPro AI" style="width:28px;height:28px;object-fit:contain"/></div>
                             <div>
                                 <div class="cw-bubble cw-bubble--ai">
                                     @((MarkupString)FormatText(msg.Content))
@@ -146,7 +152,7 @@
                 @if (_busy)
                 {
                     <div class="cw-row cw-row--ai">
-                        <div class="cw-ai-avatar"><i class="bi bi-robot"></i></div>
+                        <div class="cw-ai-avatar"><img src="images/dmspro-ai.svg" alt="DMSPro AI" style="width:28px;height:28px;object-fit:contain"/></div>
                         <div class="cw-bubble cw-bubble--ai cw-bubble--typing">
                             <span></span><span></span><span></span>
                         </div>
@@ -157,7 +163,7 @@
                 @if (_showSurvey)
                 {
                     <div class="cw-row cw-row--ai">
-                        <div class="cw-ai-avatar"><i class="bi bi-robot"></i></div>
+                        <div class="cw-ai-avatar"><img src="images/dmspro-ai.svg" alt="DMSPro AI" style="width:28px;height:28px;object-fit:contain"/></div>
                         <div class="cw-survey-card">
                             <div class="cw-survey-title">
                                 <i class="bi bi-stars me-1 text-warning"></i>
@@ -212,7 +218,7 @@
                               @bind:event="oninput"
                               @onkeydown="OnKeyDown"
                               @onkeydown:preventDefault="@_suppressEnter"
-                              placeholder="@(_models.Count == 0 ? "Ollama chưa kết nối…" : "Nhập câu hỏi… (Enter gửi)")"
+                              placeholder="@(_models.Count == 0 ? "Ollama..." : L10n.T("ai.placeholder"))"
                               rows="1"
                               disabled="@(_busy || _models.Count == 0)"></textarea>
                     <button class="cw-send-btn @(!string.IsNullOrWhiteSpace(_input) && !_busy ? "cw-send-btn--active" : "")"
@@ -253,7 +259,8 @@
     private bool   _loadingModels;
     private bool   _historyLoaded;
     private string _input         = "";
-    private string _selectedModel = "";
+    private const  string FixedModel    = "qwen2.5:7b";
+    private string _selectedModel = FixedModel;
     private IReadOnlyList<OllamaModel>    _models   = [];
     private readonly List<DisplayMessage> _messages = [];
 
@@ -261,7 +268,14 @@
     private bool   _showSurvey;
     private int    _surveyScore    = 0;
     private string _surveyFeedback = "";
-    private int    _userMessageCount = 0;   // đếm lượt user gửi trong session này
+    private int    _userMessageCount = 0;
+
+    // Greeting state
+    private bool _greeted = false;
+
+    // Idle survey: sau 1h chua chat -> hoi cam nhan
+    private Timer? _idleSurveyTimer;
+    private DateTime _lastUserAction = DateTime.UtcNow;
 
     // ── System prompt ─────────────────────────────────────────
     private string SystemPrompt
@@ -280,36 +294,32 @@
                 sb.AppendLine();
             }
 
+            // Lay toan bo menu tu NavMenuService — bot biet chinh xac trang nao ton tai
             sb.AppendLine();
-            sb.AppendLine("=== CÁC TRANG TRONG HỆ THỐNG ===");
-            sb.AppendLine("[Bản đồ] bản đồ, map, vị trí, salesman, lộ trình");
-            sb.AppendLine($"  Không có ngày → /map | Hôm nay → /map?date={DateTime.Today:yyyy-MM-dd} | Ngày khác → /map?date=yyyy-MM-dd");
-            sb.AppendLine("[Hướng dẫn] hướng dẫn, help, trợ giúp → /help");
-            sb.AppendLine("[Báo cáo trống] → /report");
-
-            if (ReportLinks?.Count > 0)
+            sb.AppendLine("=== TOÀN BỘ TRANG TRONG HỆ THỐNG ===");
+            sb.AppendLine("(Dùng URL chính xác khi tạo NAVIGATE)");
+            var menuGroups = MenuSvc.GetMenu(Auth.Role);
+            foreach (var grp in menuGroups)
             {
-                sb.AppendLine();
-                sb.AppendLine("=== BÁO CÁO CÓ SẴN ===");
-                foreach (var r in ReportLinks)
-                {
-                    sb.Append($"• {r.Label}: {r.Url}");
-                    if (r.SpParams?.Count > 0)
-                    {
-                        var req = r.SpParams.Where(p => p.Required).Select(p => p.Name + "*");
-                        var opt = r.SpParams.Where(p => !p.Required).Select(p => p.Name);
-                        sb.Append($" | Params: {string.Join(", ", req.Concat(opt))}");
-                    }
-                    sb.AppendLine();
-                }
+                sb.AppendLine($"[{grp.Name}]");
+                foreach (var item in grp.Items)
+                    sb.AppendLine($"  • {item.Title} → {item.Href}");
             }
+
+            // Them cac trang dac biet co query param
+            sb.AppendLine("[Trang đặc biệt]");
+            sb.AppendLine($"  • Bản đồ hôm nay → /territory-map?date={DateTime.Today:yyyy-MM-dd}");
+            sb.AppendLine($"  • Bản đồ ngày khác → /territory-map?date=yyyy-MM-dd");
+            sb.AppendLine("  • Hướng dẫn → /help");
 
             sb.AppendLine();
             sb.AppendLine("=== QUY TẮC ĐIỀU HƯỚNG ===");
-            sb.AppendLine("A) Đủ thông tin → [NAVIGATE|<url kèm filter>|<tên button ngắn>]");
-            sb.AppendLine("B) Thiếu tham số bắt buộc (*) → Hỏi lại (1-2 thông tin quan trọng nhất)");
-            sb.AppendLine("C) Không filter / 'mặc định' / 'tất cả' → Navigate URL gốc");
-            sb.AppendLine("D) Trang tĩnh (map, help) → Navigate ngay");
+            sb.AppendLine("A) Hiểu rõ yêu cầu → tạo [NAVIGATE|<url>|<tên button>] ngay");
+            sb.AppendLine("B) Không chắc trang nào phù hợp → hỏi lại VÀ liệt kê 2-3 lựa chọn có nút NAVIGATE để user chọn");
+            sb.AppendLine("C) Yêu cầu mơ hồ → hỏi 1 câu làm rõ, sau đó navigate");
+            sb.AppendLine("D) Không cần filter → navigate URL gốc ngay");
+            sb.AppendLine("VÍ DỤ: User hỏi 'xem doanh số' → [NAVIGATE|/report/summary-sales|Tổng hợp doanh số]");
+            sb.AppendLine("VÍ DỤ: User hỏi 'báo cáo nào về nhân viên' → liệt kê và tạo NAVIGATE cho từng trang phù hợp");
 
             sb.AppendLine();
             sb.AppendLine("=== XỬ LÝ KHI NGƯỜI DÙNG KHÔNG HÀI LÒNG ===");
@@ -322,9 +332,59 @@
             sb.AppendLine("5. Kết thúc bằng câu hỏi nhẹ nhàng: hỏi người dùng muốn mình hỗ trợ như thế nào");
 
             sb.AppendLine();
-            sb.AppendLine("Trả lời bằng ngôn ngữ người dùng đang dùng.");
+            var langInstruction = L10n.CurrentLang switch
+            {
+                "EN" => "ALWAYS respond in English.",
+                "ID" => "SELALU jawab dalam Bahasa Indonesia.",
+                _    => "LUÔN trả lời bằng Tiếng Việt."
+            };
+            sb.AppendLine(langInstruction);
             return sb.ToString();
         }
+    }
+
+    // ── Greeting khi dang nhap ────────────────────────────────
+    /// Goi tu MainLayout sau khi auth thanh cong.
+    /// Template co dinh, khong can Ollama.
+    public async Task ShowGreetingAsync()
+    {
+        if (_greeted) return;
+        _greeted = true;
+
+        // Mo cua so chat
+        _open = true;
+        if (_models.Count == 0) await LoadModelsAsync();
+        if (!_historyLoaded)    await LoadHistoryAsync();
+
+        // Neu da co lich su hom nay thi khong chen loi chao
+        if (_messages.Count > 0) { StateHasChanged(); return; }
+
+        var greeting = BuildGreeting();
+        _messages.Add(new DisplayMessage { Role = "assistant", Content = greeting });
+        StateHasChanged();
+        await ScrollAsync();
+
+        // Bat dau timer kiem tra 1h idle -> hoi cam nhan
+        StartIdleSurveyTimer();
+    }
+
+    private string BuildGreeting()
+    {
+        var hour = DateTime.Now.Hour;
+        string timeKey, emojiKey;
+        if (hour < 12)      { timeKey = "ai.greeting_morning";   emojiKey = "ai.greeting_emoji_morning"; }
+        else if (hour < 18) { timeKey = "ai.greeting_afternoon"; emojiKey = "ai.greeting_emoji_afternoon"; }
+        else                { timeKey = "ai.greeting_evening";   emojiKey = "ai.greeting_emoji_evening"; }
+        var emoji    = L10n.T(emojiKey);
+        var timeOfDay= L10n.T(timeKey);
+        var sub      = L10n.T("ai.empty_sub");
+        var name     = Auth.FullName?.Split(' ').LastOrDefault() ?? Auth.UserName;
+        return L10n.CurrentLang switch
+        {
+            "EN" => $"{emoji} Good {timeOfDay}, **{name}**!\n\n{sub}",
+            "ID" => $"{emoji} Selamat {timeOfDay}, **{name}**!\n\n{sub}",
+            _    => $"{emoji} Chào {timeOfDay}, **{name}**!\n\n{sub}"
+        };
     }
 
     // ── Toggle & init ─────────────────────────────────────────
@@ -344,7 +404,10 @@
         try
         {
             _models = await Chatbot.GetModelsAsync();
-            if (_models.Count > 0) _selectedModel = _models[0].Name;
+            // Co dinh qwen2.5:7b, kiem tra co ton tai khong, fallback model dau neu khong co
+            _selectedModel = _models.Any(m => m.Name == FixedModel)
+                ? FixedModel
+                : (_models.Count > 0 ? _models[0].Name : FixedModel);
         }
         finally { _loadingModels = false; StateHasChanged(); }
     }
@@ -405,6 +468,7 @@
         _input = "";
         _busy  = true;
         _userMessageCount++;
+        _lastUserAction = DateTime.UtcNow; // reset idle timer
         _showSurvey = false;
         StateHasChanged();
         await ScrollAsync();
@@ -414,19 +478,26 @@
 
         try
         {
-            var history = _messages.Take(_messages.Count - 1)
-                                   .Select(m => m.ToApiMessage()).ToList();
-            var raw   = await Chatbot.SendAsync(_selectedModel, history, text, SystemPrompt);
-            var (clean, navs) = ParseNavigate(raw);
+            // OPTIM: Thu phat hien intent dieu huong nhanh (khong can LLM)
+            // Neu khop -> tra ket qua ngay, tranh round-trip ~3-5s
+            var fastResult = TryFastNavigate(text);
+            string raw;
+            if (fastResult != null)
+            {
+                raw = fastResult;
+            }
+            else
+            {
+                var history = _messages.Take(_messages.Count - 1)
+                                       .Select(m => m.ToApiMessage()).ToList();
+                raw = await Chatbot.SendAsync(_selectedModel, history, text, SystemPrompt);
+            }
 
+            var (clean, navs) = ParseNavigate(raw);
             var aiMsg = new DisplayMessage { Role = "assistant", Content = clean, NavActions = navs };
             _messages.Add(aiMsg);
 
-            // Lưu tin nhắn bot
             _ = History.SaveAsync(Auth.UserName, "assistant", clean, navs);
-
-            // Kiểm tra survey sau 4 lượt user gửi
-            if (_userMessageCount >= 4) await CheckSurveyAsync();
         }
         catch (Exception ex)
         {
@@ -533,6 +604,91 @@
         }
     }
 
+    // ── Fast Navigate — xu ly dieu huong khong can LLM ────────
+    // Khop keyword -> tra NAVIGATE string ngay (~0ms thay vi 3-5s)
+    private string? TryFastNavigate(string input)
+    {
+        var t = input.ToLower().Trim();
+        var today = DateTime.Today.ToString("yyyy-MM-dd");
+
+        // Lay danh sach menu de map dong
+        var allItems = MenuSvc.GetMenu(Auth.Role)
+            .SelectMany(g => g.Items)
+            .ToList();
+
+        // Uu tien khop chinh xac Title menu (case-insensitive)
+        foreach (var item in allItems)
+        {
+            if (t.Contains(item.Title.ToLower()) || t.Contains(item.Href.ToLower()))
+                return $"Mở **{item.Title}** cho bạn ngay! [NAVIGATE|{item.Href}|{item.Title}]";
+        }
+
+        // Keyword mapping nhanh cho cac cum tu pho bien
+        var keywords = new[]
+        {
+            // Dashboard
+            (new[]{"dashboard","tổng quan","tong quan","kpi tổng","home"}, "/dashboard", "Dashboard"),
+            // Reports
+            (new[]{"viếng thăm","vieng tham","visit","báo cáo vt","bao cao vt"}, "/report/visit", "Báo cáo viếng thăm"),
+            (new[]{"tổng hợp kpi","tong hop kpi","sm visit","visit summary"}, "/report/summary", "Tổng hợp KPI"),
+            (new[]{"tổng hợp doanh số","tong hop doanh so","summary sales","doanh số tổng"}, "/report/summary-sales", "Tổng hợp doanh số"),
+            (new[]{"doanh số ngày","doanh so ngay","daily mtd","mtd"}, "/report/sales-daily", "Doanh số ngày MTD"),
+            (new[]{"hiệu quả","hieu qua","sales effective"}, "/report/sales-effective", "Bán hàng hiệu quả"),
+            (new[]{"pc theo","pc nhân viên","pc by"}, "/report/pc-sm", "PC theo nhân viên"),
+            (new[]{"lý do viếng","ly do vieng","visit reason"}, "/report/visit-reason", "Lý do viếng thăm"),
+            (new[]{"3g offline","offline"}, "/report/3g-offline", "3G Offline"),
+            (new[]{"gps sai","gps không hợp lệ","outlet gps"}, "/report/outlet-invalid-location", "Outlet GPS"),
+            (new[]{"ch chưa vt","ch chua vt","chưa viếng","outlet not visit"}, "/report/outlet-not-visit-mcp", "CH chưa VT MCP"),
+            (new[]{"hình ảnh","hinh anh","display image","trưng bày"}, "/report/display-image", "Hình ảnh trưng bày"),
+            (new[]{"user log","nhật ký","nhat ky","user action"}, "/report/user-log", "Nhật ký người dùng"),
+            (new[]{"chấm công","cham cong","timekeeping"}, "/report/timekeeping", "Chấm công"),
+            (new[]{"mobility","dùng app","dung app","sử dụng app"}, "/report/user-mobility", "TDV dùng App"),
+            (new[]{"issues","vấn đề","van de","sự cố","su co"}, "/report/issues-full", "Báo cáo Issues"),
+            // Map
+            (new[]{"bản đồ","ban do","map","territory","vị trí"}, $"/territory-map?date={today}", "Bản đồ hôm nay"),
+            (new[]{"tracking","theo dõi","theo doi","giám sát di chuyển"}, "/tracking", "Theo dõi nhân viên"),
+            // MCP
+            (new[]{"mcp report","báo cáo mcp","bao cao mcp"}, "/mcp/report", "Báo cáo MCP"),
+            (new[]{"mcp detail","chi tiết mcp","chi tiet mcp"}, "/mcp/detail", "Chi tiết MCP"),
+            // Distribution
+            (new[]{"phân phối sku","phan phoi sku","distribution","sku"}, "/distribution", "Phân phối SKU"),
+            (new[]{"budget","ngân sách","ngan sach"}, "/distribution/budget", "Phân bổ Budget"),
+            // Admin
+            (new[]{"bảo mật","bao mat","security","audit log","session"}, "/admin/security", "Bảo mật hệ thống"),
+            (new[]{"người dùng","nguoi dung","user management"}, "/user", "Quản lý người dùng"),
+            (new[]{"role","quyền","quyen","phân quyền","phan quyen"}, "/account/roles", "Quản lý Role"),
+            // Help
+            (new[]{"hướng dẫn","huong dan","help","trợ giúp","tro giup"}, "/help", "Hướng dẫn"),
+        };
+
+        foreach (var (keys, url, label) in keywords)
+        {
+            if (keys.Any(k => t.Contains(k)))
+                return $"Mở **{label}** cho bạn ngay! [NAVIGATE|{url}|{label}]";
+        }
+
+        // Cau hoi liet ke bao cao -> tra nhanh khong can LLM
+        if (t.Contains("có báo cáo") || t.Contains("co bao cao") ||
+            t.Contains("báo cáo nào") || t.Contains("bao cao nao") ||
+            t.Contains("danh sách") || t.Contains("liệt kê"))
+        {
+            var reportItems = MenuSvc.GetMenu(Auth.Role)
+                .Where(g => g.Name == "Báo cáo")
+                .SelectMany(g => g.Items)
+                .ToList();
+            if (reportItems.Any())
+            {
+                var sb = new System.Text.StringBuilder();
+                sb.AppendLine("Hệ thống có các báo cáo sau:\n");
+                foreach (var item in reportItems)
+                    sb.AppendLine($"• {item.Title} [NAVIGATE|{item.Href}|{item.Title}]");
+                return sb.ToString();
+            }
+        }
+
+        return null; // Khong khop -> goi LLM
+    }
+
     // ── Navigate ──────────────────────────────────────────────
     private void NavigateTo(string url)
     {
@@ -559,6 +715,32 @@
     }
 
     private static string ShortName(string n) => n.Length > 22 ? n[..22] + "…" : n;
+
+    // ── Survey sau 1h ke tu khi mo chat ──────────────────────
+    private void StartIdleSurveyTimer()
+    {
+        _idleSurveyTimer?.Dispose();
+        // Hien survey chinh xac sau 1h ke tu khi goi StartIdleSurveyTimer (luc login/mo chat)
+        _idleSurveyTimer = new Timer(async _ =>
+        {
+            if (!_showSurvey)
+            {
+                await InvokeAsync(async () =>
+                {
+                    await CheckSurveyAsync();
+                    StateHasChanged();
+                });
+            }
+            // Chi chay 1 lan, huy timer
+            _idleSurveyTimer?.Dispose();
+            _idleSurveyTimer = null;
+        }, null, TimeSpan.FromHours(1), Timeout.InfiniteTimeSpan);
+    }
+
+    public void Dispose()
+    {
+        _idleSurveyTimer?.Dispose();
+    }
 
     private static (string text, List<ChatNavLink> navs) ParseNavigate(string raw)
     {

@@ -1,0 +1,117 @@
+@page "/report/visit"
+@attribute [NavMenu(Title="Báo cáo viếng thăm", Icon="bi-shop-window", Group="Báo cáo", GroupOrder=20, Order=10)]
+@using BlazorReporting.Services
+@inject AuthService Auth
+@inject ReportService RptSvc
+@inject NavigationManager Nav
+
+<PageTitle>Báo cáo viếng thăm</PageTitle>
+
+<div class="container-fluid mt-3">
+    <h5 class="mb-3"><i class="bi bi-shop-window me-2"></i>Báo cáo viếng thăm chi tiết</h5>
+
+    <div class="card shadow-sm mb-3">
+        <div class="card-body py-2">
+            <div class="d-flex gap-2 flex-wrap align-items-end">
+                <div>
+                    <label class="form-label small mb-1">Ngày *</label>
+                    <input type="date" class="form-control form-control-sm" style="width:150px" @bind="_date" />
+                </div>
+                <div>
+                    <label class="form-label small mb-1">Tuyến</label>
+                    <input class="form-control form-control-sm" style="width:160px" placeholder="RouteCD..." @bind="_routeCD" />
+                </div>
+                <div>
+                    <label class="form-label small mb-1">Giám sát</label>
+                    <input class="form-control form-control-sm" style="width:140px" placeholder="SaleSupCD..." @bind="_saleSupCD" />
+                </div>
+                <button class="btn btn-sm btn-primary" @onclick="LoadAsync">
+                    <i class="bi bi-search me-1"></i>Xem
+                </button>
+                @if (_data.Any())
+                {
+                    <span class="text-muted small ms-2">
+                        @_data.Count lần VT —
+                        <span class="text-success fw-semibold">@_data.Count(x => x.HasOrder == 1) có ĐH</span>
+                    </span>
+                }
+            </div>
+        </div>
+    </div>
+
+    @if (!string.IsNullOrEmpty(_error))
+    {
+        <div class="alert alert-danger py-2">@_error</div>
+    }
+
+    @if (_loading)
+    {
+        <div class="text-center py-4"><span class="spinner-border text-primary"></span></div>
+    }
+    else
+    {
+        <SortableGrid Items="_data" Context="r" MinWidth="1200px" DefaultPageSize="20">
+            <Columns>
+                <GridColumn TItem="ReportVisitRow" Title="Nhân viên BH"         Value="@(x => x.SalesmanName)" />
+                <GridColumn TItem="ReportVisitRow" Title="Tuyến"       Value="@(x => x.RouteCD)" />
+                <GridColumn TItem="ReportVisitRow" Title="NPP" Value="@(x => x.DistributorName)" />
+                <GridColumn TItem="ReportVisitRow" Title="Cửa hàng"      Value="@(x => x.OutletName)" />
+                <GridColumn TItem="ReportVisitRow" Title="Bắt đầu"    Value="@(x => x.StartTime.HasValue ? x.StartTime.Value.ToString("HH:mm") : "")" Align="center" />
+                <GridColumn TItem="ReportVisitRow" Title="Kết thúc"   Value="@(x => x.EndTime.HasValue ? x.EndTime.Value.ToString("HH:mm") : "")" Align="center" />
+                <GridColumn TItem="ReportVisitRow" Title="T.gian (ph)" Value="@(x => x.TimeVisit)" Align="end" />
+                <GridColumn TItem="ReportVisitRow" Title="Km"          Value="@(x => x.Distance)" Align="end" />
+                <GridColumn TItem="ReportVisitRow" Title="SKU"         Value="@(x => x.TotalSKU)" Align="end" />
+                <GridColumn TItem="ReportVisitRow" Title="Doanh số"    Value="@(x => x.TotalAmount)" Align="end" />
+                <GridColumn TItem="ReportVisitRow" Title="MCP"         Value="@(x => x.strIsMCP)" Align="center" />
+                <GridColumn TItem="ReportVisitRow" Title="Đơn hàng"   Value="@(x => x.HasOrder == 1 ? "Có" : "Không")" Align="center" />
+            </Columns>
+            <RowTemplate>
+                <td class="fw-semibold small">@r.SalesmanName</td>
+                <td class="small font-monospace">@r.RouteCD</td>
+                <td class="small">@r.DistributorName</td>
+                <td class="small">@r.OutletName</td>
+                <td class="text-center small">@(r.StartTime.HasValue ? r.StartTime.Value.ToString("HH:mm") : "—")</td>
+                <td class="text-center small">@(r.EndTime.HasValue ? r.EndTime.Value.ToString("HH:mm") : "—")</td>
+                <td class="text-end">@r.TimeVisit</td>
+                <td class="text-end small">@((r.Distance/1000m).ToString("N1"))</td>
+                <td class="text-end">@r.TotalSKU.ToString("N0")</td>
+                <td class="text-end small">@((r.TotalAmount/1_000_000m).ToString("N2"))M</td>
+                <td class="text-center">
+                    <span class="badge @(r.strIsMCP=="IsRoute"?"bg-primary":"bg-secondary")" style="font-size:.65rem">
+                        @(r.strIsMCP=="IsRoute"?"Đúng tuyến":"Ngoài tuyến")
+                    </span>
+                </td>
+                <td class="text-center">
+                    @if (r.HasOrder == 1)
+                    { <i class="bi bi-check-circle-fill text-success"></i> }
+                    else
+                    { <i class="bi bi-x-circle text-secondary"></i> }
+                </td>
+            </RowTemplate>
+        </SortableGrid>
+    }
+</div>
+
+@code {
+    private List<ReportVisitRow> _data = new();
+    private bool _loading;
+    private string _error = "", _routeCD = "", _saleSupCD = "";
+    private DateTime _date = DateTime.Today;
+
+    protected override void OnInitialized()
+    {
+        if (!Auth.IsLoggedIn) Nav.NavigateTo("/", replace: true);
+    }
+
+    private async Task LoadAsync()
+    {
+        _loading = true; _error = "";
+        try
+        {
+            _data = await RptSvc.GetReportVisitAsync(_date, Auth.UserName,
+                routeCD: _routeCD, saleSupCD: _saleSupCD);
+        }
+        catch (Exception ex) { _error = ex.Message; }
+        finally { _loading = false; }
+    }
+}

@@ -1,0 +1,53 @@
+@page "/report/timekeeping"
+@attribute [NavMenu(Title="Chấm công", Icon="bi-fingerprint", Group="Báo cáo", GroupOrder=20, Order=120)]
+@using BlazorReporting.Services
+@inject AuthService Auth
+@inject ReportService RptSvc
+@inject NavigationManager Nav
+<PageTitle>Timekeeping</PageTitle>
+<div class="container-fluid mt-3">
+    <h5 class="mb-3"><i class="bi bi-fingerprint me-2"></i>Bao cao cham cong Nhân viên BH</h5>
+    <div class="card shadow-sm mb-3"><div class="card-body py-2">
+        <div class="d-flex gap-2 flex-wrap align-items-end">
+            <div><label class="form-label small mb-1">Từ ngày</label><input type="date" class="form-control form-control-sm" style="width:150px" @bind="_from"/></div>
+            <div><label class="form-label small mb-1">Đến ngày</label><input type="date" class="form-control form-control-sm" style="width:150px" @bind="_to"/></div>
+            <div><label class="form-label small mb-1">Nhân viên BH</label><input class="form-control form-control-sm" style="width:150px" placeholder="SalesmanID..." @bind="_sm"/></div>
+            <button class="btn btn-sm btn-primary" @onclick="LoadAsync"><i class="bi bi-search me-1"></i>Xem</button>
+            @if (_data.Any()){<span class="text-muted small ms-2">@_data.Count dong</span>}
+        </div>
+    </div></div>
+    @if (_error!=null){<div class="alert alert-danger py-2 alert-dismissible">@_error<button class="btn-close" @onclick="ClearErr"></button></div>}
+    @if (_loading){<div class="text-center py-4"><span class="spinner-border text-primary"></span></div>}
+    else {
+        <SortableGrid Items="_data" Context="r" MinWidth="900px" DefaultPageSize="20">
+            <Columns>
+                <GridColumn TItem="GenericReportRow" Title="Nhân viên BH"          Value="@(x=>x.SalesmanName)"/>
+                <GridColumn TItem="GenericReportRow" Title="Region"       Value="@(x=>x.RegionName)"/>
+                <GridColumn TItem="GenericReportRow" Title="Area"         Value="@(x=>x.AreaName)"/>
+                <GridColumn TItem="GenericReportRow" Title="Ngày có lịch" Value="@(x=>x.ScheduleDateWork)" Align="end"/>
+                <GridColumn TItem="GenericReportRow" Title="Đã đồng bộ"   Value="@(x=>x.SynchronizeDate)" Align="end"/>
+                <GridColumn TItem="GenericReportRow" Title="Có doanh số"  Value="@(x=>x.VisitedDate)" Align="end"/>
+                <GridColumn TItem="GenericReportRow" Title="% Ngày làm"   Value="@(x=>x.VisitedDateRate)" Align="end"/>
+            </Columns>
+            <RowTemplate>
+                <td class="fw-semibold small">@r.SalesmanName</td>
+                <td class="small">@r.RegionName</td>
+                <td class="small">@r.AreaName</td>
+                <td class="text-end">@r.ScheduleDateWork</td>
+                <td class="text-end @(r.SynchronizeDate==r.ScheduleDateWork&&r.ScheduleDateWork>0?"text-success":"")">@r.SynchronizeDate</td>
+                <td class="text-end">@r.VisitedDate</td>
+                <td class="text-end"><span class="@P(r.VisitedDateRate)">@r.VisitedDateRate.ToString("N1")%</span></td>
+            </RowTemplate>
+        </SortableGrid>
+    }
+</div>
+@code {
+    private List<GenericReportRow> _data=new(); private bool _loading; private string? _error;
+    private string _sm=""; private DateTime _from=DateTime.Today.AddDays(-30), _to=DateTime.Today;
+    private void ClearErr() => _error = null;
+    private string P(decimal p)=>p>=80?"text-success":p>=50?"text-warning":"text-danger";
+    protected override void OnInitialized(){if(!Auth.IsLoggedIn)Nav.NavigateTo("/",replace:true);}
+    private async Task LoadAsync(){_loading=true;_error=null;
+        try{_data=await RptSvc.GetTimekeepingAsync(_from,_to,Auth.UserName,salesmanId:_sm);}
+        catch(Exception ex){_error=ex.Message;}finally{_loading=false;}}
+}

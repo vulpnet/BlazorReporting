@@ -1,0 +1,123 @@
+@page "/config/settings"
+@attribute [NavMenu(Title="Cấu hình hệ thống", Icon="bi-sliders", Group="Cấu hình", GroupOrder=80, Order=10)]
+@using BlazorReporting.Services
+@inject AuthService Auth
+@inject ConfigService CfgSvc
+@inject NavigationManager Nav
+
+<PageTitle>Cấu hình hệ thống</PageTitle>
+
+<div class="container-fluid mt-3">
+    <h5 class="mb-3"><i class="bi bi-sliders me-2"></i>Cấu hình hệ thống (CustomSetting)</h5>
+
+    @if (!string.IsNullOrEmpty(_msg))
+    {
+        <div class="alert @(_ok?"alert-success":"alert-danger") py-2 alert-dismissible">
+            @_msg <button class="btn-close" @onclick="ClearMsg"></button>
+        </div>
+    }
+
+    @if (_loading)
+    {
+        <div class="text-center py-4"><span class="spinner-border text-primary"></span></div>
+    }
+    else
+    {
+        @* Group by SettingGroup *@
+        @foreach (var grp in _settings.GroupBy(x => x.SettingGroup).OrderBy(g => g.Key))
+        {
+            <div class="card shadow-sm mb-3">
+                <div class="card-header py-2 fw-semibold small bg-light">
+                    <i class="bi bi-folder2 me-1"></i>@grp.Key
+                </div>
+                <div class="card-body p-0">
+                    <table class="table table-sm table-hover align-middle mb-0">
+                        <thead class="table-secondary">
+                            <tr>
+                                <th style="width:30%">Tên cấu hình</th>
+                                <th style="width:25%">Code</th>
+                                <th>Giá trị</th>
+                                <th class="text-center" style="width:80px">Sửa</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach (var s in grp)
+                            {
+                                <tr>
+                                    <td>@s.SettingName</td>
+                                    <td class="text-muted small font-monospace">@s.SettingCode</td>
+                                    <td>
+                                        @if (_editKey == $"{s.SettingGroup}:{s.SettingCode}")
+                                        {
+                                            <div class="d-flex gap-1">
+                                                <input class="form-control form-control-sm" @bind="_editValue" @onkeydown="OnKeyDown" />
+                                                <button class="btn btn-xs btn-success" @onclick="()=>SaveAsync(s)">
+                                                    <i class="bi bi-check"></i>
+                                                </button>
+                                                <button class="btn btn-xs btn-secondary" @onclick="CancelEdit">
+                                                    <i class="bi bi-x"></i>
+                                                </button>
+                                            </div>
+                                        }
+                                        else
+                                        {
+                                            <span>@s.SettingValue</span>
+                                        }
+                                    </td>
+                                    <td class="text-center">
+                                        @if (_editKey != $"{s.SettingGroup}:{s.SettingCode}")
+                                        {
+                                            <button class="btn btn-xs btn-outline-primary" @onclick="()=>StartEdit(s)">
+                                                <i class="bi bi-pencil"></i>
+                                            </button>
+                                        }
+                                    </td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        }
+    }
+</div>
+
+@code {
+    private List<CustomSettingRow> _settings = new();
+    private bool _loading = true, _ok;
+    private string _msg = "", _editKey = "", _editValue = "";
+
+    private void ClearMsg() => _msg = "";
+    private void CancelEdit() => _editKey = "";
+
+    protected override async Task OnInitializedAsync()
+    {
+        if (!Auth.IsLoggedIn) { Nav.NavigateTo("/", replace: true); return; }
+        _loading = true;
+        _settings = await CfgSvc.GetCustomSettingsAsync();
+        _loading = false;
+    }
+
+    private void StartEdit(CustomSettingRow s)
+    {
+        _editKey = $"{s.SettingGroup}:{s.SettingCode}";
+        _editValue = s.SettingValue;
+    }
+
+    private async Task SaveAsync(CustomSettingRow s)
+    {
+        var ok = await CfgSvc.UpdateCustomSettingAsync(s.SettingCode, s.SettingGroup, _editValue);
+        _ok = ok; _msg = ok ? $"Đã cập nhật [{s.SettingCode}]." : "Có lỗi xảy ra.";
+        if (ok)
+        {
+            var idx = _settings.FindIndex(x => x.SettingCode == s.SettingCode && x.SettingGroup == s.SettingGroup);
+            if (idx >= 0) _settings[idx] = new CustomSettingRow { SettingCode=s.SettingCode, SettingGroup=s.SettingGroup, SettingName=s.SettingName, SettingValue=_editValue };
+        }
+        _editKey = "";
+    }
+
+    private async Task OnKeyDown(KeyboardEventArgs e)
+    {
+        if (e.Key == "Escape") CancelEdit();
+    }
+}

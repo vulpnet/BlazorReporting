@@ -1,0 +1,55 @@
+@page "/report/outlet-invalid-location"
+@attribute [NavMenu(Title="Outlet GPS không hợp lệ", Icon="bi-geo-fill", Group="Báo cáo", GroupOrder=20, Order=90)]
+@using BlazorReporting.Services
+@inject AuthService Auth
+@inject ReportService RptSvc
+@inject NavigationManager Nav
+<PageTitle>Outlet GPS Invalid</PageTitle>
+<div class="container-fluid mt-3">
+    <h5 class="mb-3"><i class="bi bi-geo-fill me-2 text-danger"></i>Outlet vi tri GPS khong hop le</h5>
+    <div class="card shadow-sm mb-3"><div class="card-body py-2">
+        <div class="d-flex gap-2 flex-wrap align-items-end">
+            <div><label class="form-label small mb-1">Giám sát</label><input class="form-control form-control-sm" style="width:150px" @bind="_sup"/></div>
+            <button class="btn btn-sm btn-primary" @onclick="LoadAsync"><i class="bi bi-search me-1"></i>Xem</button>
+            @if (_data.Any()){<span class="text-muted small ms-2">@_data.Count dong</span>}
+        </div>
+    </div></div>
+    @if (_error!=null){<div class="alert alert-danger py-2 alert-dismissible">@_error<button class="btn-close" @onclick="ClearErr"></button></div>}
+    @if (_loading){<div class="text-center py-4"><span class="spinner-border text-primary"></span></div>}
+    else {
+        <SortableGrid Items="_data" Context="r" MinWidth="1000px" DefaultPageSize="20">
+            <Columns>
+                <GridColumn TItem="GenericReportRow" Title="Location CD"  Value="@(x=>x.LocationCD)"/>
+                <GridColumn TItem="GenericReportRow" Title="Outlet CD"    Value="@(x=>x.OutletCD)"/>
+                <GridColumn TItem="GenericReportRow" Title="Tên cửa hàng"   Value="@(x=>x.OutletName)"/>
+                <GridColumn TItem="GenericReportRow" Title="Giám sát"           Value="@(x=>x.SalesSupName)"/>
+                <GridColumn TItem="GenericReportRow" Title="Tuyến"        Value="@(x=>x.RouteCD)"/>
+                <GridColumn TItem="GenericReportRow" Title="NPP"  Value="@(x=>x.DistributorName)"/>
+                <GridColumn TItem="GenericReportRow" Title="Lat"          Value="@(x=>x.Latitude)" Align="end"/>
+                <GridColumn TItem="GenericReportRow" Title="Lng"          Value="@(x=>x.Longitude)" Align="end"/>
+                <GridColumn TItem="GenericReportRow" Title="Trạng thái"   Value="@(x=>x.IsActive?"Active":"Inactive")" Align="center"/>
+            </Columns>
+            <RowTemplate>
+                <td class="small font-monospace text-danger">@r.LocationCD</td>
+                <td class="small font-monospace">@r.OutletCD</td>
+                <td class="small">@r.OutletName</td>
+                <td class="small text-muted">@r.SalesSupName</td>
+                <td class="small font-monospace">@r.RouteCD</td>
+                <td class="small">@r.DistributorName</td>
+                <td class="text-end small">@r.Latitude.ToString("F4")</td>
+                <td class="text-end small">@r.Longitude.ToString("F4")</td>
+                <td class="text-center">
+                    <span class="badge @(r.IsActive?"bg-success":"bg-secondary")">@(r.IsActive?"Active":"Inactive")</span>
+                </td>
+            </RowTemplate>
+        </SortableGrid>
+    }
+</div>
+@code {
+    private List<GenericReportRow> _data=new(); private bool _loading; private string? _error; private string _sup="";
+    private void ClearErr() => _error = null;
+    protected override void OnInitialized(){if(!Auth.IsLoggedIn)Nav.NavigateTo("/",replace:true);}
+    private async Task LoadAsync(){_loading=true;_error=null;
+        try{_data=await RptSvc.GetOutletInvalidLocationAsync(Auth.UserName,sup:_sup);}
+        catch(Exception ex){_error=ex.Message;}finally{_loading=false;}}
+}

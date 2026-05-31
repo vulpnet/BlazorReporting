@@ -1,0 +1,113 @@
+@page "/account/role-features"
+@attribute [NavMenu(Title="Phân quyền Feature", Icon="bi-diagram-3-fill", Group="Quản trị", GroupOrder=90, Order=20)]
+@using BlazorReporting.Services
+@inject AuthService Auth
+@inject UserManagementService UserSvc
+@inject NavigationManager Nav
+
+<PageTitle>Phân quyền Feature</PageTitle>
+
+<div class="container-fluid mt-3">
+    <h5 class="mb-3"><i class="bi bi-diagram-3-fill me-2"></i>Phân quyền Feature theo Role</h5>
+
+    <div class="row g-3">
+        <div class="col-md-3">
+            <label class="form-label fw-bold">Chọn Role</label>
+            <select class="form-select" @onchange="OnRoleChanged">
+                <option value="0">-- Chọn Role --</option>
+                @foreach (var r in _roles)
+                {
+                    <option value="@r.ID">@r.RoleName</option>
+                }
+            </select>
+        </div>
+
+        @if (_selectedRoleId > 0)
+        {
+            <div class="col-md-9">
+                <div class="d-flex align-items-center mb-2">
+                    <label class="fw-bold me-3">Features (@_features.Count tổng)</label>
+                    <span class="text-muted small">Đã chọn: @_selectedFeatures.Count</span>
+                    <button class="btn btn-sm btn-primary ms-auto" @onclick="SaveAsync" disabled="@_saving">
+                        @if (_saving) { <span class="spinner-border spinner-border-sm me-1"></span> }
+                        <i class="bi bi-save me-1"></i>Lưu phân quyền
+                    </button>
+                </div>
+
+                @if (!string.IsNullOrEmpty(_saveMsg))
+                {
+                    <div class="alert @(_saveOk ? "alert-success" : "alert-danger") py-2">@_saveMsg</div>
+                }
+
+                <div class="border rounded p-2" style="max-height:500px;overflow-y:auto">
+                    @foreach (var grp in _features.GroupBy(f => f.Group ?? "Khác").OrderBy(g => g.Key))
+                    {
+                        <div class="mb-2">
+                            <div class="fw-semibold text-primary small mb-1 border-bottom">@grp.Key</div>
+                            @foreach (var f in grp.OrderBy(x => x.FeatureName))
+                            {
+                                <div class="form-check ms-2">
+                                    <input class="form-check-input" type="checkbox"
+                                           id="f_@f.ID"
+                                           checked="@_selectedFeatures.Contains(f.ID)"
+                                           @onchange="e => ToggleFeature(f.ID, (bool)e.Value!)" />
+                                    <label class="form-check-label small" for="f_@f.ID">
+                                        @f.FeatureName
+                                        <span class="text-muted">(@f.PhraseCode)</span>
+                                    </label>
+                                </div>
+                            }
+                        </div>
+                    }
+                </div>
+            </div>
+        }
+    </div>
+</div>
+
+@code {
+    private List<RoleVM> _roles = new();
+    private List<FeatureVM> _features = new();
+    private HashSet<int> _selectedFeatures = new();
+    private int _selectedRoleId;
+    private bool _saving;
+    private string _saveMsg = "";
+    private bool _saveOk;
+
+    protected override async Task OnInitializedAsync()
+    {
+        if (!Auth.IsLoggedIn) { Nav.NavigateTo("/", replace: true); return; }
+        _roles = await UserSvc.GetRolesAsync();
+        _features = await UserSvc.GetFeaturesAsync();
+    }
+
+    private async Task OnRoleChanged(ChangeEventArgs e)
+    {
+        _selectedRoleId = int.Parse(e.Value?.ToString() ?? "0");
+        _saveMsg = "";
+        if (_selectedRoleId > 0)
+        {
+            var ids = await UserSvc.GetFeatureIdsByRoleAsync(_selectedRoleId);
+            _selectedFeatures = ids.ToHashSet();
+        }
+        else
+        {
+            _selectedFeatures.Clear();
+        }
+    }
+
+    private void ToggleFeature(int id, bool selected)
+    {
+        if (selected) _selectedFeatures.Add(id);
+        else _selectedFeatures.Remove(id);
+    }
+
+    private async Task SaveAsync()
+    {
+        _saving = true; _saveMsg = "";
+        await UserSvc.SaveRoleFeatureAsync(_selectedRoleId, _selectedFeatures);
+        _saving = false;
+        _saveOk = true;
+        _saveMsg = "Lưu phân quyền thành công.";
+    }
+}

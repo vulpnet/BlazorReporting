@@ -1,0 +1,150 @@
+@page "/issues"
+@attribute [NavMenu(Title="Báo cáo Issues", Icon="bi-exclamation-triangle-fill", Group="Issues", GroupOrder=50, Order=10)]
+@using BlazorReporting.Services
+@inject AuthService Auth
+@inject IssuesService IssueSvc
+@inject NavigationManager Nav
+
+<PageTitle>Báo cáo Issues</PageTitle>
+
+<div class="container-fluid mt-3">
+    <h5 class="mb-3"><i class="bi bi-exclamation-triangle-fill me-2 text-warning"></i>Danh sách Issues</h5>
+
+    <div class="card shadow-sm mb-3">
+        <div class="card-body py-2">
+            <div class="d-flex gap-2 flex-wrap align-items-end">
+                <div>
+                    <label class="form-label small mb-1">Từ ngày</label>
+                    <input type="date" class="form-control form-control-sm" style="width:150px" @bind="_from" />
+                </div>
+                <div>
+                    <label class="form-label small mb-1">Đến ngày</label>
+                    <input type="date" class="form-control form-control-sm" style="width:150px" @bind="_to" />
+                </div>
+                <div>
+                    <label class="form-label small mb-1">Trạng thái</label>
+                    <select class="form-select form-select-sm" style="width:140px" @bind="_status">
+                        <option value="-1">Tất cả</option>
+                        <option value="0">Chưa xử lý</option>
+                        <option value="1">Đã xử lý</option>
+                    </select>
+                </div>
+                <div>
+                    <label class="form-label small mb-1">Nhân viên BH</label>
+                    <input class="form-control form-control-sm" style="width:130px" placeholder="SalesmanCode..." @bind="_salesmanCode" />
+                </div>
+                <button class="btn btn-sm btn-primary" @onclick="LoadAsync">
+                    <i class="bi bi-search me-1"></i>Xem
+                </button>
+                @if (_data.Any())
+                {
+                    <span class="badge bg-warning text-dark ms-2">@_data.Count(x=>x.Status==0) chưa xử lý</span>
+                    <span class="badge bg-success ms-1">@_data.Count(x=>x.Status==1) đã xử lý</span>
+                }
+            </div>
+        </div>
+    </div>
+
+    @if (!string.IsNullOrEmpty(_msg))
+    {
+        <div class="alert @(_ok?"alert-success":"alert-danger") py-2 alert-dismissible">
+            @_msg <button class="btn-close" @onclick="ClearMsg"></button>
+        </div>
+    }
+
+    @if (_loading)
+    {
+        <div class="text-center py-4"><span class="spinner-border text-primary"></span></div>
+    }
+    else
+    {
+        <SortableGrid Items="_data" Context="r" MinWidth="900px" DefaultPageSize="20">
+            <Columns>
+                <GridColumn TItem="IssueRow" Title="Ngày VT"     Value="@(x => x.VisitDate.HasValue ? x.VisitDate.Value.ToString("dd/MM/yyyy") : "")" Align="center" />
+                <GridColumn TItem="IssueRow" Title="Nhân viên BH"         Value="@(x => x.SalesmanCode)" />
+                <GridColumn TItem="IssueRow" Title="NPP" Value="@(x => x.DistributorCode)" />
+                <GridColumn TItem="IssueRow" Title="Cửa hàng"      Value="@(x => x.OutletID)" />
+                <GridColumn TItem="IssueRow" Title="Nội dung"    Value="@(x => x.Content)" />
+                <GridColumn TItem="IssueRow" Title="Xử lý"       Value="@(x => x.Resolve)" />
+                <GridColumn TItem="IssueRow" Title="Ảnh"         Value="@(x => x.ImageCount)" Align="center" />
+                <GridColumn TItem="IssueRow" Title="Trạng thái"  Value="@(x => x.Status==0?"Chưa xử lý":"Đã xử lý")" Align="center" />
+            </Columns>
+            <RowTemplate>
+                <td class="text-center small">@(r.VisitDate.HasValue ? r.VisitDate.Value.ToString("dd/MM/yyyy") : "—")</td>
+                <td class="small fw-semibold">@r.SalesmanCode</td>
+                <td class="small">@r.DistributorCode</td>
+                <td class="small font-monospace">@r.OutletID</td>
+                <td class="small">@r.Content</td>
+                <td class="small text-muted">
+                    @if (_editId == r.ID)
+                    {
+                        <div class="d-flex gap-1">
+                            <input class="form-control form-control-sm py-0" style="font-size:.75rem" @bind="_editResolve" />
+                            <button class="btn btn-xs btn-success" @onclick="()=>SaveResolveAsync(r.ID)"><i class="bi bi-check"></i></button>
+                            <button class="btn btn-xs btn-secondary" @onclick="()=>_editId=0"><i class="bi bi-x"></i></button>
+                        </div>
+                    }
+                    else
+                    {
+                        @r.Resolve
+                    }
+                </td>
+                <td class="text-center">@r.ImageCount</td>
+                <td class="text-center">
+                    <span class="badge @(r.Status==0?"bg-warning text-dark":"bg-success")">
+                        @(r.Status==0?"Chưa xử lý":"Đã xử lý")
+                    </span>
+                </td>
+            </RowTemplate>
+            <ActionColumn Context="r">
+                @if (r.Status == 0)
+                {
+                    <button class="btn btn-xs btn-outline-primary" title="Xử lý" @onclick="()=>StartResolve(r)">
+                        <i class="bi bi-pencil"></i>
+                    </button>
+                }
+            </ActionColumn>
+        </SortableGrid>
+    }
+</div>
+
+@code {
+    private List<IssueRow> _data = new();
+    private bool _loading, _ok;
+    private string _msg = "", _salesmanCode = "";
+    private int _status = -1, _editId;
+    private string _editResolve = "";
+    private DateTime _from = DateTime.Today.AddDays(-7), _to = DateTime.Today;
+
+    private void ClearMsg() => _msg = "";
+
+    protected override void OnInitialized()
+    {
+        if (!Auth.IsLoggedIn) Nav.NavigateTo("/", replace: true);
+    }
+
+    private async Task LoadAsync()
+    {
+        _loading = true;
+        _data = await IssueSvc.GetIssuesAsync(_from, _to, _salesmanCode, _status);
+        _loading = false;
+    }
+
+    private void StartResolve(IssueRow r)
+    {
+        _editId = r.ID;
+        _editResolve = r.Resolve ?? "";
+    }
+
+    private async Task SaveResolveAsync(int id)
+    {
+        var ok = await IssueSvc.UpdateIssueResolveAsync(id, _editResolve);
+        _ok = ok; _msg = ok ? "Đã cập nhật xử lý." : "Có lỗi.";
+        if (ok)
+        {
+            var idx = _data.FindIndex(x => x.ID == id);
+            if (idx >= 0) { _data[idx].Resolve = _editResolve; _data[idx].Status = 1; }
+        }
+        _editId = 0;
+    }
+}

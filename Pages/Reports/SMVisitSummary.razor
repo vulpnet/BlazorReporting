@@ -1,0 +1,127 @@
+@page "/report/summary"
+@attribute [NavMenu(Title="Tổng hợp KPI", Icon="bi-bar-chart-line-fill", Group="Báo cáo", GroupOrder=20, Order=20)]
+@using BlazorReporting.Services
+@inject AuthService Auth
+@inject ReportService RptSvc
+@inject NavigationManager Nav
+<PageTitle>SM Visit Summary</PageTitle>
+<div class="container-fluid mt-3">
+    <h5 class="mb-3"><i class="bi bi-bar-chart-line-fill me-2"></i>SM Visit Summary</h5>
+    <div class="card shadow-sm mb-3"><div class="card-body py-2">
+        <div class="d-flex gap-2 flex-wrap align-items-end">
+            <div><label class="form-label small mb-1">Từ ngày *</label><input type="date" class="form-control form-control-sm" style="width:150px" @bind="_fromDate"/></div>
+            <div><label class="form-label small mb-1">Đến ngày *</label><input type="date" class="form-control form-control-sm" style="width:150px" @bind="_toDate"/></div>
+            <div><label class="form-label small mb-1">Tuyến</label><input class="form-control form-control-sm" style="width:160px" placeholder="RouteCD..." @bind="_routeCD"/></div>
+            <div><label class="form-label small mb-1">Giám sát</label><input class="form-control form-control-sm" style="width:140px" placeholder="SaleSupCD..." @bind="_saleSupCD"/></div>
+            <div><label class="form-label small mb-1">Nhân viên BH</label><input class="form-control form-control-sm" style="width:140px" placeholder="SalesmanCD..." @bind="_salesmanCD"/></div>
+            <button class="btn btn-sm btn-primary" @onclick="LoadAsync"><i class="bi bi-search me-1"></i>Xem</button>
+            @if (_data.Any()){<span class="text-muted small ms-2">@_data.Count dong</span>}
+        </div>
+    </div></div>
+
+    @if (_data.Any())
+    {
+        var mcpData = _data.Where(x => x.strIsMCP == "IsRoute").ToList();
+        <div class="row g-2 mb-3">
+            <div class="col-6 col-md-2">
+                <div class="card border-0 shadow-sm text-center py-2">
+                    <div class="fw-bold fs-5 text-primary">@_data.Select(x => x.SalesmanCD).Distinct().Count()</div>
+                    <div class="small text-muted">Nhân viên BH</div>
+                </div>
+            </div>
+            <div class="col-6 col-md-2">
+                <div class="card border-0 shadow-sm text-center py-2">
+                    <div class="fw-bold fs-5 text-success">@mcpData.Sum(x => x.OutletVisited).ToString("N0")</div>
+                    <div class="small text-muted">CH da VT</div>
+                </div>
+            </div>
+            <div class="col-6 col-md-2">
+                <div class="card border-0 shadow-sm text-center py-2">
+                    <div class="fw-bold fs-5 text-warning">@mcpData.Sum(x => x.OrderCount).ToString("N0")</div>
+                    <div class="small text-muted">Đơn hàng</div>
+                </div>
+            </div>
+            <div class="col-6 col-md-3">
+                <div class="card border-0 shadow-sm text-center py-2">
+                    <div class="fw-bold fs-5 text-info">@((mcpData.Sum(x => x.TotalAmount)/1_000_000m).ToString("N1"))M</div>
+                    <div class="small text-muted">Doanh số</div>
+                </div>
+            </div>
+            <div class="col-6 col-md-3">
+                <div class="card border-0 shadow-sm text-center py-2">
+                    @{
+                        var planTotal = mcpData.Sum(x => x.OutletMustVisit);
+                        var visitedTotal = mcpData.Sum(x => x.OutletVisited);
+                        var avgVisitPct = planTotal > 0 ? visitedTotal * 100m / planTotal : 0;
+                    }
+                    <div class="fw-bold fs-5 @(avgVisitPct>=80?"text-success":avgVisitPct>=50?"text-warning":"text-danger")">
+                        @avgVisitPct.ToString("N1")%
+                    </div>
+                    <div class="small text-muted">% VT</div>
+                </div>
+            </div>
+        </div>
+    }
+
+    @if (_error!=null){<div class="alert alert-danger py-2 alert-dismissible">@_error<button class="btn-close" @onclick="ClearErr"></button></div>}
+    @if (_loading){<div class="text-center py-4"><span class="spinner-border text-primary"></span></div>}
+    else {
+        <SortableGrid Items="_data" Context="r" MinWidth="1200px" DefaultPageSize="20">
+            <Columns>
+                <GridColumn TItem="SMVisitSummaryRow" Title="Nhân viên BH"         Value="@(x => x.SalesmanName)"/>
+                <GridColumn TItem="SMVisitSummaryRow" Title="Giám sát"          Value="@(x => x.SalesSupName)"/>
+                <GridColumn TItem="SMVisitSummaryRow" Title="Tuyến"       Value="@(x => x.RouteCD)"/>
+                <GridColumn TItem="SMVisitSummaryRow" Title="NPP" Value="@(x => x.DistributorName)"/>
+                <GridColumn TItem="SMVisitSummaryRow" Title="Ngày"        Value="@(x => x.VisitDate.HasValue ? x.VisitDate.Value.ToString("dd/MM") : "")" Align="center"/>
+                <GridColumn TItem="SMVisitSummaryRow" Title="CH Kế hoạch"    Value="@(x => x.OutletMustVisit)" Align="end"/>
+                <GridColumn TItem="SMVisitSummaryRow" Title="Đã viếng thăm"       Value="@(x => x.OutletVisited)" Align="end"/>
+                <GridColumn TItem="SMVisitSummaryRow" Title="% Viếng thăm"        Value="@(x => x.VisitMCP)" Align="end"/>
+                <GridColumn TItem="SMVisitSummaryRow" Title="Đơn hàng"    Value="@(x => x.OrderCount)" Align="end"/>
+                <GridColumn TItem="SMVisitSummaryRow" Title="% Có đơn"        Value="@(x => x.SOMCP)" Align="end"/>
+                <GridColumn TItem="SMVisitSummaryRow" Title="LPPC"        Value="@(x => x.LPPC)" Align="end"/>
+                <GridColumn TItem="SMVisitSummaryRow" Title="Doanh số"    Value="@(x => x.TotalAmount)" Align="end"/>
+                <GridColumn TItem="SMVisitSummaryRow" Title="Đồng bộ"        Value="@(x => x.FirstSyncTime.HasValue ? x.FirstSyncTime.Value.ToString("HH:mm") : "Chua")" Align="center"/>
+                <GridColumn TItem="SMVisitSummaryRow" Title="MCP"         Value="@(x => x.strIsMCP)" Align="center"/>
+            </Columns>
+            <RowTemplate>
+                <td class="fw-semibold small">@r.SalesmanName</td>
+                <td class="small text-muted">@r.SalesSupName</td>
+                <td class="small font-monospace">@r.RouteCD</td>
+                <td class="small">@r.DistributorName</td>
+                <td class="text-center small">@(r.VisitDate.HasValue ? r.VisitDate.Value.ToString("dd/MM") : "—")</td>
+                <td class="text-end">@r.OutletMustVisit</td>
+                <td class="text-end @(r.OutletVisited>=r.OutletMustVisit&&r.OutletMustVisit>0?"text-success fw-bold":"")">@r.OutletVisited</td>
+                <td class="text-end">
+                    @{ var vc = r.OutletMustVisit > 0 ? r.VisitMCP : 0m; }
+                    <span class="@(vc>=80?"text-success":vc>=50?"text-warning":"text-danger")">@vc.ToString("N1")%</span>
+                </td>
+                <td class="text-end">@r.OrderCount</td>
+                <td class="text-end small">@r.SOMCP.ToString("N1")%</td>
+                <td class="text-end small">@r.LPPC.ToString("N1")</td>
+                <td class="text-end small">@((r.TotalAmount/1_000_000m).ToString("N2"))M</td>
+                <td class="text-center">
+                    @if (r.FirstSyncTime.HasValue)
+                    { <span class="badge bg-success">@r.FirstSyncTime.Value.ToString("HH:mm")</span> }
+                    else
+                    { <span class="badge bg-secondary">Chua</span> }
+                </td>
+                <td class="text-center">
+                    <span class="badge @(r.strIsMCP=="IsRoute"?"bg-primary":"bg-secondary")" style="font-size:.65rem">
+                        @(r.strIsMCP=="IsRoute"?"Dung tuyen":"Ngoai")
+                    </span>
+                </td>
+            </RowTemplate>
+        </SortableGrid>
+    }
+</div>
+@code {
+    private List<SMVisitSummaryRow> _data=new(); private bool _loading; private string? _error;
+    private string _routeCD="", _saleSupCD="", _salesmanCD="";
+    private DateTime _fromDate=DateTime.Today, _toDate=DateTime.Today;
+    private void ClearErr() => _error = null;
+    protected override void OnInitialized(){if(!Auth.IsLoggedIn)Nav.NavigateTo("/",replace:true);}
+    private async Task LoadAsync(){_loading=true;_error=null;
+        try{_data=await RptSvc.GetSMVisitSummaryAsync(_fromDate,_toDate,Auth.UserName,
+            saleSupCD:_saleSupCD,routeCD:_routeCD,salesmanCD:_salesmanCD);}
+        catch(Exception ex){_error=ex.Message;}finally{_loading=false;}}
+}

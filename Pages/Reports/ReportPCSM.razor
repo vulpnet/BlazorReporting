@@ -1,0 +1,62 @@
+@page "/report/pc-sm"
+@attribute [NavMenu(Title="PC theo nhân viên", Icon="bi-percent", Group="Báo cáo", GroupOrder=20, Order=70)]
+@using BlazorReporting.Services
+@inject AuthService Auth
+@inject ReportService RptSvc
+@inject NavigationManager Nav
+<PageTitle>PC by SM</PageTitle>
+<div class="container-fluid mt-3">
+    <h5 class="mb-3"><i class="bi bi-percent me-2"></i>Bao cao PC theo Nhân viên BH</h5>
+    <div class="card shadow-sm mb-3"><div class="card-body py-2">
+        <div class="d-flex gap-2 flex-wrap align-items-end">
+            <div><label class="form-label small mb-1">Ngày</label><input type="date" class="form-control form-control-sm" style="width:150px" @bind="_date"/></div>
+            <div><label class="form-label small mb-1">Tuyến</label><input class="form-control form-control-sm" style="width:150px" @bind="_route"/></div>
+            <div><label class="form-label small mb-1">Giám sát</label><input class="form-control form-control-sm" style="width:140px" @bind="_sup"/></div>
+            <div><label class="form-label small mb-1">% PC >=</label><input type="number" class="form-control form-control-sm" style="width:80px" @bind="_percent"/></div>
+            <button class="btn btn-sm btn-primary" @onclick="LoadAsync"><i class="bi bi-search me-1"></i>Xem</button>
+            @if (_data.Any()){<span class="text-muted small ms-2">@_data.Count dong</span>}
+        </div>
+    </div></div>
+    @if (_error!=null){<div class="alert alert-danger py-2 alert-dismissible">@_error<button class="btn-close" @onclick="ClearErr"></button></div>}
+    @if (_loading){<div class="text-center py-4"><span class="spinner-border text-primary"></span></div>}
+    else {
+        <SortableGrid Items="_data" Context="r" MinWidth="1000px" DefaultPageSize="20">
+            <Columns>
+                <GridColumn TItem="GenericReportRow" Title="Ngày"        Value="@(x=>x.VisitDate.HasValue?x.VisitDate.Value.ToString("dd/MM"):"")" Align="center"/>
+                <GridColumn TItem="GenericReportRow" Title="Nhân viên BH"         Value="@(x=>x.SalesmanName)"/>
+                <GridColumn TItem="GenericReportRow" Title="Giám sát"          Value="@(x=>x.SalesSupName)"/>
+                <GridColumn TItem="GenericReportRow" Title="Tuyến"       Value="@(x=>x.RouteCD)"/>
+                <GridColumn TItem="GenericReportRow" Title="PC Đạt"     Value="@(x=>x.PCPass)" Align="end"/>
+                <GridColumn TItem="GenericReportRow" Title="PC Không đạt"     Value="@(x=>x.PCNotPass)" Align="end"/>
+                <GridColumn TItem="GenericReportRow" Title="MCP"         Value="@(x=>x.MCP)" Align="end"/>
+                <GridColumn TItem="GenericReportRow" Title="Đơn hàng"    Value="@(x=>x.OrderCount)" Align="end"/>
+                <GridColumn TItem="GenericReportRow" Title="% PC MCP"    Value="@(x=>x.PC_MCP)" Align="end"/>
+                <GridColumn TItem="GenericReportRow" Title="MTD PC Đạt" Value="@(x=>x.MTDPCPass)" Align="end"/>
+                <GridColumn TItem="GenericReportRow" Title="% MTD PC"    Value="@(x=>x.MTDPC_MCP)" Align="end"/>
+            </Columns>
+            <RowTemplate>
+                <td class="text-center small">@(r.VisitDate.HasValue?r.VisitDate.Value.ToString("dd/MM"):"-")</td>
+                <td class="fw-semibold small">@r.SalesmanName</td>
+                <td class="small text-muted">@r.SalesSupName</td>
+                <td class="small font-monospace">@r.RouteCD</td>
+                <td class="text-end text-success fw-bold">@r.PCPass</td>
+                <td class="text-end text-danger">@r.PCNotPass</td>
+                <td class="text-end">@r.MCP</td>
+                <td class="text-end">@r.OrderCount</td>
+                <td class="text-end"><span class="@P(r.PC_MCP)">@r.PC_MCP.ToString("N1")%</span></td>
+                <td class="text-end">@r.MTDPCPass</td>
+                <td class="text-end"><span class="@P(r.MTDPC_MCP)">@r.MTDPC_MCP.ToString("N1")%</span></td>
+            </RowTemplate>
+        </SortableGrid>
+    }
+</div>
+@code {
+    private List<GenericReportRow> _data=new(); private bool _loading; private string? _error;
+    private string _route="",_sup=""; private DateTime _date=DateTime.Today; private int _percent=0;
+    private void ClearErr() => _error = null;
+    private string P(decimal p)=>p>=80?"text-success":p>=50?"text-warning":"text-danger";
+    protected override void OnInitialized(){if(!Auth.IsLoggedIn)Nav.NavigateTo("/",replace:true);}
+    private async Task LoadAsync(){_loading=true;_error=null;
+        try{_data=await RptSvc.GetReportPCSMAsync(_date,Auth.UserName,sup:_sup,route:_route,percent:_percent);}
+        catch(Exception ex){_error=ex.Message;}finally{_loading=false;}}
+}
