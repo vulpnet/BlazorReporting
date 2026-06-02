@@ -206,7 +206,7 @@
             if (result.Success && result.Value is not null)
             {
                 Auth.Restore(result.Value);
-                Nav.NavigateTo("/map", replace: true);
+                Nav.NavigateTo("/dashboard", replace: true);
             }
         }
         catch { /* localStorage chưa sẵn sàng hoặc không có session */ }
