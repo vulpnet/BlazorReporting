@@ -4,12 +4,13 @@
 @inject AuthService Auth
 @inject UserManagementService UserSvc
 @inject NavigationManager Nav
+@inject LocalizationService L10n
 
-<PageTitle>Quản lý người dùng</PageTitle>
+<PageTitle>@L10n.T("user.page_title")</PageTitle>
 
 <div class="container-fluid mt-3">
     <div class="d-flex align-items-center mb-3">
-        <h5 class="mb-0"><i class="bi bi-people-fill me-2"></i>Quản lý người dùng</h5>
+        <h5 class="mb-0"><i class="bi bi-people-fill me-2"></i>@L10n.T("user.page_title")</h5>
     </div>
 
     @if (!string.IsNullOrEmpty(_statusMsg))
@@ -29,17 +30,17 @@
         <SortableGrid @ref="_grid" Items="_users" Context="u" MinWidth="900px" DefaultPageSize="20">
                 <ToolbarContent>
                     <button class="btn btn-sm btn-primary" @onclick="OpenAdd">
-                        <i class="bi bi-person-plus me-1"></i>Thêm
+                        <i class="bi bi-person-plus me-1"></i>@L10n.T("user.btn_add")
                     </button>
                 </ToolbarContent>
                 <Columns>
                     <GridColumn TItem="UserVM" Title="Username"   Value="@(x => x.UserName)" />
-                    <GridColumn TItem="UserVM" Title="Họ tên"     Value="@(x => x.FullName)" />
+                    <GridColumn TItem="UserVM" Title="@L10n.T("user.col_fullname")"     Value="@(x => x.FullName)" />
                     <GridColumn TItem="UserVM" Title="Email"      Value="@(x => x.Email)" />
-                    <GridColumn TItem="UserVM" Title="Điện thoại" Value="@(x => x.Phone)" />
+                    <GridColumn TItem="UserVM" Title="@L10n.T("user.col_phone")" Value="@(x => x.Phone)" />
                     <GridColumn TItem="UserVM" Title="Role"       Value="@(x => x.RoleName)" />
-                    <GridColumn TItem="UserVM" Title="Loại TK"    Value="@(x => x.ApplicationCD)" />
-                    <GridColumn TItem="UserVM" Title="Trạng thái" Value="@(x => x.IsConfirmed ? "Active" : "Inactive")" Align="center" />
+                    <GridColumn TItem="UserVM" Title="@L10n.T("user.col_account_type_short")"    Value="@(x => x.ApplicationCD)" />
+                    <GridColumn TItem="UserVM" Title="@L10n.T("user.col_status")" Value="@(x => x.IsConfirmed ? "Active" : "Inactive")" Align="center" />
                 </Columns>
                 <RowTemplate>
                     <td><i class="bi bi-person me-1 text-secondary"></i>@u.UserName</td>
@@ -56,7 +57,7 @@
                     </td>
                 </RowTemplate>
                 <ActionColumn Context="u">
-                    <button class="btn btn-xs btn-outline-primary me-1" title="Sửa" @onclick="() => OpenEdit(u)">
+                    <button class="btn btn-xs btn-outline-primary me-1" title="@L10n.T("user.tooltip_edit")" @onclick="() => OpenEdit(u)">
                         <i class="bi bi-pencil"></i>
                     </button>
                     @if (u.IsConfirmed)
@@ -71,7 +72,7 @@
                             <i class="bi bi-person-check"></i>
                         </button>
                     }
-                    <button class="btn btn-xs btn-outline-secondary" title="Reset mật khẩu" @onclick="() => ResetPassAsync(u.UserName)">
+                    <button class="btn btn-xs btn-outline-secondary" title="@L10n.T("user.tooltip_reset_password")" @onclick="() => ResetPassAsync(u.UserName)">
                         <i class="bi bi-arrow-counterclockwise"></i>
                     </button>
                 </ActionColumn>
@@ -86,7 +87,7 @@
         <div class="modal-dialog">
             <div class="modal-content">
                 <div class="modal-header">
-                    <h5 class="modal-title">@(_isAdd ? "Thêm người dùng" : "Sửa người dùng")</h5>
+                    <h5 class="modal-title">@(_isAdd ? L10n.T("user.modal_title_add") : L10n.T("user.modal_title_edit"))</h5>
                     <button type="button" class="btn-close" @onclick="() => _showModal = false"></button>
                 </div>
                 <div class="modal-body">
@@ -100,7 +101,7 @@
                             <input class="form-control" @bind="_fUsername" disabled="@(!_isAdd)" />
                         </div>
                         <div class="col-6">
-                            <label class="form-label">Họ tên *</label>
+                            <label class="form-label">@L10n.T("user.lbl_fullname")</label>
                             <input class="form-control" @bind="_fFullName" />
                         </div>
                         <div class="col-6">
@@ -108,13 +109,13 @@
                             <input class="form-control" type="email" @bind="_fEmail" />
                         </div>
                         <div class="col-6">
-                            <label class="form-label">Điện thoại</label>
+                            <label class="form-label">@L10n.T("user.lbl_phone")</label>
                             <input class="form-control" @bind="_fPhone" />
                         </div>
                         <div class="col-6">
                             <label class="form-label">Role *</label>
                             <select class="form-select" @bind="_fRoleId">
-                                <option value="0">-- Chọn Role --</option>
+                                <option value="0">@L10n.T("user.select_role_placeholder")</option>
                                 @foreach (var r in _roles)
                                 {
                                     <option value="@r.ID">@r.RoleName</option>
@@ -122,7 +123,7 @@
                             </select>
                         </div>
                         <div class="col-6">
-                            <label class="form-label">Loại tài khoản *</label>
+                            <label class="form-label">@L10n.T("user.lbl_account_type")</label>
                             <select class="form-select" @bind="_fAppCd">
                                 <option value="ETOOLS">ETOOLS</option>
                                 <option value="DMS">DMS</option>
@@ -131,10 +132,10 @@
                     </div>
                 </div>
                 <div class="modal-footer">
-                    <button class="btn btn-secondary" @onclick="() => _showModal = false">Hủy</button>
+                    <button class="btn btn-secondary" @onclick="() => _showModal = false">@L10n.T("user.btn_cancel")</button>
                     <button class="btn btn-primary" @onclick="SaveUserAsync" disabled="@_saving">
                         @if (_saving) { <span class="spinner-border spinner-border-sm me-1"></span> }
-                        Lưu
+                        @L10n.T("user.btn_save")
                     </button>
                 </div>
             </div>
@@ -192,7 +193,7 @@
             var idx = _users.FindIndex(x => x.UserName == u.UserName);
             if (idx >= 0) { u.IsConfirmed = active; _users[idx] = u; }
             _statusOk = true;
-            _statusMsg = $"{(active ? "Active" : "Inactive")} người dùng {u.UserName} thành công.";
+            _statusMsg = $"{(active ? "Active" : "Inactive")} {L10n.T("user.msg_active_success")}";
         }
     }
 
@@ -201,15 +202,15 @@
         var email = await UserSvc.GetUserEmailAsync(username);
         _statusOk = !string.IsNullOrEmpty(email);
         _statusMsg = string.IsNullOrEmpty(email)
-            ? $"Không tìm thấy email của {username}."
-            : $"Chức năng gửi email reset cần cấu hình SMTP. Email: {email}";
+            ? L10n.T("user.msg_email_not_found")
+            : L10n.T("user.msg_reset_smtp_info");
     }
 
     private async Task SaveUserAsync()
     {
         _modalMsg = "";
         if (string.IsNullOrWhiteSpace(_fUsername) || string.IsNullOrWhiteSpace(_fEmail) || _fRoleId == 0)
-        { _modalMsg = "Vui lòng nhập đầy đủ thông tin bắt buộc."; return; }
+        { _modalMsg = L10n.T("user.msg_required_fields"); return; }
 
         _saving = true;
         if (_isAdd)

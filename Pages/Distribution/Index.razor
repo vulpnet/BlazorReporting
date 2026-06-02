@@ -1,27 +1,28 @@
 @page "/distribution"
-@attribute [NavMenu(Title="Phân phối SKU", Icon="bi-box-seam-fill", Group="Phân phối", GroupOrder=30, Order=10)]
+@attribute [NavMenu(Title="dist.nav_title", Icon="bi-box-seam-fill", Group="nav.distribution", GroupOrder=30, Order=10)]
 @using BlazorReporting.Services
 @inject AuthService Auth
 @inject DistributionService DistSvc
 @inject NavigationManager Nav
+@inject LocalizationService L10n
 
-<PageTitle>Quản lý phân phối SKU</PageTitle>
+<PageTitle>@L10n.T("dist.page_title")</PageTitle>
 
 <div class="container-fluid mt-3">
-    <h5 class="mb-3"><i class="bi bi-box-seam-fill me-2"></i>Quản lý phân phối SKU</h5>
+    <h5 class="mb-3"><i class="bi bi-box-seam-fill me-2"></i>@L10n.T("dist.page_title")</h5>
 
     @* Filter bar *@
     <div class="card shadow-sm mb-3">
         <div class="card-body py-2">
             <div class="d-flex gap-2 flex-wrap align-items-end">
                 <div>
-                    <label class="form-label small mb-1">Ngày</label>
+                    <label class="form-label small mb-1">@L10n.T("lbl.date")</label>
                     <input type="date" class="form-control form-control-sm" @bind="_date" />
                 </div>
                 <div style="min-width:240px">
-                    <label class="form-label small mb-1">Distributor *</label>
+                    <label class="form-label small mb-1">@L10n.T("dist.lbl_distributor_required")</label>
                     <select class="form-select form-select-sm" @bind="_distCode">
-                        <option value="">-- Chọn Distributor --</option>
+                        <option value="">@L10n.T("dist.select_distributor_placeholder")</option>
                         @foreach (var d in _distributors)
                         {
                             <option value="@d.DistributorCode">@d.DistributorCode — @d.DistributorName</option>
@@ -29,7 +30,7 @@
                     </select>
                 </div>
                 <button class="btn btn-sm btn-primary" @onclick="LoadDataAsync" disabled="@(string.IsNullOrEmpty(_distCode))">
-                    <i class="bi bi-search me-1"></i>Xem
+                    <i class="bi bi-search me-1"></i>@L10n.T("btn.view")
                 </button>
             </div>
         </div>
@@ -51,13 +52,13 @@
         <SortableGrid Items="_data" Context="r" MinWidth="1000px" DefaultPageSize="20">
             <Columns>
                 <GridColumn TItem="DistributionRow" Title="Salesman"    Value="@(x => x.SalesmanName)" />
-                <GridColumn TItem="DistributionRow" Title="Giám sát"          Value="@(x => x.SalesSupName)" />
+                <GridColumn TItem="DistributionRow" Title="@L10n.T("dist.col_supervisor")"          Value="@(x => x.SalesSupName)" />
                 <GridColumn TItem="DistributionRow" Title="SKU Code"    Value="@(x => x.SKUCode)" />
                 <GridColumn TItem="DistributionRow" Title="SKU Name"    Value="@(x => x.SKUName)" />
-                <GridColumn TItem="DistributionRow" Title="Loại"        Value="@(x => x.Type)" Align="center" />
-                <GridColumn TItem="DistributionRow" Title="Tồn kho NPP" Value="@(x => x.StockSKU)" Align="end" />
-                <GridColumn TItem="DistributionRow" Title="Tồn kho Nhân viên BH" Value="@(x => x.StockSalesman)" Align="end" />
-                <GridColumn TItem="DistributionRow" Title="Ngày phân phối" Value="@(x => x.DistributeDate.HasValue ? x.DistributeDate.Value.ToString("dd/MM/yyyy") : "")" Align="center" />
+                <GridColumn TItem="DistributionRow" Title="@L10n.T("dist.col_type")"        Value="@(x => x.Type)" Align="center" />
+                <GridColumn TItem="DistributionRow" Title="@L10n.T("dist.col_stock_npp")" Value="@(x => x.StockSKU)" Align="end" />
+                <GridColumn TItem="DistributionRow" Title="@L10n.T("dist.col_stock_salesman")" Value="@(x => x.StockSalesman)" Align="end" />
+                <GridColumn TItem="DistributionRow" Title="@L10n.T("dist.col_distribute_date")" Value="@(x => x.DistributeDate.HasValue ? x.DistributeDate.Value.ToString("dd/MM/yyyy") : "")" Align="center" />
             </Columns>
             <RowTemplate>
                 <td class="fw-semibold">@r.SalesmanName <small class="text-muted">(@r.SalesmanCode)</small></td>
@@ -70,7 +71,7 @@
                 <td class="text-center small">@(r.DistributeDate.HasValue ? r.DistributeDate.Value.ToString("dd/MM/yyyy") : "-")</td>
             </RowTemplate>
             <ActionColumn Context="r">
-                <button class="btn btn-xs btn-outline-danger" title="Xóa" @onclick="()=>DeleteAsync(r)">
+                <button class="btn btn-xs btn-outline-danger" title="@L10n.T("btn.delete")" @onclick="()=>DeleteAsync(r)">
                     <i class="bi bi-trash"></i>
                 </button>
             </ActionColumn>
@@ -80,7 +81,7 @@
     {
         <div class="text-center text-muted py-5">
             <i class="bi bi-inbox display-6"></i>
-            <p class="mt-2">Không có dữ liệu phân phối cho Distributor và ngày đã chọn.</p>
+            <p class="mt-2">@L10n.T("dist.no_data_message")</p>
         </div>
     }
 </div>

@@ -1,15 +1,16 @@
 @page "/map"
-@attribute [NavMenu(Title="Bản đồ phân phối", Icon="bi-geo-alt", Group="Phân tích", GroupOrder=10, Order=20, Hidden=true)]
+@attribute [NavMenu(Title="map.nav_title", Icon="bi-geo-alt", Group="nav.analysis", GroupOrder=10, Order=20, Hidden=true)]
 @using BlazorReporting.Data
 @using BlazorReporting.Services
 @using System.Text.Json
+@inject LocalizationService L10n
 @inject IDataRepository Repo
 @inject SalesForecastService Forecaster
 @inject IJSRuntime JS
 @inject NavigationManager Nav
 @implements IAsyncDisposable
 
-<PageTitle>Bản đồ Salesman – DMSPRO</PageTitle>
+<PageTitle>@L10n.T("map.page_title")</PageTitle>
 
 @* ══ TOOLBAR ══════════════════════════════════════════ *@
 <div class="map-toolbar">
@@ -18,8 +19,8 @@
         <div class="d-flex align-items-center gap-2 me-2">
             <div class="map-title-icon"><i class="bi bi-geo-alt-fill"></i></div>
             <div>
-                <div class="map-title">Bản đồ vị trí Salesman</div>
-                <div class="map-subtitle">DMSAimSalesmanLocation — vị trí cuối cùng trong ngày</div>
+                <div class="map-title">@L10n.T("map.title")</div>
+                <div class="map-subtitle">@L10n.T("map.subtitle")</div>
             </div>
         </div>
 
@@ -108,7 +109,7 @@
 
                     @* Today shortcut *@
                     <div class="cal-footer">
-                        <button class="cal-today-btn" @onclick="GoToToday">Today</button>
+                        <button class="cal-today-btn" @onclick="GoToToday">@L10n.T("map.cal_today")</button>
                     </div>
                 </div>
             }
@@ -117,9 +118,9 @@
         <button class="btn btn-primary btn-sm d-flex align-items-center gap-1"
                 @onclick="LoadAsync" disabled="@_loading">
             @if (_loading)
-            { <span class="spinner-border spinner-border-sm"></span><span>Đang tải…</span> }
+            { <span class="spinner-border spinner-border-sm"></span><span>@L10n.T("lbl.loading")</span> }
             else
-            { <i class="bi bi-search"></i><span>Xem bản đồ</span> }
+            { <i class="bi bi-search"></i><span>@L10n.T("map.btn_view_map")</span> }
         </button>
 
         @if (_locations.Count > 0)
@@ -132,27 +133,27 @@
                 <span class="badge bg-secondary" style="font-size:.68rem">
                     <span class="spinner-border spinner-border-sm me-1"
                           style="width:.6rem;height:.6rem;border-width:1.5px"></span>
-                    Địa chỉ @_geocodedCount/@_locations.Count
+                    @L10n.T("map.geocoding_progress")
                 </span>
             }
 
             @* ── Nút chart ── *@
             <div class="btn-group btn-group-sm">
                 <button class="btn @(_showChart ? "btn-primary" : "btn-outline-primary") d-flex align-items-center gap-1"
-                        @onclick="ToggleChartAsync" title="Biểu đồ doanh số theo khu vực">
+                        @onclick="ToggleChartAsync" title="@L10n.T("map.btn_sales_chart_tooltip")">
                     <i class="bi bi-bar-chart-fill"></i>
-                    <span class="d-none d-sm-inline">Doanh số</span>
+                    <span class="d-none d-sm-inline">@L10n.T("map.btn_sales")</span>
                 </button>
                 <button class="btn @(_showProductPanel ? "btn-warning" : "btn-outline-warning") d-flex align-items-center gap-1"
-                        @onclick="ToggleProductPanelAsync" title="Phân tích sản phẩm">
+                        @onclick="ToggleProductPanelAsync" title="@L10n.T("map.btn_product_analysis_tooltip")">
                     <i class="bi bi-box-seam-fill"></i>
-                    <span class="d-none d-sm-inline">Sản phẩm</span>
+                    <span class="d-none d-sm-inline">@L10n.T("map.btn_products")</span>
                 </button>
             </div>
 
             <div class="input-group input-group-sm ms-auto" style="width:210px">
                 <span class="input-group-text bg-white"><i class="bi bi-search"></i></span>
-                <input class="form-control" placeholder="Tìm username / địa chỉ…"
+                <input class="form-control" placeholder="@L10n.T("map.search_placeholder")"
                        @bind="_search" @bind:event="oninput" />
             </div>
         }
@@ -178,7 +179,7 @@
             <div class="map-placeholder">
                 <div class="text-center text-muted">
                     <i class="bi bi-map display-1 opacity-25 d-block mb-3"></i>
-                    <p class="mb-0">Chọn ngày và nhấn <strong>Xem bản đồ</strong></p>
+                    <p class="mb-0">@L10n.T("map.placeholder_hint")</p>
                 </div>
             </div>
         }
@@ -187,7 +188,7 @@
         {
             <div class="map-overlay">
                 <div class="spinner-border text-primary" style="width:2.5rem;height:2.5rem"></div>
-                <div class="mt-2 fw-semibold" style="color:#fff">Đang tải dữ liệu…</div>
+                <div class="mt-2 fw-semibold" style="color:#fff">@L10n.T("map.loading_data")</div>
             </div>
         }
 
@@ -205,18 +206,18 @@
                             <div class="map-route-date">@_date.ToString("dd/MM/yyyy")</div>
                         </div>
                     </div>
-                    <button class="map-route-close" @onclick="ClearRouteAsync" title="Đóng lộ trình">
+                    <button class="map-route-close" @onclick="ClearRouteAsync" title="@L10n.T("map.close_route_tooltip")">
                         <i class="bi bi-x-lg"></i>
                     </button>
                 </div>
                 <div class="map-route-stats">
                     <div class="map-route-stat">
                         <i class="bi bi-geo-fill text-success"></i>
-                        <span>@_routeInfo.Stops điểm GPS</span>
+                        <span>@L10n.T("map.route_gps_stops")</span>
                     </div>
                     <div class="map-route-stat">
                         <i class="bi bi-shop text-warning"></i>
-                        <span>@_routeInfo.CustomerStops KH</span>
+                        <span>@L10n.T("map.route_customer_stops")</span>
                     </div>
                     <div class="map-route-stat">
                         <i class="bi bi-clock text-primary"></i>
@@ -224,7 +225,7 @@
                     </div>
                     <div class="map-route-stat">
                         <i class="bi bi-signpost-2 text-secondary"></i>
-                        <span>~@_routeInfo.Km km</span>
+                        <span>@L10n.T("map.route_km")</span>
                     </div>
                     @if (_routeInfo.TotalSales > 0)
                     {
@@ -242,7 +243,7 @@
             <div class="map-overlay" style="background:rgba(15,23,42,.35)">
                 <div class="spinner-border text-white"></div>
                 <div class="mt-2 text-white fw-semibold" style="font-size:.85rem">
-                    Đang tải lộ trình…
+                    @L10n.T("map.loading_route")
                 </div>
             </div>
         }
@@ -258,15 +259,15 @@
                     <div class="d-flex align-items-center gap-2 flex-wrap">
                         <i class="bi bi-bar-chart-fill text-primary"></i>
                         <span class="fw-bold" style="font-size:.88rem">
-                            Doanh số @_date.ToString("dd/MM/yyyy")
+                            @L10n.T("map.chart_title_date")
                         </span>
                         @if (_chartTotal > 0)
                         {
                             <span class="badge bg-success" style="font-size:.7rem">
-                                Tổng: @FormatMoney(_chartTotal)
+                                @L10n.T("map.chart_total")
                             </span>
                             <span class="badge bg-secondary" style="font-size:.7rem">
-                                @_chartData.Count mục
+                                @L10n.T("map.chart_item_count")
                             </span>
                         }
                     </div>
@@ -277,10 +278,10 @@
                         @* Loại nhóm *@
                         <select class="form-select form-select-sm chart-ctrl-select"
                                 @bind="_chartGroupBy" @bind:after="RefreshChartAsync">
-                            <option value="route">🗺 Tuyến</option>
-                            <option value="sm">👤 Salesman</option>
-                            <option value="province">🏙 Tỉnh/TP</option>
-                            <option value="channel">📦 Kênh</option>
+                            <option value="route">@L10n.T("map.group_route")</option>
+                            <option value="sm">@L10n.T("map.group_sm")</option>
+                            <option value="province">@L10n.T("map.group_province")</option>
+                            <option value="channel">@L10n.T("map.group_channel")</option>
                         </select>
 
                         @* Loại biểu đồ *@
@@ -300,7 +301,7 @@
                             <span class="spinner-border spinner-border-sm text-primary"></span>
                         }
                         <button class="btn btn-sm btn-outline-secondary p-1"
-                                @onclick="() => _showChart = false" title="Đóng">
+                                @onclick="() => _showChart = false" title="@L10n.T("map.btn_close_chart_tooltip")">
                             <i class="bi bi-x-lg"></i>
                         </button>
                     </div>
@@ -311,13 +312,13 @@
                     @if (_chartLoading)
                     {
                         <div class="d-flex align-items-center justify-content-center h-100 text-muted">
-                            <div class="spinner-border me-2"></div>Đang tải…
+                            <div class="spinner-border me-2"></div>@L10n.T("lbl.loading")
                         </div>
                     }
                     else if (_chartData.Count == 0)
                     {
                         <div class="d-flex align-items-center justify-content-center h-100 text-muted">
-                            <i class="bi bi-inbox me-2"></i>Không có dữ liệu
+                            <i class="bi bi-inbox me-2"></i>@L10n.T("lbl.no_data")
                         </div>
                     }
                     else
@@ -339,7 +340,7 @@
                 @* Header / filters *@
                 <div class="map-ps-header">
                     <i class="bi bi-box-seam-fill text-warning me-1"></i>
-                    <span class="fw-bold me-2" style="font-size:.85rem">Phân tích sản phẩm</span>
+                    <span class="fw-bold me-2" style="font-size:.85rem">@L10n.T("map.product_analysis_title")</span>
 
                     <select class="form-select form-select-sm ps-select" @bind="_psYear" disabled="@_psLoading">
                         @for (int y = DateTime.Today.Year; y >= DateTime.Today.Year - 4; y--)
@@ -348,9 +349,9 @@
 
                     <select class="form-select form-select-sm ps-select" @bind="_psPeriodType"
                             @bind:after="OnPsPeriodTypeChanged" disabled="@_psLoading">
-                        <option value="year">Cả năm</option>
-                        <option value="quarter">Quý</option>
-                        <option value="month">Tháng</option>
+                        <option value="year">@L10n.T("map.period_year")</option>
+                        <option value="quarter">@L10n.T("map.period_quarter")</option>
+                        <option value="month">@L10n.T("map.period_month")</option>
                     </select>
 
                     @if (_psPeriodType == "quarter")
@@ -367,7 +368,7 @@
                         <select class="form-select form-select-sm ps-select" @bind="_psPeriodValue" disabled="@_psLoading">
                             @for (int m = 1; m <= 12; m++)
                             {
-                                <option value="@m">Tháng @m</option>
+                                <option value="@m">@L10n.T("map.month_label")</option>
                             }
                         </select>
                     }
@@ -375,7 +376,7 @@
                     <select class="form-select form-select-sm ps-select" @bind="_psGroupBy" disabled="@_psLoading">
                         <option value="route">🗺 Tuyến</option>
                         <option value="province">🏙 Tỉnh/TP</option>
-                        <option value="sm">👤 SM</option>
+                        <option value="sm">@L10n.T("map.group_sm_short")</option>
                     </select>
 
                     <select class="form-select form-select-sm ps-select" @bind="_psTopN" disabled="@_psLoading">
@@ -390,7 +391,7 @@
                         { <span class="spinner-border spinner-border-sm"></span> }
                         else
                         { <i class="bi bi-search"></i> }
-                        <span>Phân tích</span>
+                        <span>@L10n.T("map.btn_analyze")</span>
                     </button>
 
                     @if (_psData.Count > 0)
@@ -416,14 +417,14 @@
                         {
                             <div class="map-ps-placeholder">
                                 <div class="spinner-border text-warning"></div>
-                                <div class="mt-2 text-muted" style="font-size:.8rem">Đang tải…</div>
+                                <div class="mt-2 text-muted" style="font-size:.8rem">@L10n.T("lbl.loading")</div>
                             </div>
                         }
                         else if (_psData.Count == 0)
                         {
                             <div class="map-ps-placeholder text-muted">
                                 <i class="bi bi-box-seam display-6 opacity-25 d-block mb-2"></i>
-                                Chọn kỳ và nhấn <strong>Phân tích</strong>
+                                @L10n.T("map.product_placeholder_hint")
                             </div>
                         }
                         else
@@ -438,7 +439,7 @@
                         {
                             <div class="d-flex align-items-center gap-2 mb-1 flex-shrink-0">
                                 <i class="bi bi-graph-up-arrow text-warning" style="font-size:.85rem"></i>
-                                <span style="font-size:.78rem;font-weight:700">Xu hướng</span>
+                                <span style="font-size:.78rem;font-weight:700">@L10n.T("map.trend_title")</span>
                                 <select class="form-select form-select-sm ps-select"
                                         style="width:auto;max-width:190px"
                                         @bind="_psSelectedProd"
@@ -499,7 +500,7 @@
                         else
                         {
                             <div class="map-ps-placeholder text-muted" style="font-size:.8rem">
-                                <i class="bi bi-arrow-left-circle me-1"></i>Tải dữ liệu để xem xu hướng
+                                @L10n.T("map.trend_empty_hint")
                             </div>
                         }
                     </div>
@@ -512,12 +513,12 @@
                         <table class="ps-strategy-table">
                             <thead>
                                 <tr>
-                                    <th>Khu vực</th>
-                                    <th>SP bán chạy nhất</th>
-                                    <th class="text-end">Số lượng</th>
-                                    <th class="text-end">Doanh số</th>
-                                    <th>Xu hướng</th>
-                                    <th>Gợi ý</th>
+                                    <th>@L10n.T("map.tbl_area")</th>
+                                    <th>@L10n.T("map.tbl_top_product")</th>
+                                    <th class="text-end">@L10n.T("map.tbl_qty")</th>
+                                    <th class="text-end">@L10n.T("map.tbl_sales")</th>
+                                    <th>@L10n.T("map.tbl_trend")</th>
+                                    <th>@L10n.T("map.tbl_suggestion")</th>
                                 </tr>
                             </thead>
                             <tbody>
@@ -553,13 +554,13 @@
     {
         <div class="map-sidebar">
             <div class="map-sidebar-header">
-                <i class="bi bi-list-ul me-1"></i>Danh sách
+                <i class="bi bi-list-ul me-1"></i>@L10n.T("map.sidebar_title")
                 <span class="badge bg-primary ms-1">@FilteredLocations.Count()</span>
                 @if (_routeInfo != null)
                 {
                     <button class="btn btn-xs btn-outline-danger ms-auto py-0 px-1"
                             style="font-size:.65rem" @onclick="ClearRouteAsync">
-                        <i class="bi bi-x"></i> Xoá lộ trình
+                        <i class="bi bi-x"></i> @L10n.T("map.btn_clear_route")
                     </button>
                 }
             </div>
@@ -579,7 +580,7 @@
                                 <div class="map-sidebar-name">@loc.UserName</div>
                                 @* Nút lộ trình *@
                                 <button class="map-route-btn @(isRoute ? "map-route-btn--active" : "")"
-                                        title="@(isRoute ? "Đang xem lộ trình" : "Xem lộ trình di chuyển")"
+                                        title="@(isRoute ? L10n.T("map.route_btn_active_tooltip") : L10n.T("map.route_btn_tooltip"))"
                                         @onclick:stopPropagation="true"
                                         @onclick="() => ShowRouteAsync(loc, idx)">
                                     @if (_routeLoading && _routeLoadingUser == loc.UserName)
@@ -602,7 +603,7 @@
                             }
                             else if (_geocodingStarted)
                             {
-                                <div class="map-sidebar-addr map-sidebar-addr--loading">Đang lấy địa chỉ…</div>
+                                <div class="map-sidebar-addr map-sidebar-addr--loading">@L10n.T("map.geocoding_loading")</div>
                             }
                             @if (_sales.TryGetValue(loc.UserName, out var sale) && sale > 0)
                             {
@@ -725,12 +726,12 @@
                 var name = top.InventoryName;
                 var (tc, ti, tt, sg) = rank switch
                 {
-                    0 or 1 => ("up",   "bi-arrow-up-circle-fill",    "Tăng trưởng",
+                    0 or 1 => ("up",   "bi-arrow-up-circle-fill",    L10n.T("map.strategy_trend_up"),
                                $"Đẩy mạnh {name}, duy trì chiến lược hiện tại"),
                     _ when rank >= total - 2
-                          => ("down", "bi-arrow-down-circle-fill", "Cần chú ý",
+                          => ("down", "bi-arrow-down-circle-fill", L10n.T("map.strategy_trend_down"),
                                $"Xem xét khuyến mãi {name} tại khu vực này"),
-                    _     => ("flat", "bi-dash-circle-fill",       "Ổn định",
+                    _     => ("flat", "bi-dash-circle-fill",       L10n.T("map.strategy_trend_flat"),
                                $"Cơ hội mở rộng {name} sang khu vực lân cận")
                 };
                 return new PsStrategyRow(g.Key, top.InventoryCD, top.InventoryName,
@@ -841,10 +842,10 @@
                     { PropertyNamingPolicy = System.Text.Json.JsonNamingPolicy.CamelCase });
                 var title = _chartGroupBy switch
                 {
-                    "sm"       => "Doanh số theo Salesman",
-                    "province" => "Doanh số theo Tỉnh/Thành phố",
-                    "channel"  => "Doanh số theo Kênh",
-                    _          => "Doanh số theo Tuyến"
+                    "sm"       => L10n.T("map.chart_title_sm"),
+                    "province" => L10n.T("map.chart_title_province"),
+                    "channel"  => L10n.T("map.chart_title_channel"),
+                    _          => L10n.T("map.chart_title_route")
                 };
                 await JS.InvokeVoidAsync("chartInterop.render",
                     "sales-chart", json, title, _chartType);
@@ -872,7 +873,7 @@
         }
         catch (Exception ex)
         {
-            _error = "Lỗi khởi tạo bản đồ: " + ex.Message;
+            _error = L10n.T("map.error_init") + ex.Message;
             StateHasChanged();
         }
     }
@@ -902,7 +903,7 @@
 
             if (_locations.Count == 0)
             {
-                _error = $"Không có dữ liệu cho ngày {_date:dd/MM/yyyy}";
+                _error = L10n.T("map.error_no_data_date");
                 await JS.InvokeVoidAsync("mapInterop.addMarkersJson", "[]");
             }
             else
@@ -981,7 +982,7 @@
             var route = await Repo.GetSalesmanRouteWithSalesAsync(loc.UserName, _date);
             if (route.Count == 0)
             {
-                _error = $"Không có dữ liệu lộ trình cho {loc.UserName}";
+                _error = L10n.T("map.error_no_route");
                 return;
             }
 
@@ -1178,7 +1179,7 @@
                 _psSelectedProd  = PsTopProducts.FirstOrDefault() ?? "";
                 _psAreaNeedsDraw = true;
             }
-            else _error = "Không có dữ liệu sản phẩm cho kỳ đã chọn.";
+            else _error = L10n.T("map.error_no_product_data");
         }
         catch (Exception ex) { _error = ex.Message; }
         finally
@@ -1226,7 +1227,7 @@
 
     private ForecastResult? _psForecast;
 
-    private static List<PsPrediction> BuildPsPredictions(ForecastResult fc)
+    private List<PsPrediction> BuildPsPredictions(ForecastResult fc)
     {
         var result = new List<PsPrediction>();
         for (int i = 0; i < fc.Labels.Count; i++)
@@ -1250,9 +1251,9 @@
 
             var (icon, txt) = sig switch
             {
-                "up"   => ("bi-arrow-up-right-circle-fill",   "Tăng"),
-                "down" => ("bi-arrow-down-right-circle-fill", "Giảm"),
-                _      => ("bi-dash-circle-fill",              "Ổn định")
+                "up"   => ("bi-arrow-up-right-circle-fill",   L10n.T("map.signal_up")),
+                "down" => ("bi-arrow-down-right-circle-fill", L10n.T("map.signal_down")),
+                _      => ("bi-dash-circle-fill",              L10n.T("map.strategy_trend_flat"))
             };
             result.Add(new PsPrediction(fc.Labels[i], predQ, predA, sig, icon, txt));
         }

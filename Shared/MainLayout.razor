@@ -34,7 +34,7 @@ else
 
             <header class="dm-topbar">
                 <button class="dm-topbar__toggle dm-only-desktop" @onclick="ToggleCollapse"
-                        title="@(_collapsed ? "Mở rộng menu" : "Thu gọn menu")">
+                        title="@(_collapsed ? L10n.T("topbar.expand_menu") : L10n.T("topbar.collapse_menu"))">
                     <i class="bi @(_collapsed ? "bi-chevron-double-right" : "bi-chevron-double-left")"></i>
                 </button>
                 <button class="dm-topbar__toggle dm-only-mobile" @onclick="() => _mobileOpen = !_mobileOpen"
@@ -84,7 +84,7 @@ else
 
 <div id="blazor-error-ui" class="alert alert-danger m-2"
      style="display:none;position:fixed;bottom:1rem;left:1rem;right:1rem;z-index:9999">
-    Có lỗi xảy ra. <a href="" class="alert-link">Tải lại</a>
+    @L10n.T("error.occurred") <a href="" class="alert-link">@L10n.T("error.reload")</a>
 </div>
 
 @code {
@@ -95,7 +95,7 @@ else
     private DotNetObjectReference<MainLayout>? _jsRef; // S1
     private ChatWindow? _chatWindow;
 
-    private string CurrentTitle => CurrentItem()?.Title ?? "Trang chủ";
+    private string CurrentTitle => CurrentItem()?.Title ?? L10n.T("nav.home");
     private string CurrentGroup => CurrentItem()?.Group ?? "";
 
     private NavMenuItem? CurrentItem()

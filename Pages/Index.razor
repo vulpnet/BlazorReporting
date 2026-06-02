@@ -9,6 +9,7 @@
 @inject AuditLogService Audit
 @inject DeviceSessionService DeviceSvc
 @inject IJSRuntime JS
+@inject LocalizationService L10n
 
 <div class="login-page">
 
@@ -27,33 +28,32 @@
             </div>
 
             <h2 class="login-tagline">
-                Nền tảng báo cáo<br/>thông minh cho DMS
+                @((MarkupString)L10n.T("login.tagline"))
             </h2>
             <p class="login-desc">
-                Phân tích dữ liệu phân phối, theo dõi KPI và xuất báo cáo
-                trong tích tắc — mọi lúc, mọi nơi.
+                @L10n.T("login.desc")
             </p>
 
             <ul class="login-features">
                 <li>
                     <span class="login-feat-icon"><i class="bi bi-database-fill"></i></span>
-                    <span>Kết nối trực tiếp SQL Server — SP, View, Table</span>
+                    <span>@L10n.T("login.feat_sql")</span>
                 </li>
                 <li>
                     <span class="login-feat-icon"><i class="bi bi-grid-3x3-gap-fill"></i></span>
-                    <span>Pivot động, drill-down đến từng cell</span>
+                    <span>@L10n.T("login.feat_pivot")</span>
                 </li>
                 <li>
                     <span class="login-feat-icon"><i class="bi bi-file-earmark-arrow-down-fill"></i></span>
-                    <span>Xuất Excel, CSV, PDF chỉ 1 click</span>
+                    <span>@L10n.T("login.feat_export")</span>
                 </li>
                 <li>
                     <span class="login-feat-icon"><i class="bi bi-geo-alt-fill"></i></span>
-                    <span>Bản đồ vị trí & lộ trình Salesman</span>
+                    <span>@L10n.T("login.feat_map")</span>
                 </li>
                 <li>
                     <span class="login-feat-icon"><i class="bi bi-robot"></i></span>
-                    <span>Trợ lý AI phân tích dữ liệu (Ollama)</span>
+                    <span>@L10n.T("login.feat_ai")</span>
                 </li>
             </ul>
 
@@ -71,15 +71,25 @@
                 <div class="login-card-logo-sm">
                     <i class="bi bi-bar-chart-line-fill"></i>
                 </div>
-                <h4 class="login-card-title">Đăng nhập</h4>
-                <p class="login-card-sub">Chào mừng trở lại! Vui lòng nhập thông tin của bạn.</p>
+                <h4 class="login-card-title">@L10n.T("login.title")</h4>
+                <p class="login-card-sub">@L10n.T("login.subtitle")</p>
+            </div>
+
+            @* Language switcher *@
+            <div class="login-lang-switcher" style="display:flex;gap:6px;justify-content:center;margin-bottom:12px;">
+                <button type="button" class="btn btn-sm @(_currentLang == "VI" ? "btn-primary" : "btn-outline-secondary")"
+                        @onclick='() => SetLangAsync("VI")'>VI</button>
+                <button type="button" class="btn btn-sm @(_currentLang == "EN" ? "btn-primary" : "btn-outline-secondary")"
+                        @onclick='() => SetLangAsync("EN")'>EN</button>
+                <button type="button" class="btn btn-sm @(_currentLang == "ID" ? "btn-primary" : "btn-outline-secondary")"
+                        @onclick='() => SetLangAsync("ID")'>ID</button>
             </div>
 
             @if (_error)
             {
                 <div class="login-alert">
                     <i class="bi bi-shield-exclamation me-2"></i>
-                    Tên đăng nhập hoặc mật khẩu không đúng.
+                    @L10n.T("login.error")
                 </div>
             }
 
@@ -87,7 +97,7 @@
 
                 @* Username *@
                 <div class="lf-group @(_focusUser ? "lf-group--focus" : "")">
-                    <label class="lf-label">Tên đăng nhập</label>
+                    <label class="lf-label">@L10n.T("login.username")</label>
                     <div class="lf-input-wrap">
                         <span class="lf-icon"><i class="bi bi-person-fill"></i></span>
                         <input class="lf-input"
@@ -100,13 +110,13 @@
                                @onblur="() => _focusUser = false"
                                @onkeydown="OnKeyDown"
                                disabled="@_loading"
-                               placeholder="Nhập tên đăng nhập" />
+                               placeholder="@L10n.T("login.username_placeholder")" />
                     </div>
                 </div>
 
                 @* Password *@
                 <div class="lf-group @(_focusPass ? "lf-group--focus" : "")">
-                    <label class="lf-label">Mật khẩu</label>
+                    <label class="lf-label">@L10n.T("login.password")</label>
                     <div class="lf-input-wrap">
                         <span class="lf-icon"><i class="bi bi-lock-fill"></i></span>
                         <input class="lf-input"
@@ -118,10 +128,10 @@
                                @onblur="() => _focusPass = false"
                                @onkeydown="OnKeyDown"
                                disabled="@_loading"
-                               placeholder="Nhập mật khẩu" />
+                               placeholder="@L10n.T("login.password_placeholder")" />
                         <button class="lf-eye" type="button" tabindex="-1"
                                 @onclick="() => _showPass = !_showPass"
-                                title="@(_showPass ? "Ẩn mật khẩu" : "Hiện mật khẩu")">
+                                title="@(_showPass ? L10n.T("login.hide_password") : L10n.T("login.show_password"))">
                             <i class="bi @(_showPass ? "bi-eye-slash" : "bi-eye")"></i>
                         </button>
                     </div>
@@ -133,12 +143,12 @@
                     @if (_loading)
                     {
                         <span class="lf-spinner"></span>
-                        <span>Đang đăng nhập…</span>
+                        <span>@L10n.T("login.loading")</span>
                     }
                     else
                     {
                         <i class="bi bi-box-arrow-in-right me-2"></i>
-                        <span>Đăng nhập</span>
+                        <span>@L10n.T("login.btn")</span>
                     }
                 </button>
 
@@ -146,7 +156,7 @@
 
             <div class="login-card-footer">
                 <i class="bi bi-shield-lock me-1"></i>
-                Kết nối được mã hoá & bảo mật
+                @L10n.T("login.secure_note")
             </div>
         </div>
 
@@ -166,11 +176,28 @@
     private bool   _focusUser;
     private bool   _focusPass;
     private string? _deviceInfo; // S4: thu thap device info
+    private string _currentLang = "VI";
+
+    protected override void OnInitialized()
+    {
+        L10n.OnChanged += () => { _currentLang = L10n.CurrentLang; StateHasChanged(); };
+    }
 
     // Kiểm tra session ngầm sau khi render — không block UI
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
         if (!firstRender) return;
+        // Restore saved language
+        try
+        {
+            var saved = await JS.InvokeAsync<string>("localStorage.getItem", "dmspro_lang");
+            if (!string.IsNullOrEmpty(saved))
+            {
+                L10n.SetLang(saved);
+                _currentLang = saved;
+            }
+        }
+        catch { }
         // S4: thu thap user agent de identify device
         try { _deviceInfo = await JS.InvokeAsync<string>("eval", "navigator.userAgent"); } catch { }
         try
@@ -183,6 +210,14 @@
             }
         }
         catch { /* localStorage chưa sẵn sàng hoặc không có session */ }
+    }
+
+    private async Task SetLangAsync(string lang)
+    {
+        L10n.SetLang(lang);
+        _currentLang = lang;
+        try { await JS.InvokeVoidAsync("localStorage.setItem", "dmspro_lang", lang); } catch { }
+        StateHasChanged();
     }
 
     private async Task LoginAsync()

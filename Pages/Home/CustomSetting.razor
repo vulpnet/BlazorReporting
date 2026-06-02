@@ -4,11 +4,12 @@
 @inject AuthService Auth
 @inject DashboardService DashSvc
 @inject NavigationManager Nav
+@inject LocalizationService L10n
 
-<PageTitle>Cài đặt màu UI</PageTitle>
+<PageTitle>@L10n.T("custom_setting.page_title")</PageTitle>
 
 <div class="container-fluid mt-3">
-    <h5 class="mb-3"><i class="bi bi-palette-fill me-2"></i>Cài đặt màu UI</h5>
+    <h5 class="mb-3"><i class="bi bi-palette-fill me-2"></i>@L10n.T("custom_setting.page_title")</h5>
 
     @if (!string.IsNullOrEmpty(_msg))
     {
@@ -26,15 +27,15 @@
         <SortableGrid @ref="_grid" Items="_settings" Context="s" MinWidth="500px" DefaultPageSize="20">
             <ToolbarContent>
                 <button class="btn btn-sm btn-primary" @onclick="OpenAdd">
-                    <i class="bi bi-plus-lg me-1"></i>Thêm
+                    <i class="bi bi-plus-lg me-1"></i>@L10n.T("custom_setting.btn_add")
                 </button>
             </ToolbarContent>
             <Columns>
-                <GridColumn TItem="CustomColorSettingRow" Title="Tên setting" Value="@(x => x.SettingName)" />
+                <GridColumn TItem="CustomColorSettingRow" Title="@L10n.T("custom_setting.col_name")" Value="@(x => x.SettingName)" />
                 <GridColumn TItem="CustomColorSettingRow" Title="Type"        Value="@(x => x.Type)" />
-                <GridColumn TItem="CustomColorSettingRow" Title="Từ"          Value="@(x => x.ValueFrom)" Align="end" />
-                <GridColumn TItem="CustomColorSettingRow" Title="Đến"         Value="@(x => x.ValueTo)"   Align="end" />
-                <GridColumn TItem="CustomColorSettingRow" Title="Màu"         Value="@(x => x.Color)"     Align="center" Filterable="false" />
+                <GridColumn TItem="CustomColorSettingRow" Title="@L10n.T("custom_setting.col_from")"          Value="@(x => x.ValueFrom)" Align="end" />
+                <GridColumn TItem="CustomColorSettingRow" Title="@L10n.T("custom_setting.col_to")"         Value="@(x => x.ValueTo)"   Align="end" />
+                <GridColumn TItem="CustomColorSettingRow" Title="@L10n.T("custom_setting.col_color")"         Value="@(x => x.Color)"     Align="center" Filterable="false" />
             </Columns>
             <RowTemplate>
                 <td>@s.SettingName</td>
@@ -63,30 +64,30 @@
         <div class="modal-dialog">
             <div class="modal-content">
                 <div class="modal-header">
-                    <h5 class="modal-title">@(_editId==0?"Thêm setting":"Sửa setting")</h5>
+                    <h5 class="modal-title">@(_editId==0?L10n.T("custom_setting.modal_title_add"):L10n.T("custom_setting.modal_title_edit"))</h5>
                     <button class="btn-close" @onclick="()=>_showModal=false"></button>
                 </div>
                 <div class="modal-body">
                     <div class="mb-2">
-                        <label class="form-label">Tên setting *</label>
+                        <label class="form-label">@L10n.T("custom_setting.lbl_name")</label>
                         <input class="form-control" @bind="_fName" />
                     </div>
                     <div class="mb-2">
-                        <label class="form-label">Type *</label>
-                        <input class="form-control" @bind="_fType" placeholder="vd: Revenue, Visit..." />
+                        <label class="form-label">@L10n.T("custom_setting.lbl_type")</label>
+                        <input class="form-control" @bind="_fType" placeholder="@L10n.T("custom_setting.placeholder_type")" />
                     </div>
                     <div class="row g-2 mb-2">
                         <div class="col-6">
-                            <label class="form-label">Giá trị từ</label>
+                            <label class="form-label">@L10n.T("custom_setting.lbl_value_from")</label>
                             <input class="form-control" type="number" @bind="_fFrom" />
                         </div>
                         <div class="col-6">
-                            <label class="form-label">Giá trị đến</label>
+                            <label class="form-label">@L10n.T("custom_setting.lbl_value_to")</label>
                             <input class="form-control" type="number" @bind="_fTo" />
                         </div>
                     </div>
                     <div class="mb-2">
-                        <label class="form-label">Màu (hex) *</label>
+                        <label class="form-label">@L10n.T("custom_setting.lbl_color")</label>
                         <div class="d-flex gap-2 align-items-center">
                             <input class="form-control" @bind="_fColor" placeholder="#FF0000" style="font-family:monospace" />
                             <input type="color" class="form-control form-control-color"
@@ -95,10 +96,10 @@
                     </div>
                 </div>
                 <div class="modal-footer">
-                    <button class="btn btn-secondary" @onclick="()=>_showModal=false">Hủy</button>
+                    <button class="btn btn-secondary" @onclick="()=>_showModal=false">@L10n.T("custom_setting.btn_cancel")</button>
                     <button class="btn btn-primary" @onclick="SaveAsync" disabled="@_saving">
                         @if (_saving) { <span class="spinner-border spinner-border-sm me-1"></span> }
-                        Lưu
+                        @L10n.T("custom_setting.btn_save")
                     </button>
                 </div>
             </div>
@@ -144,18 +145,18 @@
     private async Task SaveAsync()
     {
         if (string.IsNullOrWhiteSpace(_fName)||string.IsNullOrWhiteSpace(_fColor))
-        { _ok=false; _msg="Vui lòng nhập đầy đủ thông tin."; return; }
+        { _ok=false; _msg=L10n.T("custom_setting.err_required"); return; }
         _saving=true;
         var row = new CustomColorSettingRow { ID=_editId, SettingName=_fName, Type=_fType, Color=_fColor, ValueFrom=_fFrom, ValueTo=_fTo };
         if (_editId==0)
         {
             var added = await DashSvc.AddColorSettingAsync(row);
-            if (added!=null) { _settings.Add(added); _ok=true; _msg="Thêm thành công."; }
+            if (added!=null) { _settings.Add(added); _ok=true; _msg=L10n.T("custom_setting.msg_add_ok"); }
         }
         else
         {
             var ok = await DashSvc.UpdateColorSettingAsync(row);
-            if (ok) { var idx=_settings.FindIndex(x=>x.ID==_editId); if(idx>=0) _settings[idx]=row; _ok=true; _msg="Cập nhật thành công."; }
+            if (ok) { var idx=_settings.FindIndex(x=>x.ID==_editId); if(idx>=0) _settings[idx]=row; _ok=true; _msg=L10n.T("custom_setting.msg_update_ok"); }
         }
         _saving=false; _showModal=false;
     }
@@ -163,6 +164,6 @@
     private async Task DeleteAsync(int id)
     {
         var ok = await DashSvc.DeleteColorSettingAsync(id);
-        if (ok) { _settings.RemoveAll(x=>x.ID==id); _ok=true; _msg="Đã xóa."; }
+        if (ok) { _settings.RemoveAll(x=>x.ID==id); _ok=true; _msg=L10n.T("custom_setting.msg_delete_ok"); }
     }
 }

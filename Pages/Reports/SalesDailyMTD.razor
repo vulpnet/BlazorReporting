@@ -4,17 +4,18 @@
 @inject AuthService Auth
 @inject ReportService RptSvc
 @inject NavigationManager Nav
+@inject LocalizationService L10n
 <PageTitle>Sales Daily MTD</PageTitle>
 <div class="container-fluid mt-3">
     <h5 class="mb-3"><i class="bi bi-calendar3 me-2"></i>Sales Daily MTD</h5>
     <div class="card shadow-sm mb-3"><div class="card-body py-2">
         <div class="d-flex gap-2 flex-wrap align-items-end">
-            <div><label class="form-label small mb-1">Từ ngày</label><input type="date" class="form-control form-control-sm" style="width:150px" @bind="_from"/></div>
-            <div><label class="form-label small mb-1">Đến ngày</label><input type="date" class="form-control form-control-sm" style="width:150px" @bind="_to"/></div>
-            <div><label class="form-label small mb-1">Tuyến</label><input class="form-control form-control-sm" style="width:150px" placeholder="RouteCD..." @bind="_route"/></div>
-            <div><label class="form-label small mb-1">Nhân viên BH</label><input class="form-control form-control-sm" style="width:140px" placeholder="SalesmanID..." @bind="_sm"/></div>
-            <button class="btn btn-sm btn-primary" @onclick="LoadAsync"><i class="bi bi-search me-1"></i>Xem</button>
-            @if (_data.Any()){<span class="text-muted small ms-2">@_data.Count dong</span>}
+            <div><label class="form-label small mb-1">@L10n.T("lbl.from_date")</label><input type="date" class="form-control form-control-sm" style="width:150px" @bind="_from"/></div>
+            <div><label class="form-label small mb-1">@L10n.T("lbl.to_date")</label><input type="date" class="form-control form-control-sm" style="width:150px" @bind="_to"/></div>
+            <div><label class="form-label small mb-1">@L10n.T("lbl.route")</label><input class="form-control form-control-sm" style="width:150px" placeholder="RouteCD..." @bind="_route"/></div>
+            <div><label class="form-label small mb-1">@L10n.T("lbl.salesman")</label><input class="form-control form-control-sm" style="width:140px" placeholder="SalesmanID..." @bind="_sm"/></div>
+            <button class="btn btn-sm btn-primary" @onclick="LoadAsync"><i class="bi bi-search me-1"></i>@L10n.T("btn.view")</button>
+            @if (_data.Any()){<span class="text-muted small ms-2">@_data.Count @L10n.T("sales_daily_mtd.row_count_suffix")</span>}
         </div>
     </div></div>
     @if (_error!=null){<div class="alert alert-danger py-2 alert-dismissible">@_error<button class="btn-close" @onclick="ClearErr"></button></div>}
@@ -22,13 +23,13 @@
     else {
         <SortableGrid Items="_data" Context="r" MinWidth="1000px" DefaultPageSize="20">
             <Columns>
-                <GridColumn TItem="GenericReportRow" Title="Ngày"        Value="@(x=>x.VisitDate.HasValue?x.VisitDate.Value.ToString("dd/MM/yy"):"")" Align="center"/>
-                <GridColumn TItem="GenericReportRow" Title="Nhân viên BH"         Value="@(x=>x.SalesmanName)"/>
-                <GridColumn TItem="GenericReportRow" Title="Tuyến"       Value="@(x=>x.RouteCD)"/>
-                <GridColumn TItem="GenericReportRow" Title="NPP" Value="@(x=>x.DistributorName)"/>
-                <GridColumn TItem="GenericReportRow" Title="Doanh số"    Value="@(x=>x.TotalAmount)" Align="end"/>
-                <GridColumn TItem="GenericReportRow" Title="Doanh số MTD"      Value="@(x=>x.MTDTotalAmount)" Align="end"/>
-                <GridColumn TItem="GenericReportRow" Title="Đơn hàng"    Value="@(x=>x.OrderCount)" Align="end"/>
+                <GridColumn TItem="GenericReportRow" Title="@L10n.T("lbl.date")"        Value="@(x=>x.VisitDate.HasValue?x.VisitDate.Value.ToString("dd/MM/yy"):"")" Align="center"/>
+                <GridColumn TItem="GenericReportRow" Title="@L10n.T("lbl.salesman")"         Value="@(x=>x.SalesmanName)"/>
+                <GridColumn TItem="GenericReportRow" Title="@L10n.T("lbl.route")"       Value="@(x=>x.RouteCD)"/>
+                <GridColumn TItem="GenericReportRow" Title="@L10n.T("lbl.distributor")" Value="@(x=>x.DistributorName)"/>
+                <GridColumn TItem="GenericReportRow" Title="@L10n.T("sales_daily_mtd.col_total_amount")"    Value="@(x=>x.TotalAmount)" Align="end"/>
+                <GridColumn TItem="GenericReportRow" Title="@L10n.T("sales_daily_mtd.col_mtd_amount")"      Value="@(x=>x.MTDTotalAmount)" Align="end"/>
+                <GridColumn TItem="GenericReportRow" Title="@L10n.T("sales_daily_mtd.col_order_count")"    Value="@(x=>x.OrderCount)" Align="end"/>
                 <GridColumn TItem="GenericReportRow" Title="SKU"         Value="@(x=>x.TotalSKU)" Align="end"/>
                 <GridColumn TItem="GenericReportRow" Title="MCP"         Value="@(x=>x.strIsMCP)" Align="center"/>
             </Columns>
@@ -41,7 +42,7 @@
                 <td class="text-end small text-info">@((r.MTDTotalAmount/1_000_000m).ToString("N2"))M</td>
                 <td class="text-end">@r.OrderCount</td>
                 <td class="text-end small">@r.TotalSKU.ToString("N0")</td>
-                <td class="text-center"><span class="badge @(r.strIsMCP=="IsRoute"?"bg-primary":"bg-secondary")" style="font-size:.65rem">@(r.strIsMCP=="IsRoute"?"Dung tuyen":"Ngoai")</span></td>
+                <td class="text-center"><span class="badge @(r.strIsMCP=="IsRoute"?"bg-primary":"bg-secondary")" style="font-size:.65rem">@(r.strIsMCP=="IsRoute"?L10n.T("sales_daily_mtd.badge_in_route"):L10n.T("sales_daily_mtd.badge_off_route"))</span></td>
             </RowTemplate>
         </SortableGrid>
     }

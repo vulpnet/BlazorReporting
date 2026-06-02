@@ -6,9 +6,10 @@
 @inject IDataRepository Repo
 @inject SalesStrategyService Strategist
 @inject IJSRuntime JS
+@inject LocalizationService L10n
 @implements IAsyncDisposable
 
-<PageTitle>Chiến lược kinh doanh – DMSPRO</PageTitle>
+<PageTitle>@L10n.T("sales_strategy.page_title") – DMSPRO</PageTitle>
 
 @* ══ TOOLBAR ══════════════════════════════════════════════ *@
 <div class="ps-toolbar">
@@ -17,8 +18,8 @@
         <div class="d-flex align-items-center gap-2 me-2">
             <div class="strat-title-icon"><i class="bi bi-robot"></i></div>
             <div>
-                <div class="ps-title">Chiến lược kinh doanh</div>
-                <div class="ps-subtitle">ML.NET SSA · Dự đoán nhu cầu nhập/xuất hàng theo Tỉnh/TP</div>
+                <div class="ps-title">@L10n.T("sales_strategy.page_title")</div>
+                <div class="ps-subtitle">@L10n.T("sales_strategy.subtitle")</div>
             </div>
         </div>
 
@@ -33,9 +34,9 @@
         @* ── Kiểu kỳ ── *@
         <select class="form-select form-select-sm ps-select" @bind="_periodType"
                 @bind:after="OnPeriodTypeChanged" disabled="@_training">
-            <option value="year">Cả năm</option>
-            <option value="quarter">Theo quý</option>
-            <option value="month">Theo tháng</option>
+            <option value="year">@L10n.T("sales_strategy.period_year")</option>
+            <option value="quarter">@L10n.T("sales_strategy.period_quarter")</option>
+            <option value="month">@L10n.T("sales_strategy.period_month")</option>
         </select>
 
         @* ── Giá trị kỳ ── *@
@@ -53,49 +54,49 @@
             <select class="form-select form-select-sm ps-select" @bind="_periodValue" disabled="@_training">
                 @for (int m = 1; m <= 12; m++)
                 {
-                    <option value="@m">Tháng @m</option>
+                    <option value="@m">@L10n.T("sales_strategy.month_n")</option>
                 }
             </select>
         }
 
         @* ── Cửa sổ lịch sử train ── *@
         <select class="form-select form-select-sm ps-select" @bind="_historyMonths" disabled="@_training"
-                title="Số tháng lịch sử dùng để huấn luyện mô hình ML.NET">
-            <option value="6">6T lịch sử</option>
-            <option value="12">12T lịch sử</option>
-            <option value="18">18T lịch sử</option>
-            <option value="24">24T lịch sử</option>
+                title="@L10n.T("sales_strategy.history_tooltip")">
+            <option value="6">@L10n.T("sales_strategy.history_6m")</option>
+            <option value="12">@L10n.T("sales_strategy.history_12m")</option>
+            <option value="18">@L10n.T("sales_strategy.history_18m")</option>
+            <option value="24">@L10n.T("sales_strategy.history_24m")</option>
         </select>
 
         @* ── Top SP ── *@
         <select class="form-select form-select-sm ps-select" @bind="_topProducts" disabled="@_training">
-            <option value="10">Top 10 SP</option>
-            <option value="20">Top 20 SP</option>
-            <option value="30">Top 30 SP</option>
-            <option value="50">Top 50 SP</option>
+            <option value="10">@L10n.T("sales_strategy.top_products_10")</option>
+            <option value="20">@L10n.T("sales_strategy.top_products_20")</option>
+            <option value="30">@L10n.T("sales_strategy.top_products_30")</option>
+            <option value="50">@L10n.T("sales_strategy.top_products_50")</option>
         </select>
 
         @* ── Filter hành động ── *@
         <select class="form-select form-select-sm ps-select" @bind="_filterAction" disabled="@_training">
-            <option value="all">Tất cả</option>
-            <option value="import">📈 Nhập thêm</option>
-            <option value="export">📉 Xuất bớt</option>
-            <option value="maintain">➡ Duy trì</option>
+            <option value="all">@L10n.T("sales_strategy.filter_all")</option>
+            <option value="import">@L10n.T("sales_strategy.filter_import")</option>
+            <option value="export">@L10n.T("sales_strategy.filter_export")</option>
+            <option value="maintain">@L10n.T("sales_strategy.filter_maintain")</option>
         </select>
 
         <button class="btn btn-sm btn-primary d-flex align-items-center gap-1"
                 @onclick="TrainAsync" disabled="@_training">
             @if (_training)
-            { <span class="spinner-border spinner-border-sm"></span><span>Đang huấn luyện…</span> }
+            { <span class="spinner-border spinner-border-sm"></span><span>@L10n.T("sales_strategy.btn_training")</span> }
             else
-            { <i class="bi bi-robot me-1"></i><span>Huấn luyện &amp; Phân tích</span> }
+            { <i class="bi bi-robot me-1"></i><span>@L10n.T("sales_strategy.btn_train")</span> }
         </button>
 
         <a class="btn btn-sm btn-outline-info d-flex align-items-center gap-1"
            href="/help#sales-strategy" target="_blank"
-           title="Xem hướng dẫn chi tiết">
+           title="@L10n.T("sales_strategy.help_tooltip")">
             <i class="bi bi-question-circle-fill"></i>
-            <span class="d-none d-md-inline">Hướng dẫn</span>
+            <span class="d-none d-md-inline">@L10n.T("sales_strategy.help_label")</span>
         </a>
 
         @if (_result != null && _result.All.Count > 0)
@@ -113,7 +114,7 @@
         var pct = (int)(_donePairs * 100.0 / _totalPairs);
         <div class="mt-2">
             <div class="d-flex justify-content-between small text-muted mb-1">
-                <span><i class="bi bi-cpu me-1"></i>Đang train @_donePairs / @_totalPairs cặp Tỉnh×SP…</span>
+                <span><i class="bi bi-cpu me-1"></i>@L10n.T("sales_strategy.progress_label")</span>
                 <span>@pct%</span>
             </div>
             <div class="progress" style="height:6px">
@@ -136,9 +137,9 @@
 {
     <div class="ps-empty">
         <i class="bi bi-robot display-1 opacity-20 d-block mb-3"></i>
-        <p class="fw-semibold mb-1">Nhấn <strong>Huấn luyện &amp; Phân tích</strong> để bắt đầu</p>
+        <p class="fw-semibold mb-1">@L10n.T("sales_strategy.empty_cta")</p>
         <p class="text-muted" style="font-size:.85rem">
-            ML.NET SSA sẽ train cho từng cặp Tỉnh/TP × Sản phẩm và đưa ra khuyến nghị nhập/xuất hàng
+            @L10n.T("sales_strategy.empty_desc")
         </p>
     </div>
 }
@@ -146,8 +147,8 @@ else if (_training && _result == null)
 {
     <div class="ps-empty">
         <div class="spinner-border text-primary mb-3" style="width:3rem;height:3rem"></div>
-        <p class="fw-semibold">Đang huấn luyện mô hình ML.NET…</p>
-        <p class="text-muted small">Sử dụng Singular Spectrum Analysis (SSA) cho từng cặp Tỉnh × Sản phẩm</p>
+        <p class="fw-semibold">@L10n.T("sales_strategy.loading_model")</p>
+        <p class="text-muted small">@L10n.T("sales_strategy.loading_desc")</p>
     </div>
 }
 else if (_result != null)
@@ -157,27 +158,27 @@ else if (_result != null)
         <div class="strat-summary-card strat-summary-card--primary">
             <i class="bi bi-map-fill"></i>
             <div class="strat-summary-val">@_result.TotalProvinces</div>
-            <div class="strat-summary-lbl">Tỉnh / TP</div>
+            <div class="strat-summary-lbl">@L10n.T("sales_strategy.lbl_province")</div>
         </div>
         <div class="strat-summary-card strat-summary-card--info">
             <i class="bi bi-box-seam-fill"></i>
             <div class="strat-summary-val">@_result.TotalProducts</div>
-            <div class="strat-summary-lbl">Sản phẩm</div>
+            <div class="strat-summary-lbl">@L10n.T("sales_strategy.lbl_products")</div>
         </div>
         <div class="strat-summary-card strat-summary-card--import">
             <i class="bi bi-arrow-up-circle-fill"></i>
             <div class="strat-summary-val">@_result.ImportCount</div>
-            <div class="strat-summary-lbl">Cần Nhập thêm</div>
+            <div class="strat-summary-lbl">@L10n.T("sales_strategy.lbl_need_import")</div>
         </div>
         <div class="strat-summary-card strat-summary-card--export">
             <i class="bi bi-arrow-down-circle-fill"></i>
             <div class="strat-summary-val">@_result.ExportCount</div>
-            <div class="strat-summary-lbl">Cần Xuất bớt</div>
+            <div class="strat-summary-lbl">@L10n.T("sales_strategy.lbl_need_export")</div>
         </div>
         <div class="strat-summary-card strat-summary-card--maintain">
             <i class="bi bi-dash-circle-fill"></i>
             <div class="strat-summary-val">@_result.MaintainCount</div>
-            <div class="strat-summary-lbl">Duy trì</div>
+            <div class="strat-summary-lbl">@L10n.T("sales_strategy.lbl_maintain")</div>
         </div>
     </div>
 
@@ -187,12 +188,12 @@ else if (_result != null)
         @* Province sidebar *@
         <div class="strat-province-sidebar">
             <div class="strat-sidebar-hdr">
-                <i class="bi bi-geo-alt-fill me-1 text-primary"></i>Tỉnh / TP
+                <i class="bi bi-geo-alt-fill me-1 text-primary"></i>@L10n.T("sales_strategy.lbl_province")
             </div>
             <div class="strat-sidebar-body">
                 <div class="strat-province-item @(_selectedProvince == "" ? "strat-province-item--active" : "")"
                      @onclick='() => SelectProvince("")'>
-                    <span class="fw-semibold">🌐 Toàn quốc</span>
+                    <span class="fw-semibold">@L10n.T("sales_strategy.nationwide")</span>
                     <span class="badge bg-primary ms-auto">@_result.All.Count</span>
                 </div>
                 @foreach (var ps in _result.ProvinceSummaries)
@@ -223,13 +224,13 @@ else if (_result != null)
                     <i class="bi bi-lightbulb-fill text-warning"></i>
                     <span class="fw-bold">
                         @(string.IsNullOrEmpty(_selectedProvince) ? "Toàn quốc" : _selectedProvince)
-                        — Khuyến nghị nhập/xuất hàng
+                        @L10n.T("sales_strategy.recommendation_heading")
                     </span>
                     <span class="badge bg-secondary" style="font-size:.68rem">@FilteredRows.Count dòng</span>
                 </div>
                 <div class="d-flex gap-2 align-items-center">
                     <input class="form-control form-control-sm" style="width:160px"
-                           placeholder="Tìm sản phẩm…"
+                           placeholder="@L10n.T("sales_strategy.search_placeholder")"
                            @bind="_search" @bind:event="oninput" />
                     <div class="algo-badge badge-ssa">
                         <i class="bi bi-robot me-1"></i>ML.NET SSA
@@ -241,15 +242,15 @@ else if (_result != null)
                 <table class="strat-table">
                     <thead>
                         <tr>
-                            <th>Tỉnh / TP</th>
-                            <th>Sản phẩm</th>
-                            <th class="text-end">TB 3T thực</th>
-                            <th class="text-end">Dự đoán 3T</th>
-                            <th class="text-end">Tăng trưởng</th>
-                            <th>Khuyến nghị</th>
-                            <th>Yếu tố tác động</th>
-                            <th>Lý do &amp; Sự kiện</th>
-                            <th class="text-center">Tin cậy</th>
+                            <th>@L10n.T("sales_strategy.lbl_province")</th>
+                            <th>@L10n.T("sales_strategy.lbl_products")</th>
+                            <th class="text-end">@L10n.T("sales_strategy.col_avg3m")</th>
+                            <th class="text-end">@L10n.T("sales_strategy.col_pred3m")</th>
+                            <th class="text-end">@L10n.T("sales_strategy.col_growth")</th>
+                            <th>@L10n.T("sales_strategy.col_recommendation")</th>
+                            <th>@L10n.T("sales_strategy.col_factors")</th>
+                            <th>@L10n.T("sales_strategy.col_reason")</th>
+                            <th class="text-center">@L10n.T("sales_strategy.col_confidence")</th>
                         </tr>
                     </thead>
                     <tbody>
@@ -350,7 +351,7 @@ else if (_result != null)
                 <div class="strat-charts">
                     <div class="strat-chart-card">
                         <div class="strat-chart-hdr strat-chart-hdr--import">
-                            <i class="bi bi-arrow-up-circle-fill me-1"></i>Top SP nên Nhập thêm
+                            <i class="bi bi-arrow-up-circle-fill me-1"></i>@L10n.T("sales_strategy.chart_import_title")
                         </div>
                         <div class="strat-chart-body">
                             <canvas id="strat-import-chart"></canvas>
@@ -358,7 +359,7 @@ else if (_result != null)
                     </div>
                     <div class="strat-chart-card">
                         <div class="strat-chart-hdr strat-chart-hdr--export">
-                            <i class="bi bi-arrow-down-circle-fill me-1"></i>Top SP nên Xuất bớt
+                            <i class="bi bi-arrow-down-circle-fill me-1"></i>@L10n.T("sales_strategy.chart_export_title")
                         </div>
                         <div class="strat-chart-body">
                             <canvas id="strat-export-chart"></canvas>
@@ -451,7 +452,7 @@ else if (_result != null)
                 _year, Quarter, Month, _historyMonths, _topProducts);
             if (history.Count == 0)
             {
-                _error = "Không có dữ liệu lịch sử để huấn luyện.";
+                _error = L10n.T("sales_strategy.err_no_history");
                 return;
             }
 
@@ -514,15 +515,15 @@ else if (_result != null)
         catch { /* ignore */ }
     }
 
-    private static string InvSignalLabel(InventorySignal sig) => sig switch
+    private string InvSignalLabel(InventorySignal sig) => sig switch
     {
-        InventorySignal.SurgeBuying      => "Khách đang mua gom",
-        InventorySignal.PossibleStockout => "Dấu hiệu hết hàng",
-        InventorySignal.SharpDecline     => "Bán chậm đột ngột",
-        InventorySignal.Increasing       => "Đơn hàng tăng dần",
-        InventorySignal.Slowing          => "Đơn hàng chậm lại",
-        InventorySignal.Stable           => "Ổn định",
-        _                                => "Chưa đủ dữ liệu"
+        InventorySignal.SurgeBuying      => L10n.T("sales_strategy.inv_surge_buying"),
+        InventorySignal.PossibleStockout => L10n.T("sales_strategy.inv_possible_stockout"),
+        InventorySignal.SharpDecline     => L10n.T("sales_strategy.inv_sharp_decline"),
+        InventorySignal.Increasing       => L10n.T("sales_strategy.inv_increasing"),
+        InventorySignal.Slowing          => L10n.T("sales_strategy.inv_slowing"),
+        InventorySignal.Stable           => L10n.T("sales_strategy.inv_stable"),
+        _                                => L10n.T("sales_strategy.inv_insufficient_data")
     };
 
     private static string FormatM(decimal v)

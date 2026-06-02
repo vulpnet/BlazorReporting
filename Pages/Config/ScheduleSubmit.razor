@@ -4,41 +4,42 @@
 @inject AuthService Auth
 @inject ConfigService CfgSvc
 @inject NavigationManager Nav
+@inject LocalizationService L10n
 
-<PageTitle>Mở/Đóng ngày nộp lịch</PageTitle>
+<PageTitle>@L10n.T("schedule_submit.page_title")</PageTitle>
 
 <div class="container-fluid mt-3">
-    <h5 class="mb-3"><i class="bi bi-calendar-check-fill me-2"></i>Quản lý ngày nộp lịch</h5>
+    <h5 class="mb-3"><i class="bi bi-calendar-check-fill me-2"></i>@L10n.T("schedule_submit.heading")</h5>
 
     @* Filter *@
     <div class="card shadow-sm mb-3">
         <div class="card-body py-2">
             <div class="d-flex gap-2 flex-wrap align-items-end">
                 <div>
-                    <label class="form-label small mb-1">Từ ngày</label>
+                    <label class="form-label small mb-1">@L10n.T("schedule_submit.lbl_from_date")</label>
                     <input type="date" class="form-control form-control-sm" @bind="_fromDate" />
                 </div>
                 <div>
-                    <label class="form-label small mb-1">Đến ngày</label>
+                    <label class="form-label small mb-1">@L10n.T("schedule_submit.lbl_to_date")</label>
                     <input type="date" class="form-control form-control-sm" @bind="_toDate" />
                 </div>
                 <div>
-                    <label class="form-label small mb-1">Loại ca</label>
+                    <label class="form-label small mb-1">@L10n.T("schedule_submit.lbl_shift_type")</label>
                     <select class="form-select form-select-sm" style="width:130px" @bind="_filterType">
-                        <option value="">Tất cả</option>
-                        <option value="AM">Sáng (AM)</option>
-                        <option value="PM">Chiều (PM)</option>
+                        <option value="">@L10n.T("schedule_submit.opt_all")</option>
+                        <option value="AM">@L10n.T("schedule_submit.opt_am")</option>
+                        <option value="PM">@L10n.T("schedule_submit.opt_pm")</option>
                     </select>
                 </div>
                 <div>
-                    <label class="form-label small mb-1">Nhân viên</label>
+                    <label class="form-label small mb-1">@L10n.T("schedule_submit.lbl_employee")</label>
                     <input class="form-control form-control-sm" style="width:160px" placeholder="EmployeeID..." @bind="_filterEmp" />
                 </div>
                 <button class="btn btn-sm btn-primary" @onclick="LoadAsync">
-                    <i class="bi bi-search me-1"></i>Tìm
+                    <i class="bi bi-search me-1"></i>@L10n.T("schedule_submit.btn_search")
                 </button>
                 <button class="btn btn-sm btn-success ms-auto" @onclick="OpenAdd">
-                    <i class="bi bi-plus-lg me-1"></i>Mở ngày mới
+                    <i class="bi bi-plus-lg me-1"></i>@L10n.T("schedule_submit.btn_open_new")
                 </button>
             </div>
         </div>
@@ -59,12 +60,12 @@
     {
         <SortableGrid Items="_items" Context="r" MinWidth="700px" DefaultPageSize="20">
             <Columns>
-                <GridColumn TItem="ScheduleSubmitRow" Title="Nhân viên"  Value="@(x => x.EmployeeID)" />
-                <GridColumn TItem="ScheduleSubmitRow" Title="Ngày"       Value="@(x => x.Date.ToString("dd/MM/yyyy"))" Align="center" />
-                <GridColumn TItem="ScheduleSubmitRow" Title="Ca"         Value="@(x => x.Type)" Align="center" />
-                <GridColumn TItem="ScheduleSubmitRow" Title="Ghi chú"    Value="@(x => x.Note)" />
-                <GridColumn TItem="ScheduleSubmitRow" Title="Giờ đóng"  Value="@(x => x.CloseTime)" Align="end" />
-                <GridColumn TItem="ScheduleSubmitRow" Title="Trạng thái" Value="@(x => x.Status == 0 ? "Mở" : "Đóng")" Align="center" />
+                <GridColumn TItem="ScheduleSubmitRow" Title="@L10n.T("schedule_submit.col_employee")"  Value="@(x => x.EmployeeID)" />
+                <GridColumn TItem="ScheduleSubmitRow" Title="@L10n.T("schedule_submit.col_date")"       Value="@(x => x.Date.ToString("dd/MM/yyyy"))" Align="center" />
+                <GridColumn TItem="ScheduleSubmitRow" Title="@L10n.T("schedule_submit.col_shift")"         Value="@(x => x.Type)" Align="center" />
+                <GridColumn TItem="ScheduleSubmitRow" Title="@L10n.T("schedule_submit.col_note")"    Value="@(x => x.Note)" />
+                <GridColumn TItem="ScheduleSubmitRow" Title="@L10n.T("schedule_submit.col_close_time")"  Value="@(x => x.CloseTime)" Align="end" />
+                <GridColumn TItem="ScheduleSubmitRow" Title="@L10n.T("schedule_submit.col_status")" Value="@(x => x.Status == 0 ? L10n.T("schedule_submit.status_open") : L10n.T("schedule_submit.status_closed"))" Align="center" />
             </Columns>
             <RowTemplate>
                 <td class="fw-semibold">@r.EmployeeID</td>
@@ -74,18 +75,18 @@
                 <td class="text-end">@r.CloseTime</td>
                 <td class="text-center">
                     <span class="badge @(r.Status==0?"bg-success":"bg-secondary")">
-                        @(r.Status==0?"Mở":"Đóng")
+                        @(r.Status==0 ? L10n.T("schedule_submit.status_open") : L10n.T("schedule_submit.status_closed"))
                     </span>
                 </td>
             </RowTemplate>
             <ActionColumn Context="r">
                 @if (r.Status == 0)
                 {
-                    <button class="btn btn-xs btn-outline-danger me-1" title="Đóng ngày" @onclick="()=>CloseAsync(r.ID)">
+                    <button class="btn btn-xs btn-outline-danger me-1" title="@L10n.T("schedule_submit.btn_close_day")" @onclick="()=>CloseAsync(r.ID)">
                         <i class="bi bi-lock"></i>
                     </button>
                 }
-                <button class="btn btn-xs btn-outline-secondary" title="Xóa" @onclick="()=>DeleteAsync(r.ID)">
+                <button class="btn btn-xs btn-outline-secondary" title="@L10n.T("schedule_submit.btn_delete")" @onclick="()=>DeleteAsync(r.ID)">
                     <i class="bi bi-trash"></i>
                 </button>
             </ActionColumn>
@@ -99,45 +100,45 @@
         <div class="modal-dialog">
             <div class="modal-content">
                 <div class="modal-header">
-                    <h5 class="modal-title">Mở ngày nộp lịch</h5>
+                    <h5 class="modal-title">@L10n.T("schedule_submit.modal_title")</h5>
                     <button class="btn-close" @onclick="()=>_showModal=false"></button>
                 </div>
                 <div class="modal-body">
                     <div class="row g-2">
                         <div class="col-6">
-                            <label class="form-label">Nhân viên ID *</label>
+                            <label class="form-label">@L10n.T("schedule_submit.lbl_employee_id")</label>
                             <input class="form-control" @bind="_fEmp" />
                         </div>
                         <div class="col-6">
-                            <label class="form-label">Ca *</label>
+                            <label class="form-label">@L10n.T("schedule_submit.lbl_shift_required")</label>
                             <select class="form-select" @bind="_fType">
-                                <option value="AM">Sáng (AM)</option>
-                                <option value="PM">Chiều (PM)</option>
+                                <option value="AM">@L10n.T("schedule_submit.opt_am")</option>
+                                <option value="PM">@L10n.T("schedule_submit.opt_pm")</option>
                             </select>
                         </div>
                         <div class="col-6">
-                            <label class="form-label">Từ ngày *</label>
+                            <label class="form-label">@L10n.T("schedule_submit.lbl_from_date_required")</label>
                             <input type="date" class="form-control" @bind="_fFrom" />
                         </div>
                         <div class="col-6">
-                            <label class="form-label">Đến ngày *</label>
+                            <label class="form-label">@L10n.T("schedule_submit.lbl_to_date_required")</label>
                             <input type="date" class="form-control" @bind="_fTo" />
                         </div>
                         <div class="col-6">
-                            <label class="form-label">Giờ đóng (giờ) *</label>
+                            <label class="form-label">@L10n.T("schedule_submit.lbl_close_time_required")</label>
                             <input type="number" class="form-control" @bind="_fCloseTime" min="1" />
                         </div>
                         <div class="col-6">
-                            <label class="form-label">Ghi chú</label>
+                            <label class="form-label">@L10n.T("schedule_submit.lbl_note")</label>
                             <input class="form-control" @bind="_fNote" />
                         </div>
                     </div>
                 </div>
                 <div class="modal-footer">
-                    <button class="btn btn-secondary" @onclick="()=>_showModal=false">Hủy</button>
+                    <button class="btn btn-secondary" @onclick="()=>_showModal=false">@L10n.T("schedule_submit.btn_cancel")</button>
                     <button class="btn btn-success" @onclick="SaveOpenAsync" disabled="@_saving">
                         @if (_saving) { <span class="spinner-border spinner-border-sm me-1"></span> }
-                        Mở lịch
+                        @L10n.T("schedule_submit.btn_open_schedule")
                     </button>
                 </div>
             </div>
@@ -178,7 +179,7 @@
     private async Task SaveOpenAsync()
     {
         if (string.IsNullOrWhiteSpace(_fEmp) || _fCloseTime < 1)
-        { _ok=false; _msg="Vui lòng nhập đầy đủ thông tin."; return; }
+        { _ok=false; _msg=L10n.T("schedule_submit.err_required_fields"); return; }
 
         _saving = true;
         int opened = 0;
@@ -187,7 +188,7 @@
             var row = new ScheduleSubmitRow { EmployeeID=_fEmp, Date=d, Type=_fType, Note=_fNote, CloseTime=_fCloseTime };
             if (await CfgSvc.OpenScheduleAsync(row, Auth.UserName)) opened++;
         }
-        _ok=true; _msg=$"Đã mở {opened} ngày thành công.";
+        _ok=true; _msg=L10n.T("schedule_submit.msg_opened_success").Replace("{opened}", opened.ToString());
         _items = await CfgSvc.GetScheduleSubmitsAsync(_filterEmp, _fromDate, _toDate, _filterType);
         _saving=false; _showModal=false;
     }
@@ -195,14 +196,14 @@
     private async Task CloseAsync(int id)
     {
         var ok = await CfgSvc.CloseScheduleAsync(id, Auth.UserName);
-        _ok=ok; _msg= ok ? "Đã đóng ngày." : "Có lỗi.";
+        _ok=ok; _msg= ok ? L10n.T("schedule_submit.msg_closed_success") : L10n.T("schedule_submit.msg_error");
         if (ok) { var idx=_items.FindIndex(x=>x.ID==id); if(idx>=0) _items[idx].Status=1; }
     }
 
     private async Task DeleteAsync(int id)
     {
         var ok = await CfgSvc.DeleteScheduleAsync(id);
-        _ok=ok; _msg= ok ? "Đã xóa." : "Có lỗi.";
+        _ok=ok; _msg= ok ? L10n.T("schedule_submit.msg_deleted_success") : L10n.T("schedule_submit.msg_error");
         if (ok) _items.RemoveAll(x=>x.ID==id);
     }
 }

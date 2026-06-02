@@ -1,9 +1,10 @@
 @inherits LayoutComponentBase
+@inject LocalizationService L10n
 
 @* Layout không có navbar — chỉ dùng cho trang login *@
 @Body
 
 <div id="blazor-error-ui" class="alert alert-danger m-2"
      style="display:none;position:fixed;bottom:1rem;left:1rem;right:1rem;z-index:9999">
-    Có lỗi xảy ra. <a href="" class="alert-link">Tải lại</a>
+    @L10n.T("error.blazor_error") <a href="" class="alert-link">@L10n.T("error.reload")</a>
 </div>

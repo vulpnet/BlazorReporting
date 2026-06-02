@@ -4,11 +4,12 @@
 @inject AuthService Auth
 @inject MCPService McpSvc
 @inject NavigationManager Nav
+@inject LocalizationService L10n
 
-<PageTitle>Báo cáo Customer MCP</PageTitle>
+<PageTitle>@L10n.T("mcp.report_page_title")</PageTitle>
 
 <div class="container-fluid mt-3">
-    <h5 class="mb-3"><i class="bi bi-map-fill me-2"></i>Báo cáo Customer MCP</h5>
+    <h5 class="mb-3"><i class="bi bi-map-fill me-2"></i>@L10n.T("mcp.report_page_title")</h5>
 
     @* Filter *@
     <div class="card shadow-sm mb-3">
@@ -17,7 +18,7 @@
                 <div>
                     <label class="form-label small mb-1">Distributor</label>
                     <select class="form-select form-select-sm" style="width:240px" @bind="_distId">
-                        <option value="0">-- Tất cả --</option>
+                        <option value="0">@L10n.T("mcp.report_all_distributors")</option>
                         @foreach (var d in _distributors)
                         {
                             <option value="@d.DistributorID">@d.DistributorCode — @d.DistributorName</option>
@@ -25,7 +26,7 @@
                     </select>
                 </div>
                 <button class="btn btn-sm btn-primary" @onclick="LoadAsync">
-                    <i class="bi bi-search me-1"></i>Xem
+                    <i class="bi bi-search me-1"></i>@L10n.T("btn.view")
                 </button>
             </div>
         </div>
@@ -42,11 +43,11 @@
                 <GridColumn TItem="MCPReportRow" Title="Region"       Value="@(x => x.RegionName)" />
                 <GridColumn TItem="MCPReportRow" Title="Area"         Value="@(x => x.AreName)" />
                 <GridColumn TItem="MCPReportRow" Title="NPP"  Value="@(x => x.DistributorName)" />
-                <GridColumn TItem="MCPReportRow" Title="Tuyến"        Value="@(x => x.RouteName)" />
-                <GridColumn TItem="MCPReportRow" Title="Giám sát"           Value="@(x => x.SaleSupName)" />
-                <GridColumn TItem="MCPReportRow" Title="Nhân viên BH"          Value="@(x => x.SalesmanName)" />
-                <GridColumn TItem="MCPReportRow" Title="CH Trong tuyến" Value="@(x => x.CusomerInRoute)" Align="end" />
-                <GridColumn TItem="MCPReportRow" Title="CH Đã phủ"   Value="@(x => x.Covered)" Align="end" />
+                <GridColumn TItem="MCPReportRow" Title="@L10n.T("mcp.report_col_route")"        Value="@(x => x.RouteName)" />
+                <GridColumn TItem="MCPReportRow" Title="@L10n.T("mcp.report_col_supervisor")"           Value="@(x => x.SaleSupName)" />
+                <GridColumn TItem="MCPReportRow" Title="@L10n.T("mcp.report_col_salesman")"          Value="@(x => x.SalesmanName)" />
+                <GridColumn TItem="MCPReportRow" Title="@L10n.T("mcp.report_col_outlets_in_route")" Value="@(x => x.CusomerInRoute)" Align="end" />
+                <GridColumn TItem="MCPReportRow" Title="@L10n.T("mcp.report_col_covered")"   Value="@(x => x.Covered)" Align="end" />
                 <GridColumn TItem="MCPReportRow" Title="% Coverage"   Value="@(x => x.CusomerInRoute > 0 ? x.Covered * 100m / x.CusomerInRoute : 0m)" Align="end" />
             </Columns>
             <RowTemplate>

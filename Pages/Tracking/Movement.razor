@@ -6,37 +6,38 @@
 @inject TrackingService TrkSvc
 @inject NavigationManager Nav
 @inject IJSRuntime JS
+@inject LocalizationService L10n
 @implements IAsyncDisposable
 
-<PageTitle>Theo dõi vị trí Nhân viên BH</PageTitle>
+<PageTitle>@L10n.T("tracking.page_title")</PageTitle>
 
 <div class="container-fluid mt-3">
-    <h5 class="mb-3"><i class="bi bi-broadcast-pin me-2"></i>Theo dõi vị trí Nhân viên BH thực tế</h5>
+    <h5 class="mb-3"><i class="bi bi-broadcast-pin me-2"></i>@L10n.T("tracking.page_heading")</h5>
 
     @* Filter bar *@
     <div class="card shadow-sm mb-3">
         <div class="card-body py-2">
             <div class="d-flex gap-2 flex-wrap align-items-end">
                 <div>
-                    <label class="form-label small mb-1">Ngày</label>
+                    <label class="form-label small mb-1">@L10n.T("lbl.date")</label>
                     <input type="date" class="form-control form-control-sm" style="width:150px" @bind="_date" />
                 </div>
                 <div>
-                    <label class="form-label small mb-1">SS (tùy chọn)</label>
+                    <label class="form-label small mb-1">@L10n.T("tracking.lbl_supervisor_optional")</label>
                     <input class="form-control form-control-sm" style="width:150px" placeholder="SalesupID..." @bind="_salesupId" />
                 </div>
                 <div>
-                    <label class="form-label small mb-1">Nhân viên BH (tùy chọn)</label>
+                    <label class="form-label small mb-1">@L10n.T("tracking.lbl_salesman_optional")</label>
                     <input class="form-control form-control-sm" style="width:150px" placeholder="SalesmanID..." @bind="_salesmanId" />
                 </div>
                 <button class="btn btn-sm btn-primary" @onclick="LoadAsync">
-                    <i class="bi bi-search me-1"></i>Xem
+                    <i class="bi bi-search me-1"></i>@L10n.T("btn.view")
                 </button>
                 @if (_data.Any())
                 {
-                    <span class="badge bg-info text-dark ms-2">@_data.Count Nhân viên BH</span>
-                    <span class="badge bg-success ms-1">@_data.Count(x => x.FirstSyncTime.HasValue) đã sync</span>
-                    <span class="badge bg-danger ms-1">@_data.Count(x => !x.FirstSyncTime.HasValue) chưa sync</span>
+                    <span class="badge bg-info text-dark ms-2">@_data.Count @L10n.T("tracking.badge_salesman_count")</span>
+                    <span class="badge bg-success ms-1">@_data.Count(x => x.FirstSyncTime.HasValue) @L10n.T("tracking.badge_synced")</span>
+                    <span class="badge bg-danger ms-1">@_data.Count(x => !x.FirstSyncTime.HasValue) @L10n.T("tracking.badge_not_synced")</span>
                 }
             </div>
         </div>
@@ -52,9 +53,9 @@
         <div class="col-lg-8">
             <div class="card shadow-sm">
                 <div class="card-header py-2 fw-semibold small d-flex align-items-center gap-2">
-                    <i class="bi bi-map me-1 text-primary"></i>Bản đồ vị trí
+                    <i class="bi bi-map me-1 text-primary"></i>@L10n.T("tracking.map_title")
                     @if (_loading) { <span class="spinner-border spinner-border-sm ms-2"></span> }
-                    <span class="text-muted small ms-auto">Click marker để xem chi tiết</span>
+                    <span class="text-muted small ms-auto">@L10n.T("tracking.map_hint")</span>
                 </div>
                 <div id="trackingMap" style="height:520px;border-radius:0 0 4px 4px"></div>
             </div>
@@ -64,7 +65,7 @@
         <div class="col-lg-4">
             <div class="card shadow-sm h-100">
                 <div class="card-header py-2 fw-semibold small">
-                    <i class="bi bi-list-ul me-1"></i>Danh sách Nhân viên BH
+                    <i class="bi bi-list-ul me-1"></i>@L10n.T("tracking.sm_list_title")
                 </div>
                 <div style="overflow-y:auto;max-height:520px">
                     @if (_data.Any())
@@ -100,7 +101,7 @@
                                     }
                                     @if (!hasGps)
                                     {
-                                        <span class="badge bg-secondary" style="font-size:.65rem">Chưa có GPS</span>
+                                        <span class="badge bg-secondary" style="font-size:.65rem">@L10n.T("tracking.badge_no_gps")</span>
                                     }
                                 </div>
                             </div>
@@ -108,7 +109,7 @@
                     }
                     else if (_searched)
                     {
-                        <div class="text-center text-muted py-4 small">Không có dữ liệu</div>
+                        <div class="text-center text-muted py-4 small">@L10n.T("lbl.no_data")</div>
                     }
                 </div>
             </div>
@@ -121,16 +122,16 @@
         <div class="mt-3">
             <SortableGrid Items="_data" Context="r" MinWidth="1100px" DefaultPageSize="20">
                 <Columns>
-                    <GridColumn TItem="SMLocationRow" Title="Nhân viên BH"         Value="@(x => x.SalesmanName)" />
-                    <GridColumn TItem="SMLocationRow" Title="Giám sát"          Value="@(x => x.SaleSupName)" />
-                    <GridColumn TItem="SMLocationRow" Title="Tuyến"       Value="@(x => x.RouteCD)" />
-                    <GridColumn TItem="SMLocationRow" Title="NPP" Value="@(x => x.DistributorName)" />
-                    <GridColumn TItem="SMLocationRow" Title="Sync đầu"   Value="@(x => x.FirstSyncTime.HasValue ? x.FirstSyncTime.Value.ToString("HH:mm") : "Chưa")" Align="center" />
-                    <GridColumn TItem="SMLocationRow" Title="Sync cuối"  Value="@(x => x.LastSyncTime.HasValue ? x.LastSyncTime.Value.ToString("HH:mm") : "")" Align="center" />
-                    <GridColumn TItem="SMLocationRow" Title="KM"          Value="@(x => x.TotalDistance)" Align="end" />
-                    <GridColumn TItem="SMLocationRow" Title="T.gian VT"  Value="@(x => x.TimeVisit)" Align="center" />
-                    <GridColumn TItem="SMLocationRow" Title="T.gian di"  Value="@(x => x.TimeMove)" Align="center" />
-                    <GridColumn TItem="SMLocationRow" Title="Outlet hiện tại" Value="@(x => x.OutletName)" />
+                    <GridColumn TItem="SMLocationRow" Title="@L10n.T("tracking.col_salesman")"         Value="@(x => x.SalesmanName)" />
+                    <GridColumn TItem="SMLocationRow" Title="@L10n.T("tracking.col_supervisor")"          Value="@(x => x.SaleSupName)" />
+                    <GridColumn TItem="SMLocationRow" Title="@L10n.T("tracking.col_route")"       Value="@(x => x.RouteCD)" />
+                    <GridColumn TItem="SMLocationRow" Title="@L10n.T("tracking.col_distributor")" Value="@(x => x.DistributorName)" />
+                    <GridColumn TItem="SMLocationRow" Title="@L10n.T("tracking.col_first_sync")"   Value="@(x => x.FirstSyncTime.HasValue ? x.FirstSyncTime.Value.ToString("HH:mm") : L10n.T("tracking.val_not_yet"))" Align="center" />
+                    <GridColumn TItem="SMLocationRow" Title="@L10n.T("tracking.col_last_sync")"  Value="@(x => x.LastSyncTime.HasValue ? x.LastSyncTime.Value.ToString("HH:mm") : "")" Align="center" />
+                    <GridColumn TItem="SMLocationRow" Title="@L10n.T("tracking.col_km")"          Value="@(x => x.TotalDistance)" Align="end" />
+                    <GridColumn TItem="SMLocationRow" Title="@L10n.T("tracking.col_time_visit")"  Value="@(x => x.TimeVisit)" Align="center" />
+                    <GridColumn TItem="SMLocationRow" Title="@L10n.T("tracking.col_time_move")"  Value="@(x => x.TimeMove)" Align="center" />
+                    <GridColumn TItem="SMLocationRow" Title="@L10n.T("tracking.col_current_outlet")" Value="@(x => x.OutletName)" />
                 </Columns>
                 <RowTemplate>
                     <td class="fw-semibold small">@r.SalesmanName</td>
@@ -141,7 +142,7 @@
                         @if (r.FirstSyncTime.HasValue)
                         { <span class="badge bg-success">@r.FirstSyncTime.Value.ToString("HH:mm")</span> }
                         else
-                        { <span class="badge bg-secondary">Chưa</span> }
+                        { <span class="badge bg-secondary">@L10n.T("tracking.val_not_yet")</span> }
                     </td>
                     <td class="text-center small">@(r.LastSyncTime.HasValue ? r.LastSyncTime.Value.ToString("HH:mm") : "—")</td>
                     <td class="text-end small">@((r.TotalDistance/1000m).ToString("N1")) km</td>
@@ -205,8 +206,8 @@
                 var label = sm.SalesmanName.Length > 0 ? sm.SalesmanName[0].ToString() : "?";
                 var color = sm.FirstSyncTime.HasValue ? "#16a34a" : "#6b7280";
                 var popup = $"<b>{sm.SalesmanName}</b><br/>{sm.SaleSupName}<br/>{sm.RouteCD}" +
-                            (sm.FirstSyncTime.HasValue ? $"<br/>Sync: {sm.FirstSyncTime:HH:mm}" : "<br/><i>Chưa sync</i>") +
-                            (!string.IsNullOrEmpty(sm.OutletName) ? $"<br/>Tại: {sm.OutletName}" : "");
+                            (sm.FirstSyncTime.HasValue ? $"<br/>Sync: {sm.FirstSyncTime:HH:mm}" : $"<br/><i>{L10n.T("tracking.popup_not_synced")}</i>") +
+                            (!string.IsNullOrEmpty(sm.OutletName) ? $"<br/>{L10n.T("tracking.popup_at_outlet")}{sm.OutletName}" : "");
                 await JS.InvokeVoidAsync("mapInterop.addMarker",
                     (double)sm.Latitude!.Value, (double)sm.Longtitude!.Value,
                     sm.SalesmanID, popup, color, label);

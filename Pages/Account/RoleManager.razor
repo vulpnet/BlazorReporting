@@ -1,14 +1,15 @@
 @page "/account/roles"
-@attribute [NavMenu(Title="Quản lý Role", Icon="bi-shield-shaded", Group="Quản trị", GroupOrder=90, Order=10)]
+@attribute [NavMenu(Title="role.page_title", Icon="bi-shield-shaded", Group="Quản trị", GroupOrder=90, Order=10)]
 @using BlazorReporting.Services
 @inject AuthService Auth
 @inject UserManagementService UserSvc
 @inject NavigationManager Nav
+@inject LocalizationService L10n
 
-<PageTitle>Quản lý Role</PageTitle>
+<PageTitle>@L10n.T("role.page_title")</PageTitle>
 
 <div class="container-fluid mt-3">
-    <h5 class="mb-3"><i class="bi bi-shield-shaded me-2"></i>Quản lý Role</h5>
+    <h5 class="mb-3"><i class="bi bi-shield-shaded me-2"></i>@L10n.T("role.page_title")</h5>
 
     @if (_loading)
     {
@@ -19,14 +20,14 @@
         <SortableGrid @ref="_grid" Items="_roles" Context="r" MinWidth="600px" DefaultPageSize="20">
             <ToolbarContent>
                 <button class="btn btn-sm btn-primary" @onclick="() => OpenAdd()">
-                    <i class="bi bi-plus-lg me-1"></i>Thêm Role
+                    <i class="bi bi-plus-lg me-1"></i>@L10n.T("role.btn_add")
                 </button>
             </ToolbarContent>
             <Columns>
                 <GridColumn TItem="RoleVM" Title="ID"        Value="@(x => x.ID)"           Align="end" />
                 <GridColumn TItem="RoleVM" Title="Role Name" Value="@(x => x.RoleName)" />
-                <GridColumn TItem="RoleVM" Title="Mô tả"     Value="@(x => x.Description)" />
-                <GridColumn TItem="RoleVM" Title="Ứng dụng"  Value="@(x => x.ApplicationCD)" />
+                <GridColumn TItem="RoleVM" Title="@L10n.T("role.col_description")"     Value="@(x => x.Description)" />
+                <GridColumn TItem="RoleVM" Title="@L10n.T("role.col_application")"  Value="@(x => x.ApplicationCD)" />
             </Columns>
             <RowTemplate>
                 <td class="text-end">@r.ID</td>
@@ -49,7 +50,7 @@
         <div class="modal-dialog">
             <div class="modal-content">
                 <div class="modal-header">
-                    <h5 class="modal-title">@(_editId == 0 ? "Thêm Role mới" : "Sửa Role")</h5>
+                    <h5 class="modal-title">@(_editId == 0 ? L10n.T("role.modal_title_add") : L10n.T("role.modal_title_edit"))</h5>
                     <button type="button" class="btn-close" @onclick="CloseModal"></button>
                 </div>
                 <div class="modal-body">
@@ -58,27 +59,27 @@
                         <div class="alert @(_modalOk ? "alert-success" : "alert-danger")">@_modalMsg</div>
                     }
                     <div class="mb-2">
-                        <label class="form-label">Role Name *</label>
+                        <label class="form-label">@L10n.T("role.lbl_role_name_required")</label>
                         <input class="form-control" @bind="_fRoleName" />
                     </div>
                     <div class="mb-2">
-                        <label class="form-label">Mô tả</label>
+                        <label class="form-label">@L10n.T("role.col_description")</label>
                         <input class="form-control" @bind="_fDescription" />
                     </div>
                     <div class="mb-2">
-                        <label class="form-label">Ứng dụng</label>
+                        <label class="form-label">@L10n.T("role.col_application")</label>
                         <select class="form-select" @bind="_fAppCd">
-                            <option value="">-- Chọn --</option>
+                            <option value="">@L10n.T("role.opt_select")</option>
                             <option value="DMS">DMS</option>
                             <option value="ETOOLS">ETOOLS</option>
                         </select>
                     </div>
                 </div>
                 <div class="modal-footer">
-                    <button class="btn btn-secondary" @onclick="CloseModal">Hủy</button>
+                    <button class="btn btn-secondary" @onclick="CloseModal">@L10n.T("btn.cancel")</button>
                     <button class="btn btn-primary" @onclick="SaveAsync" disabled="@_saving">
                         @if (_saving) { <span class="spinner-border spinner-border-sm me-1"></span> }
-                        Lưu
+                        @L10n.T("btn.save")
                     </button>
                 </div>
             </div>
@@ -124,18 +125,18 @@
 
     private async Task SaveAsync()
     {
-        if (string.IsNullOrWhiteSpace(_fRoleName)) { _modalMsg = "Vui lòng nhập tên Role."; return; }
+        if (string.IsNullOrWhiteSpace(_fRoleName)) { _modalMsg = L10n.T("role.err_name_required"); return; }
         _saving = true; _modalMsg = "";
         if (_editId == 0)
         {
             var created = await UserSvc.AddRoleAsync(_fRoleName, _fDescription, null, _fAppCd);
-            if (created is not null) { _roles.Add(created); _modalOk = true; _modalMsg = "Thêm Role thành công."; }
+            if (created is not null) { _roles.Add(created); _modalOk = true; _modalMsg = L10n.T("role.msg_add_success"); }
         }
         else
         {
             var updated = new RoleVM(_editId, _fRoleName, _fDescription, null, _fAppCd);
             var ok = await UserSvc.UpdateRoleAsync(updated);
-            if (ok) { var idx = _roles.FindIndex(x=>x.ID==_editId); if(idx>=0) _roles[idx]=updated; _modalOk=true; _modalMsg="Cập nhật thành công."; }
+            if (ok) { var idx = _roles.FindIndex(x=>x.ID==_editId); if(idx>=0) _roles[idx]=updated; _modalOk=true; _modalMsg=L10n.T("role.msg_update_success"); }
         }
         _saving = false;
     }

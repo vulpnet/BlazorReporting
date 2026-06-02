@@ -4,16 +4,17 @@
 @inject AuthService Auth
 @inject ReportService RptSvc
 @inject NavigationManager Nav
+@inject LocalizationService L10n
 <PageTitle>3G Offline</PageTitle>
 <div class="container-fluid mt-3">
-    <h5 class="mb-3"><i class="bi bi-wifi-off me-2"></i>Bao cao Nhân viên BH Offline 3G</h5>
+    <h5 class="mb-3"><i class="bi bi-wifi-off me-2"></i>@L10n.T("rpt3goffline.title")</h5>
     <div class="card shadow-sm mb-3"><div class="card-body py-2">
         <div class="d-flex gap-2 flex-wrap align-items-end">
-            <div><label class="form-label small mb-1">Từ ngày</label><input type="date" class="form-control form-control-sm" style="width:150px" @bind="_from"/></div>
-            <div><label class="form-label small mb-1">Đến ngày</label><input type="date" class="form-control form-control-sm" style="width:150px" @bind="_to"/></div>
-            <div><label class="form-label small mb-1">Tuyến</label><input class="form-control form-control-sm" style="width:150px" @bind="_route"/></div>
-            <button class="btn btn-sm btn-primary" @onclick="LoadAsync"><i class="bi bi-search me-1"></i>Xem</button>
-            @if (_data.Any()){<span class="text-muted small ms-2">@_data.Count dong</span>}
+            <div><label class="form-label small mb-1">@L10n.T("lbl.from_date")</label><input type="date" class="form-control form-control-sm" style="width:150px" @bind="_from"/></div>
+            <div><label class="form-label small mb-1">@L10n.T("lbl.to_date")</label><input type="date" class="form-control form-control-sm" style="width:150px" @bind="_to"/></div>
+            <div><label class="form-label small mb-1">@L10n.T("lbl.route")</label><input class="form-control form-control-sm" style="width:150px" @bind="_route"/></div>
+            <button class="btn btn-sm btn-primary" @onclick="LoadAsync"><i class="bi bi-search me-1"></i>@L10n.T("btn.view")</button>
+            @if (_data.Any()){<span class="text-muted small ms-2">@L10n.T("rpt3goffline.row_count")</span>}
         </div>
     </div></div>
     @if (_error!=null){<div class="alert alert-danger py-2 alert-dismissible">@_error<button class="btn-close" @onclick="ClearErr"></button></div>}
@@ -21,14 +22,14 @@
     else {
         <SortableGrid Items="_data" Context="r" MinWidth="900px" DefaultPageSize="20">
             <Columns>
-                <GridColumn TItem="GenericReportRow" Title="Nhân viên BH"         Value="@(x=>x.SalesmanName)"/>
-                <GridColumn TItem="GenericReportRow" Title="Giám sát"          Value="@(x=>x.SalesSupName)"/>
-                <GridColumn TItem="GenericReportRow" Title="Tuyến"       Value="@(x=>x.RouteCD)"/>
-                <GridColumn TItem="GenericReportRow" Title="NPP" Value="@(x=>x.DistributorName)"/>
-                <GridColumn TItem="GenericReportRow" Title="Ngày"        Value="@(x=>x.VisitDate.HasValue?x.VisitDate.Value.ToString("dd/MM/yyyy"):"")" Align="center"/>
-                <GridColumn TItem="GenericReportRow" Title="Thời gian (ph)" Value="@(x=>x.ActualTime)" Align="end"/>
-                <GridColumn TItem="GenericReportRow" Title="Giới hạn"    Value="@(x=>x.TimeLimit)" Align="end"/>
-                <GridColumn TItem="GenericReportRow" Title="Kết quả"     Value="@(x=>x.Evaluate)" Align="center"/>
+                <GridColumn TItem="GenericReportRow" Title="@L10n.T("lbl.salesman")"         Value="@(x=>x.SalesmanName)"/>
+                <GridColumn TItem="GenericReportRow" Title="@L10n.T("lbl.supervisor")"          Value="@(x=>x.SalesSupName)"/>
+                <GridColumn TItem="GenericReportRow" Title="@L10n.T("lbl.route")"       Value="@(x=>x.RouteCD)"/>
+                <GridColumn TItem="GenericReportRow" Title="@L10n.T("lbl.distributor")" Value="@(x=>x.DistributorName)"/>
+                <GridColumn TItem="GenericReportRow" Title="@L10n.T("lbl.date")"        Value="@(x=>x.VisitDate.HasValue?x.VisitDate.Value.ToString("dd/MM/yyyy"):"")" Align="center"/>
+                <GridColumn TItem="GenericReportRow" Title="@L10n.T("rpt3goffline.col_actual_time")" Value="@(x=>x.ActualTime)" Align="end"/>
+                <GridColumn TItem="GenericReportRow" Title="@L10n.T("rpt3goffline.col_time_limit")"    Value="@(x=>x.TimeLimit)" Align="end"/>
+                <GridColumn TItem="GenericReportRow" Title="@L10n.T("rpt3goffline.col_evaluate")"     Value="@(x=>x.Evaluate)" Align="center"/>
             </Columns>
             <RowTemplate>
                 <td class="fw-semibold small">@r.SalesmanName</td>
@@ -36,11 +37,11 @@
                 <td class="small font-monospace">@r.RouteCD</td>
                 <td class="small">@r.DistributorName</td>
                 <td class="text-center small">@(r.VisitDate.HasValue?r.VisitDate.Value.ToString("dd/MM/yyyy"):"-")</td>
-                <td class="text-end">@r.ActualTime ph</td>
-                <td class="text-end">@r.TimeLimit ph</td>
+                <td class="text-end">@L10n.T("rpt3goffline.minutes_unit")</td>
+                <td class="text-end">@L10n.T("rpt3goffline.minutes_unit")</td>
                 <td class="text-center">
                     <span class="badge @(r.Evaluate==1?"bg-success":"bg-danger")">
-                        @(r.Evaluate==1?"Dat":"Khong dat")
+                        @(r.Evaluate==1?L10n.T("rpt3goffline.evaluate_pass"):L10n.T("rpt3goffline.evaluate_fail"))
                     </span>
                 </td>
             </RowTemplate>

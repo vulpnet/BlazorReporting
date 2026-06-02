@@ -1,38 +1,39 @@
 @page "/report/visit"
-@attribute [NavMenu(Title="Báo cáo viếng thăm", Icon="bi-shop-window", Group="Báo cáo", GroupOrder=20, Order=10)]
+@attribute [NavMenu(Title="report_visit.title", Icon="bi-shop-window", Group="Báo cáo", GroupOrder=20, Order=10)]
 @using BlazorReporting.Services
 @inject AuthService Auth
 @inject ReportService RptSvc
 @inject NavigationManager Nav
+@inject LocalizationService L10n
 
-<PageTitle>Báo cáo viếng thăm</PageTitle>
+<PageTitle>@L10n.T("report_visit.title")</PageTitle>
 
 <div class="container-fluid mt-3">
-    <h5 class="mb-3"><i class="bi bi-shop-window me-2"></i>Báo cáo viếng thăm chi tiết</h5>
+    <h5 class="mb-3"><i class="bi bi-shop-window me-2"></i>@L10n.T("report_visit.title_detail")</h5>
 
     <div class="card shadow-sm mb-3">
         <div class="card-body py-2">
             <div class="d-flex gap-2 flex-wrap align-items-end">
                 <div>
-                    <label class="form-label small mb-1">Ngày *</label>
+                    <label class="form-label small mb-1">@L10n.T("report_visit.lbl_date_required")</label>
                     <input type="date" class="form-control form-control-sm" style="width:150px" @bind="_date" />
                 </div>
                 <div>
-                    <label class="form-label small mb-1">Tuyến</label>
+                    <label class="form-label small mb-1">@L10n.T("report_visit.lbl_route")</label>
                     <input class="form-control form-control-sm" style="width:160px" placeholder="RouteCD..." @bind="_routeCD" />
                 </div>
                 <div>
-                    <label class="form-label small mb-1">Giám sát</label>
+                    <label class="form-label small mb-1">@L10n.T("report_visit.lbl_supervisor")</label>
                     <input class="form-control form-control-sm" style="width:140px" placeholder="SaleSupCD..." @bind="_saleSupCD" />
                 </div>
                 <button class="btn btn-sm btn-primary" @onclick="LoadAsync">
-                    <i class="bi bi-search me-1"></i>Xem
+                    <i class="bi bi-search me-1"></i>@L10n.T("btn.view")
                 </button>
                 @if (_data.Any())
                 {
                     <span class="text-muted small ms-2">
-                        @_data.Count lần VT —
-                        <span class="text-success fw-semibold">@_data.Count(x => x.HasOrder == 1) có ĐH</span>
+                        @_data.Count @L10n.T("report_visit.visits_count_suffix") —
+                        <span class="text-success fw-semibold">@_data.Count(x => x.HasOrder == 1) @L10n.T("report_visit.has_order_suffix")</span>
                     </span>
                 }
             </div>
@@ -52,18 +53,18 @@
     {
         <SortableGrid Items="_data" Context="r" MinWidth="1200px" DefaultPageSize="20">
             <Columns>
-                <GridColumn TItem="ReportVisitRow" Title="Nhân viên BH"         Value="@(x => x.SalesmanName)" />
-                <GridColumn TItem="ReportVisitRow" Title="Tuyến"       Value="@(x => x.RouteCD)" />
-                <GridColumn TItem="ReportVisitRow" Title="NPP" Value="@(x => x.DistributorName)" />
-                <GridColumn TItem="ReportVisitRow" Title="Cửa hàng"      Value="@(x => x.OutletName)" />
-                <GridColumn TItem="ReportVisitRow" Title="Bắt đầu"    Value="@(x => x.StartTime.HasValue ? x.StartTime.Value.ToString("HH:mm") : "")" Align="center" />
-                <GridColumn TItem="ReportVisitRow" Title="Kết thúc"   Value="@(x => x.EndTime.HasValue ? x.EndTime.Value.ToString("HH:mm") : "")" Align="center" />
-                <GridColumn TItem="ReportVisitRow" Title="T.gian (ph)" Value="@(x => x.TimeVisit)" Align="end" />
+                <GridColumn TItem="ReportVisitRow" Title="@L10n.T("report_visit.col_salesman")"         Value="@(x => x.SalesmanName)" />
+                <GridColumn TItem="ReportVisitRow" Title="@L10n.T("report_visit.col_route")"       Value="@(x => x.RouteCD)" />
+                <GridColumn TItem="ReportVisitRow" Title="@L10n.T("report_visit.col_distributor")" Value="@(x => x.DistributorName)" />
+                <GridColumn TItem="ReportVisitRow" Title="@L10n.T("report_visit.col_outlet")"      Value="@(x => x.OutletName)" />
+                <GridColumn TItem="ReportVisitRow" Title="@L10n.T("report_visit.col_start_time")"    Value="@(x => x.StartTime.HasValue ? x.StartTime.Value.ToString("HH:mm") : "")" Align="center" />
+                <GridColumn TItem="ReportVisitRow" Title="@L10n.T("report_visit.col_end_time")"   Value="@(x => x.EndTime.HasValue ? x.EndTime.Value.ToString("HH:mm") : "")" Align="center" />
+                <GridColumn TItem="ReportVisitRow" Title="@L10n.T("report_visit.col_duration_min")" Value="@(x => x.TimeVisit)" Align="end" />
                 <GridColumn TItem="ReportVisitRow" Title="Km"          Value="@(x => x.Distance)" Align="end" />
                 <GridColumn TItem="ReportVisitRow" Title="SKU"         Value="@(x => x.TotalSKU)" Align="end" />
-                <GridColumn TItem="ReportVisitRow" Title="Doanh số"    Value="@(x => x.TotalAmount)" Align="end" />
+                <GridColumn TItem="ReportVisitRow" Title="@L10n.T("report_visit.col_revenue")"    Value="@(x => x.TotalAmount)" Align="end" />
                 <GridColumn TItem="ReportVisitRow" Title="MCP"         Value="@(x => x.strIsMCP)" Align="center" />
-                <GridColumn TItem="ReportVisitRow" Title="Đơn hàng"   Value="@(x => x.HasOrder == 1 ? "Có" : "Không")" Align="center" />
+                <GridColumn TItem="ReportVisitRow" Title="@L10n.T("report_visit.col_order")"   Value="@(x => x.HasOrder == 1 ? L10n.T("report_visit.has_order_yes") : L10n.T("report_visit.has_order_no"))" Align="center" />
             </Columns>
             <RowTemplate>
                 <td class="fw-semibold small">@r.SalesmanName</td>
@@ -78,7 +79,7 @@
                 <td class="text-end small">@((r.TotalAmount/1_000_000m).ToString("N2"))M</td>
                 <td class="text-center">
                     <span class="badge @(r.strIsMCP=="IsRoute"?"bg-primary":"bg-secondary")" style="font-size:.65rem">
-                        @(r.strIsMCP=="IsRoute"?"Đúng tuyến":"Ngoài tuyến")
+                        @(r.strIsMCP=="IsRoute" ? L10n.T("report_visit.mcp_on_route") : L10n.T("report_visit.mcp_off_route"))
                     </span>
                 </td>
                 <td class="text-center">

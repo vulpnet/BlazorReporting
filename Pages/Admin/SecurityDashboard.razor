@@ -1,5 +1,6 @@
 @page "/admin/security"
-@attribute [NavMenu(Title="Bảo mật hệ thống", Icon="bi-shield-lock-fill", Group="Quản trị", GroupOrder=90, Order=5)]
+@attribute [NavMenu(Title="security.nav_title", Icon="bi-shield-lock-fill", Group="nav.admin", GroupOrder=90, Order=5)]
+@inject LocalizationService L10n
 @using BlazorReporting.Services
 @using BlazorReporting.Pages.Admin
 @using Dapper
@@ -10,11 +11,11 @@
 @inject NavigationManager Nav
 @inject IConfiguration Cfg
 
-<PageTitle>Security Dashboard</PageTitle>
+<PageTitle>@L10n.T("security.page_title")</PageTitle>
 
 <div class="container-fluid mt-3">
     <h5 class="mb-3">
-        <i class="bi bi-shield-lock-fill me-2 text-danger"></i>Security Dashboard
+        <i class="bi bi-shield-lock-fill me-2 text-danger"></i>@L10n.T("security.page_title")
         <span class="badge bg-danger ms-2 small">ISO 27001</span>
     </h5>
 
@@ -28,12 +29,12 @@
     <ul class="nav nav-tabs mb-3">
         <li class="nav-item">
             <button class="nav-link @(_tab==0?"active":"")" @onclick="()=>SetTab(0)">
-                <i class="bi bi-clock-history me-1"></i>Audit Log
+                <i class="bi bi-clock-history me-1"></i>@L10n.T("security.tab_audit_log")
             </button>
         </li>
         <li class="nav-item">
             <button class="nav-link @(_tab==1?"active":"")" @onclick="()=>SetTab(1)">
-                <i class="bi bi-laptop me-1"></i>Active Sessions
+                <i class="bi bi-laptop me-1"></i>@L10n.T("security.tab_active_sessions")
                 @if (_sessions.Any()){<span class="badge bg-primary ms-1">@_sessions.Count</span>}
             </button>
         </li>
@@ -44,24 +45,24 @@
         <div class="card shadow-sm mb-3">
             <div class="card-body py-2">
                 <div class="d-flex gap-2 flex-wrap align-items-end">
-                    <div><label class="form-label small mb-1">Từ ngày</label>
+                    <div><label class="form-label small mb-1">@L10n.T("security.lbl_from_date")</label>
                         <input type="date" class="form-control form-control-sm" style="width:150px" @bind="_logFrom"/></div>
-                    <div><label class="form-label small mb-1">Đến ngày</label>
+                    <div><label class="form-label small mb-1">@L10n.T("security.lbl_to_date")</label>
                         <input type="date" class="form-control form-control-sm" style="width:150px" @bind="_logTo"/></div>
-                    <div><label class="form-label small mb-1">Loại sự kiện</label>
+                    <div><label class="form-label small mb-1">@L10n.T("security.lbl_event_type")</label>
                         <select class="form-select form-select-sm" style="width:180px" @bind="_logEvent">
-                            <option value="">Tat ca</option>
+                            <option value="">@L10n.T("security.opt_all_events")</option>
                             <option value="LOGIN">Login</option>
                             <option value="LOGOUT">Logout</option>
                             <option value="SESSION_TIMEOUT">Session Timeout</option>
                             <option value="SESSION_KICKED">Session Kicked</option>
                         </select></div>
-                    <div><label class="form-label small mb-1">Username</label>
-                        <input class="form-control form-control-sm" style="width:150px" @bind="_logUser" placeholder="Lọc..."/></div>
+                    <div><label class="form-label small mb-1">@L10n.T("security.lbl_username")</label>
+                        <input class="form-control form-control-sm" style="width:150px" @bind="_logUser" placeholder="@L10n.T("security.placeholder_filter_user")"/></div>
                     <button class="btn btn-sm btn-primary" @onclick="LoadLogsAsync">
-                        <i class="bi bi-search me-1"></i>Xem
+                        <i class="bi bi-search me-1"></i>@L10n.T("security.btn_view_logs")
                     </button>
-                    @if (_logs.Any()){<span class="text-muted small ms-1">@_logs.Count dong</span>}
+                    @if (_logs.Any()){<span class="text-muted small ms-1">@L10n.T("security.lbl_row_count")</span>}
                 </div>
             </div>
         </div>
@@ -70,12 +71,12 @@
         else {
             <SortableGrid Items="_logs" Context="r" MinWidth="1000px" DefaultPageSize="30">
                 <Columns>
-                    <GridColumn TItem="AuditLogRow" Title="Thời gian"  Value="@(x=>x.EventTime.ToString("dd/MM HH:mm:ss"))" Align="center" Filterable="false"/>
+                    <GridColumn TItem="AuditLogRow" Title="@L10n.T("security.col_event_time")"  Value="@(x=>x.EventTime.ToString("dd/MM HH:mm:ss"))" Align="center" Filterable="false"/>
                     <GridColumn TItem="AuditLogRow" Title="Username"   Value="@(x=>x.UserName)"/>
-                    <GridColumn TItem="AuditLogRow" Title="Sự kiện"    Value="@(x=>x.EventType)"/>
-                    <GridColumn TItem="AuditLogRow" Title="Chi tiết"   Value="@(x=>x.Detail)"/>
+                    <GridColumn TItem="AuditLogRow" Title="@L10n.T("security.col_event_type")"    Value="@(x=>x.EventType)"/>
+                    <GridColumn TItem="AuditLogRow" Title="@L10n.T("security.col_detail")"   Value="@(x=>x.Detail)"/>
                     <GridColumn TItem="AuditLogRow" Title="IP"         Value="@(x=>x.IpAddress)" Align="center"/>
-                    <GridColumn TItem="AuditLogRow" Title="Kết quả"    Value="@(x=>x.IsSuccess?"OK":"FAIL")" Align="center"/>
+                    <GridColumn TItem="AuditLogRow" Title="@L10n.T("security.col_result")"    Value="@(x=>x.IsSuccess?"OK":"FAIL")" Align="center"/>
                 </Columns>
                 <RowTemplate>
                     <td class="text-center small font-monospace">@r.EventTime.ToString("dd/MM HH:mm:ss")</td>
@@ -97,10 +98,10 @@
     {
         <div class="d-flex align-items-center mb-3">
             <input class="form-control form-control-sm me-2" style="width:200px"
-                   placeholder="Lọc tên đăng nhập..." value="@_sessionFilter"
+                   placeholder="@L10n.T("security.placeholder_filter_session")" value="@_sessionFilter"
                    @oninput="e=>_sessionFilter=e.Value?.ToString()??string.Empty"/>
             <button class="btn btn-sm btn-outline-secondary" @onclick="LoadSessionsAsync">
-                <i class="bi bi-arrow-clockwise me-1"></i>Refresh
+                <i class="bi bi-arrow-clockwise me-1"></i>@L10n.T("security.btn_refresh")
             </button>
         </div>
 
@@ -110,9 +111,9 @@
                 <Columns>
                     <GridColumn TItem="SessionRow" Title="Username"   Value="@(x=>x.UserName)"/>
                     <GridColumn TItem="SessionRow" Title="IP"         Value="@(x=>x.IpAddress)" Align="center"/>
-                    <GridColumn TItem="SessionRow" Title="Đăng nhập lúc"  Value="@(x=>x.LoginTime.ToLocalTime().ToString("dd/MM HH:mm"))" Align="center" Filterable="false"/>
-                    <GridColumn TItem="SessionRow" Title="Hoạt động"  Value="@(x=>x.LastActive.ToLocalTime().ToString("HH:mm:ss"))" Align="center" Filterable="false"/>
-                    <GridColumn TItem="SessionRow" Title="Thiết bị"   Value="@(x=>x.DeviceInfo)" Filterable="false"/>
+                    <GridColumn TItem="SessionRow" Title="@L10n.T("security.col_login_time")"  Value="@(x=>x.LoginTime.ToLocalTime().ToString("dd/MM HH:mm"))" Align="center" Filterable="false"/>
+                    <GridColumn TItem="SessionRow" Title="@L10n.T("security.col_last_active")"  Value="@(x=>x.LastActive.ToLocalTime().ToString("HH:mm:ss"))" Align="center" Filterable="false"/>
+                    <GridColumn TItem="SessionRow" Title="@L10n.T("security.col_device")"   Value="@(x=>x.DeviceInfo)" Filterable="false"/>
                 </Columns>
                 <RowTemplate>
                     <td class="fw-semibold small">@s.UserName</td>
@@ -122,7 +123,7 @@
                     <td class="small text-muted" style="max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="@s.DeviceInfo">@s.DeviceInfo</td>
                 </RowTemplate>
                 <ActionColumn Context="s">
-                    <button class="btn btn-xs btn-outline-danger" title="Kick session"
+                    <button class="btn btn-xs btn-outline-danger" title="@L10n.T("security.tooltip_kick_session")"
                             @onclick="()=>KickAsync(s.SessionID, s.UserName)">
                         <i class="bi bi-x-circle"></i>
                     </button>
@@ -191,6 +192,6 @@
     {
         await DeviceSvc.AdminRevokeAsync(sessionId, Auth.UserName);
         _sessions.RemoveAll(s => s.SessionID == sessionId);
-        _msg = $"Da kick session cua {targetUser}";
+        _msg = L10n.T("security.msg_session_kicked");
     }
 }

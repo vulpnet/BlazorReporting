@@ -1,5 +1,5 @@
 @page "/report"
-@attribute [NavMenu(Title="Báo cáo", Icon="bi-table", Group="Phân tích", GroupOrder=10, Order=10, Hidden=true)]
+@attribute [NavMenu(Title="report.nav_title", Icon="bi-table", Group="nav.analysis", GroupOrder=10, Order=10, Hidden=true)]
 @using System.Text.Json
 @inject NavigationManager Nav
 @inject IDataRepository Repo
@@ -9,10 +9,11 @@
 @inject ICacheService Cache
 @inject IHttpContextAccessor HttpCtx
 @inject IJSRuntime JS
+@inject LocalizationService L10n
 @using BlazorReporting.Components
 
 @* <PageTitle>@(_config.Source.Length > 0 ? _config.Source : "Report") – BlazorReporting</PageTitle> *@
-<PageTitle>DMSPRO Reporting</PageTitle>
+<PageTitle>@L10n.T("report.page_title")</PageTitle>
 
 @* ══════════════════════════════════════════════════════════════
    CONFIG BAR — Bar 1: always-visible primary row
@@ -44,10 +45,10 @@
             {
                 <select class="form-select form-select-sm flex-shrink-0"
                         style="max-width:200px"
-                        title="Select a saved report"
+                        title="@L10n.T("report.select_saved_report")"
                         @onchange="SelectTemplateByName"
                         disabled="@_loading">
-                    <option value="">&#x1F4CB; Reports&#x2026;</option>
+                    <option value="">@L10n.T("report.reports_placeholder")</option>
                     @foreach (var t in _reportTemplates)
                     {
                         <option value="@t.Name">@t.Name</option>
@@ -71,7 +72,7 @@
             @* Page size *@
             <select class="form-select form-select-sm flex-shrink-0"
                     style="width:auto"
-                    title="Rows per page"
+                    title="@L10n.T("report.rows_per_page")"
                     value="@_config.PageSize"
                     @onchange="OnHeaderPageSizeChanged"
                     disabled="@_loading">
@@ -86,7 +87,7 @@
             <div class="d-flex gap-1 flex-shrink-0">
                 @* Run *@
                 <button class="btn btn-primary btn-sm" @onclick="ExecuteAsync"
-                        disabled="@_loading" title="Run report">
+                        disabled="@_loading" title="@L10n.T("report.btn_run_title")">
                     @if (_loading)
                     {
                         <span class="spinner-border spinner-border-sm" role="status"
@@ -96,28 +97,28 @@
                     {
                         <i class="bi bi-play-fill"></i>
                     }
-                    <span class="d-none d-sm-inline ms-1">Run</span>
+                    <span class="d-none d-sm-inline ms-1">@L10n.T("report.btn_run")</span>
                 </button>
 
                 @* Cancel — only while loading *@
                 @if (_loading)
                 {
-                    <button class="btn btn-danger btn-sm" @onclick="CancelAsync" title="Cancel query">
+                    <button class="btn btn-danger btn-sm" @onclick="CancelAsync" title="@L10n.T("report.btn_cancel_title")">
                         <i class="bi bi-stop-fill"></i>
-                        <span class="d-none d-sm-inline ms-1">Cancel</span>
+                        <span class="d-none d-sm-inline ms-1">@L10n.T("report.btn_cancel")</span>
                     </button>
                 }
 
                 @* Clear *@
                 <button class="btn btn-outline-secondary btn-sm" @onclick="ResetSource"
-                        title="Clear source and results" disabled="@_loading">
+                        title="@L10n.T("report.btn_clear_title")" disabled="@_loading">
                     <i class="bi bi-x-circle"></i>
-                    <span class="d-none d-lg-inline ms-1">Clear</span>
+                    <span class="d-none d-lg-inline ms-1">@L10n.T("report.btn_clear")</span>
                 </button>
 
                 @* Help *@
                 <a class="btn btn-outline-light btn-sm" href="/help" target="_blank"
-                   title="Open User Guide">
+                   title="@L10n.T("report.btn_help_title")">
                     <i class="bi bi-question-circle"></i>
                 </a>
             </div>
@@ -139,7 +140,7 @@
                             }
                         </span>
                         <input class="form-control"
-                               placeholder="@(p.HasDefault ? p.TypeName : "required")"
+                               placeholder="@(p.HasDefault ? p.TypeName : L10n.T("report.param_required"))"
                                value="@GetParamValue(p.Name)"
                                @oninput="e => SetParamValue(p.Name, e.Value?.ToString())" />
                     </div>
@@ -167,9 +168,7 @@
 {
     <div class="alert alert-warning alert-dismissible mx-2 mx-md-3 mt-2 mb-0" role="alert">
         <i class="bi bi-exclamation-triangle-fill me-2"></i>
-        <strong>Large dataset:</strong> @_allData.Count.ToString("N0") rows loaded into memory from this stored procedure.
-        Pivot and filtering run in-memory; consider adding <code>@@PageNumber</code> / <code>@@PageSize</code>
-        parameters to the SP for server-side paging, or switch to a View/Table for better performance.
+        @L10n.T("report.warn_large_dataset")
         <button type="button" class="btn-close" @onclick="() => _isBigSpData = false"></button>
     </div>
 }
@@ -184,10 +183,10 @@
 
             @* ── Stats badges ── *@
             <span class="badge bg-secondary">
-                <i class="bi bi-table me-1"></i>@_pagedResult.TotalCount.ToString("N0") rows
+                <i class="bi bi-table me-1"></i>@_pagedResult.TotalCount.ToString("N0") @L10n.T("report.stat_rows")
             </span>
             <span class="badge bg-secondary">
-                <i class="bi bi-layout-three-columns me-1"></i>@_columns.Count cols
+                <i class="bi bi-layout-three-columns me-1"></i>@_columns.Count @L10n.T("report.stat_cols")
             </span>
 
             @* ── Clear filters (only when active) ── *@
@@ -195,9 +194,9 @@
             {
                 <button class="btn btn-outline-warning btn-sm"
                         @onclick="ClearFilters"
-                        title="Clear all column filters">
+                        title="@L10n.T("report.btn_clear_filters_title")">
                     <i class="bi bi-funnel-fill me-1"></i>
-                    Clear filters (@_config.Filters.Count)
+                    @L10n.T("report.btn_clear_filters")
                 </button>
             }
 
@@ -206,19 +205,19 @@
                 <div class="btn-group btn-group-sm">
                     <button class="btn btn-outline-success"
                             @onclick="() => ExportAsync(ExportFormat.Excel, false)"
-                            title="Export data to Excel">
+                            title="@L10n.T("report.btn_export_excel_title")">
                         <i class="bi bi-file-earmark-excel"></i>
                         <span class="d-none d-sm-inline ms-1">Excel</span>
                     </button>
                     <button class="btn btn-outline-secondary"
                             @onclick="() => ExportAsync(ExportFormat.Csv, false)"
-                            title="Export data to CSV">
+                            title="@L10n.T("report.btn_export_csv_title")">
                         <i class="bi bi-filetype-csv"></i>
                         <span class="d-none d-sm-inline ms-1">CSV</span>
                     </button>
                     <button class="btn btn-outline-danger"
                             @onclick="() => ExportAsync(ExportFormat.Pdf, false)"
-                            title="Export data to PDF">
+                            title="@L10n.T("report.btn_export_pdf_title")">
                         <i class="bi bi-file-earmark-pdf"></i>
                         <span class="d-none d-sm-inline ms-1">PDF</span>
                     </button>
@@ -227,21 +226,21 @@
                 @* Pivot export (only when pivot exists) *@
                 @if (_pivotResult.RowKeys.Count > 0)
                 {
-                    <div class="btn-group btn-group-sm" title="Export pivot table">
+                    <div class="btn-group btn-group-sm" title="@L10n.T("report.btn_export_pivot_title")">
                         <button class="btn btn-success"
                                 @onclick="() => ExportAsync(ExportFormat.Excel, true)">
                             <i class="bi bi-file-earmark-excel"></i>
-                            <span class="d-none d-lg-inline ms-1">Pivot XLS</span>
+                            <span class="d-none d-lg-inline ms-1">@L10n.T("report.btn_pivot_xls")</span>
                         </button>
                         <button class="btn btn-secondary"
                                 @onclick="() => ExportAsync(ExportFormat.Csv, true)">
                             <i class="bi bi-filetype-csv"></i>
-                            <span class="d-none d-lg-inline ms-1">Pivot CSV</span>
+                            <span class="d-none d-lg-inline ms-1">@L10n.T("report.btn_pivot_csv")</span>
                         </button>
                         <button class="btn btn-danger"
                                 @onclick="() => ExportAsync(ExportFormat.Pdf, true)">
                             <i class="bi bi-file-earmark-pdf"></i>
-                            <span class="d-none d-lg-inline ms-1">Pivot PDF</span>
+                            <span class="d-none d-lg-inline ms-1">@L10n.T("report.btn_pivot_pdf")</span>
                         </button>
                     </div>
                 }
@@ -264,15 +263,15 @@
                     <button class="nav-link text-nowrap @(_activeTab == "data" ? "active" : "")"
                             @onclick="@(() => _activeTab = "data")">
                         <i class="bi bi-table me-1"></i>
-                        <span class="d-none d-sm-inline">Data Grid</span>
-                        <span class="d-sm-none">Grid</span>
+                        <span class="d-none d-sm-inline">@L10n.T("report.tab_data_grid")</span>
+                        <span class="d-sm-none">@L10n.T("report.tab_grid_short")</span>
                     </button>
                 </li>
                 <li class="nav-item">
                     <button class="nav-link text-nowrap @(_activeTab == "pivot" ? "active" : "")"
                             @onclick="@(() => _activeTab = "pivot")">
                         <i class="bi bi-grid-3x3-gap me-1"></i>
-                        <span>Pivot</span>
+                        <span>@L10n.T("report.tab_pivot")</span>
                         @if (_pivotResult.RowKeys.Count > 0)
                         {
                             <span class="badge bg-primary ms-1">@_pivotResult.RowKeys.Count</span>
@@ -319,7 +318,7 @@
             {
                 <div class="d-flex gap-2 align-items-center text-muted py-4 justify-content-center">
                     <div class="spinner-border text-primary"></div>
-                    <span>Building pivot…</span>
+                    <span>@L10n.T("report.pivot_building")</span>
                 </div>
             }
             else
@@ -340,7 +339,7 @@
 
             <div class="flex-fill">
                 <div class="fw-semibold">
-                    Loading <strong>@_config.Source</strong>…
+                    @L10n.T("report.loading_source")
                 </div>
 
                 @if (_rowsLoaded > 0)
@@ -355,14 +354,14 @@
                                  style="width:100%"></div>
                         </div>
                         <span style="font-size:.72rem" class="text-muted">
-                            Large dataset&ensp;—&ensp;fetching…
+                            @L10n.T("report.large_dataset_fetching")
                         </span>
                     </div>
                 }
             </div>
 
-            <button class="btn btn-outline-danger btn-sm" @onclick="CancelAsync" title="Cancel query">
-                <i class="bi bi-stop-fill me-1"></i>Cancel
+            <button class="btn btn-outline-danger btn-sm" @onclick="CancelAsync" title="@L10n.T("report.btn_cancel_title")">
+                <i class="bi bi-stop-fill me-1"></i>@L10n.T("report.btn_cancel")
             </button>
         </div>
 
@@ -391,21 +390,21 @@
     {
         <div class="alert alert-warning mt-3 mx-auto" style="max-width:420px">
             <i class="bi bi-slash-circle me-2"></i>
-            Query cancelled. Adjust parameters and click <strong>Run</strong> again.
+            @L10n.T("report.query_cancelled")
         </div>
     }
     else if (_hasExecuted)
     {
         <div class="alert alert-info mt-3">
-            <i class="bi bi-info-circle me-2"></i>No records returned by <code>@_config.Source</code>.
+            <i class="bi bi-info-circle me-2"></i>@L10n.T("report.no_records")
         </div>
     }
     else
     {
         <div class="text-center py-5 text-muted">
             <i class="bi bi-play-circle display-1 text-primary opacity-25"></i>
-            <h5 class="mt-3">No report loaded</h5>
-            <p class="small">Enter a source name above and tap <strong>Run</strong>.</p>
+            <h5 class="mt-3">@L10n.T("report.empty_title")</h5>
+            <p class="small">@L10n.T("report.empty_hint")</p>
         </div>
     }
 </div>

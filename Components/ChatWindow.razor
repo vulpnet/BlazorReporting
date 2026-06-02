@@ -13,7 +13,7 @@
 
     @* ── FAB toggle ── *@
     <button class="cw-fab @(_open ? "cw-fab--open" : "")"
-            title="@(_open ? "Đóng" : "AI Assistant")"
+            title="@(_open ? @L10n.T("ai.fab_close") : "AI Assistant")"
             @onclick="ToggleAsync">
         <span class="cw-fab-icon cw-fab-icon--chat"><i class="bi bi-chat-dots-fill"></i></span>
         <span class="cw-fab-icon cw-fab-icon--close"><i class="bi bi-x-lg"></i></span>
@@ -33,7 +33,7 @@
                     <div class="cw-header-sub">
                         @if (_loadingModels)
                         {
-                            <span class="cw-connecting"><span class="cw-dot-pulse"></span> Kết nối…</span>
+                            <span class="cw-connecting"><span class="cw-dot-pulse"></span> @L10n.T("ai.connecting")</span>
                         }
                         else if (_models.Count == 0)
                         {
@@ -58,10 +58,10 @@
                 }
 
                 <div class="cw-header-actions">
-                    <button class="cw-icon-btn" title="Xoá hội thoại" @onclick="ClearHistoryAsync">
+                    <button class="cw-icon-btn" title="@L10n.T("ai.clear_history")" @onclick="ClearHistoryAsync">
                         <i class="bi bi-arrow-counterclockwise"></i>
                     </button>
-                    <button class="cw-icon-btn" title="Đóng" @onclick="ToggleAsync">
+                    <button class="cw-icon-btn" title="@L10n.T("ai.fab_close")" @onclick="ToggleAsync">
                         <i class="bi bi-x-lg"></i>
                     </button>
                 </div>
@@ -77,35 +77,35 @@
                         <div class="cw-empty-avatar">
                             <img src="images/dmspro-ai.svg" alt="DMSPro AI" style="width:72px;height:72px;object-fit:contain"/>
                         </div>
-                        <p class="cw-empty-title">Xin chào, @Auth.FullName! 👋</p>
+                        <p class="cw-empty-title">@L10n.T("ai.empty_greeting")</p>
                         <p class="cw-empty-sub">
-                            Tôi có thể giúp bạn phân tích dữ liệu, điều hướng báo cáo hoặc bản đồ.
+                            @L10n.T("ai.empty_sub_static")
                         </p>
                         <div class="cw-suggestions">
                             @if (Columns?.Count > 0)
                             {
                                 <button class="cw-suggestion-chip"
                                         @onclick='() => QuickAsk("Tóm tắt dữ liệu báo cáo này cho tôi")'>
-                                    📊 Tóm tắt dữ liệu
+                                    @L10n.T("ai.chip_summarize")
                                 </button>
                                 <button class="cw-suggestion-chip"
                                         @onclick='() => QuickAsk("Gợi ý cách lọc dữ liệu hiệu quả")'>
-                                    ⚡ Gợi ý bộ lọc
+                                    @L10n.T("ai.chip_filter")
                                 </button>
                             }
                             <button class="cw-suggestion-chip"
                                     @onclick='() => QuickAsk("Mở bản đồ vị trí salesman hôm nay")'>
-                                🗺️ Bản đồ hôm nay
+                                @L10n.T("ai.chip_map")
                             </button>
                             <button class="cw-suggestion-chip"
                                     @onclick='() => QuickAsk("Mở trang hướng dẫn sử dụng")'>
-                                📖 Hướng dẫn
+                                @L10n.T("ai.chip_help")
                             </button>
                             @if (ReportLinks?.Count > 0)
                             {
                                 <button class="cw-suggestion-chip"
                                         @onclick='() => QuickAsk("Liệt kê tất cả báo cáo có sẵn")'>
-                                    📋 Danh sách báo cáo
+                                    @L10n.T("ai.chip_reports")
                                 </button>
                             }
                         </div>
@@ -167,9 +167,9 @@
                         <div class="cw-survey-card">
                             <div class="cw-survey-title">
                                 <i class="bi bi-stars me-1 text-warning"></i>
-                                Trải nghiệm của bạn hôm nay?
+                                @L10n.T("ai.survey_title")
                             </div>
-                            <p class="cw-survey-sub">Đánh giá giúp chúng tôi cải thiện hệ thống 🙏</p>
+                            <p class="cw-survey-sub">@L10n.T("ai.survey_sub")</p>
 
                             @* Sao *@
                             <div class="cw-stars">
@@ -193,15 +193,15 @@
                             {
                                 <textarea class="cw-survey-textarea"
                                           @bind="_surveyFeedback"
-                                          placeholder="@(_surveyScore <= 2 ? "Bạn gặp vấn đề gì? Chúng tôi sẽ khắc phục ngay…" : "Góp ý thêm (tuỳ chọn)…")"
+                                          placeholder="@(_surveyScore <= 2 ? L10n.T("ai.survey_placeholder_bad") : L10n.T("ai.survey_placeholder_good"))"
                                           rows="2"></textarea>
                                 <button class="cw-survey-submit" @onclick="SubmitSurveyAsync">
-                                    <i class="bi bi-send me-1"></i>Gửi đánh giá
+                                    <i class="bi bi-send me-1"></i>@L10n.T("ai.survey_submit")
                                 </button>
                             }
 
                             <button class="cw-survey-skip" @onclick="SkipSurvey">
-                                Để sau
+                                @L10n.T("ai.survey_skip")
                             </button>
                         </div>
                     </div>
@@ -224,12 +224,12 @@
                     <button class="cw-send-btn @(!string.IsNullOrWhiteSpace(_input) && !_busy ? "cw-send-btn--active" : "")"
                             @onclick="SendAsync"
                             disabled="@(_busy || string.IsNullOrWhiteSpace(_input) || _models.Count == 0)"
-                            title="Gửi (Enter)">
+                            title="@L10n.T("ai.send_tooltip")">
                         @if (_busy) { <span class="cw-send-spinner"></span> }
                         else        { <i class="bi bi-send-fill"></i> }
                     </button>
                 </div>
-                <div class="cw-footer-hint">Enter gửi · Shift+Enter xuống dòng</div>
+                <div class="cw-footer-hint">@L10n.T("ai.footer_hint")</div>
             </div>
 
         </div>
@@ -545,8 +545,8 @@
             {
                 Role    = "assistant",
                 Content = _surveyScore == 5
-                    ? "Cảm ơn bạn rất nhiều! ⭐⭐⭐⭐⭐ Rất vui vì bạn hài lòng với hệ thống. Tôi luôn ở đây nếu bạn cần hỗ trợ!"
-                    : "Cảm ơn bạn đã đánh giá! Chúng tôi sẽ tiếp tục cải thiện hệ thống để phục vụ bạn tốt hơn. 🙏"
+                    ? L10n.T("ai.survey_thanks_5")
+                    : L10n.T("ai.survey_thanks_good")
             };
             _messages.Add(thanks);
             _ = History.SaveAsync(Auth.UserName, "assistant", thanks.Content);
@@ -592,8 +592,8 @@
                 Content = "Chúng tôi thành thật xin lỗi vì trải nghiệm chưa tốt của bạn. " +
                           "Phản hồi của bạn rất quan trọng và chúng tôi sẽ khắc phục sớm nhất. " +
                           "Bạn có thể thử tải lại trang hoặc liên hệ quản trị viên nếu vấn đề còn tiếp diễn.",
-                NavActions = [new ChatNavLink("Tải lại báo cáo", "/report"),
-                              new ChatNavLink("Xem hướng dẫn",   "/help")]
+                NavActions = [new ChatNavLink(L10n.T("ai.nav_reload_report"), "/report"),
+                              new ChatNavLink(L10n.T("ai.nav_view_help"),    "/help")]
             };
             _messages.Add(fallback);
         }
@@ -697,13 +697,13 @@
     }
 
     // ── Helpers ───────────────────────────────────────────────
-    private static string StarLabel(int s) => s switch
+    private string StarLabel(int s) => s switch
     {
-        1 => "Rất không hài lòng 😞",
-        2 => "Không hài lòng 😕",
-        3 => "Bình thường 😐",
-        4 => "Hài lòng 😊",
-        5 => "Rất hài lòng 🤩",
+        1 => L10n.T("ai.star_1"),
+        2 => L10n.T("ai.star_2"),
+        3 => L10n.T("ai.star_3"),
+        4 => L10n.T("ai.star_4"),
+        5 => L10n.T("ai.star_5"),
         _ => ""
     };
 

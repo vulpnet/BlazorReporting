@@ -1,14 +1,15 @@
 @page "/product-sales"
-@attribute [NavMenu(Title="Doanh số sản phẩm", Icon="bi-box-seam", Group="Phân tích", GroupOrder=10, Order=30)]
+@attribute [NavMenu(Title="productsales.nav_title", Icon="bi-box-seam", Group="productsales.group_name", GroupOrder=10, Order=30)]
 @using BlazorReporting.Data
 @using BlazorReporting.Services
 @using System.Text.Json
+@inject LocalizationService L10n
 @inject IDataRepository Repo
 @inject SalesForecastService Forecaster
 @inject IJSRuntime JS
 @implements IAsyncDisposable
 
-<PageTitle>Phân tích sản phẩm – DMSPRO</PageTitle>
+<PageTitle>@L10n.T("productsales.page_title")</PageTitle>
 
 @* ══ TOOLBAR ══════════════════════════════════════════════ *@
 <div class="ps-toolbar">
@@ -18,8 +19,8 @@
         <div class="d-flex align-items-center gap-2 me-2">
             <div class="ps-title-icon"><i class="bi bi-box-seam-fill"></i></div>
             <div>
-                <div class="ps-title">Phân tích sản phẩm</div>
-                <div class="ps-subtitle">Sản phẩm bán chạy theo khu vực · Xu hướng &amp; Dự đoán</div>
+                <div class="ps-title">@L10n.T("productsales.title")</div>
+                <div class="ps-subtitle">@L10n.T("productsales.subtitle")</div>
             </div>
         </div>
 
@@ -35,9 +36,9 @@
         @* Kiểu kỳ *@
         <select class="form-select form-select-sm ps-select" @bind="_periodType"
                 @bind:after="OnPeriodTypeChanged" disabled="@_loading">
-            <option value="year">Cả năm</option>
-            <option value="quarter">Theo quý</option>
-            <option value="month">Theo tháng</option>
+            <option value="year">@L10n.T("productsales.period_year")</option>
+            <option value="quarter">@L10n.T("productsales.period_quarter")</option>
+            <option value="month">@L10n.T("productsales.period_month")</option>
         </select>
 
         @* Giá trị kỳ *@
@@ -56,32 +57,32 @@
                 @for (int m = 1; m <= 12; m++)
                 {
                     var mm = m;
-                    <option value="@mm">Tháng @mm</option>
+                    <option value="@mm">@L10n.T("productsales.month_label") @mm</option>
                 }
             </select>
         }
 
         @* Nhóm theo *@
         <select class="form-select form-select-sm ps-select" @bind="_groupBy" disabled="@_loading">
-            <option value="route">🗺 Tuyến</option>
-            <option value="province">🏙 Tỉnh/TP</option>
-            <option value="sm">👤 Salesman</option>
+            <option value="route">@L10n.T("productsales.groupby_route")</option>
+            <option value="province">@L10n.T("productsales.groupby_province")</option>
+            <option value="sm">@L10n.T("productsales.groupby_sm")</option>
         </select>
 
         @* Top N *@
         <select class="form-select form-select-sm ps-select" @bind="_topN" disabled="@_loading">
-            <option value="5">Top 5 SP</option>
-            <option value="10">Top 10 SP</option>
-            <option value="15">Top 15 SP</option>
-            <option value="20">Top 20 SP</option>
+            <option value="5">@L10n.T("productsales.top_n") 5</option>
+            <option value="10">@L10n.T("productsales.top_n") 10</option>
+            <option value="15">@L10n.T("productsales.top_n") 15</option>
+            <option value="20">@L10n.T("productsales.top_n") 20</option>
         </select>
 
         <button class="btn btn-primary btn-sm d-flex align-items-center gap-1"
                 @onclick="LoadAsync" disabled="@_loading">
             @if (_loading)
-            { <span class="spinner-border spinner-border-sm"></span><span>Đang tải…</span> }
+            { <span class="spinner-border spinner-border-sm"></span><span>@L10n.T("productsales.loading")</span> }
             else
-            { <i class="bi bi-search"></i><span>Phân tích</span> }
+            { <i class="bi bi-search"></i><span>@L10n.T("productsales.btn_analyze")</span> }
         </button>
 
         @* Metric toggle *@
@@ -90,11 +91,11 @@
             <div class="ps-metric-toggle ms-auto">
                 <button class="@(_metric=="qty" ? "active" : "")"
                         @onclick='() => SwitchMetricAsync("qty")'>
-                    <i class="bi bi-boxes me-1"></i>Số lượng
+                    <i class="bi bi-boxes me-1"></i>@L10n.T("productsales.metric_qty")
                 </button>
                 <button class="@(_metric=="amount" ? "active" : "")"
                         @onclick='() => SwitchMetricAsync("amount")'>
-                    <i class="bi bi-currency-dollar me-1"></i>Doanh số
+                    <i class="bi bi-currency-dollar me-1"></i>@L10n.T("productsales.metric_amount")
                 </button>
             </div>
         }
@@ -113,9 +114,9 @@
 {
     <div class="ps-empty">
         <i class="bi bi-box-seam display-1 opacity-20 d-block mb-3"></i>
-        <p class="mb-1 fw-semibold">Chọn kỳ và nhấn <strong>Phân tích</strong></p>
+        <p class="mb-1 fw-semibold">@L10n.T("productsales.empty_prompt")</p>
         <p class="text-muted" style="font-size:.85rem">
-            Biểu đồ sẽ hiển thị top sản phẩm bán chạy theo từng khu vực
+            @L10n.T("productsales.empty_hint")
         </p>
     </div>
 }
@@ -128,11 +129,11 @@ else
             <div class="ps-card-header">
                 <div class="d-flex align-items-center gap-2">
                     <i class="bi bi-bar-chart-line-fill text-primary"></i>
-                    <span class="fw-bold">Sản phẩm bán chạy theo khu vực</span>
+                    <span class="fw-bold">@L10n.T("productsales.card_area_title")</span>
                     @if (_areaData.Count > 0)
                     {
                         <span class="badge bg-primary" style="font-size:.7rem">
-                            @TopProducts.Count SP · @TopAreasCount khu vực
+                            @TopProducts.Count @L10n.T("productsales.badge_sp_areas") @TopAreasCount
                         </span>
                     }
                 </div>
@@ -143,7 +144,7 @@ else
                 {
                     <div class="ps-chart-placeholder">
                         <div class="spinner-border text-primary"></div>
-                        <div class="mt-2 text-muted">Đang tải dữ liệu…</div>
+                        <div class="mt-2 text-muted">@L10n.T("productsales.loading_data")</div>
                     </div>
                 }
                 else
@@ -160,7 +161,7 @@ else
             <div class="ps-card-header">
                 <div class="d-flex align-items-center gap-2">
                     <i class="bi bi-graph-up-arrow text-warning"></i>
-                    <span class="fw-bold">Xu hướng &amp; Dự đoán</span>
+                    <span class="fw-bold">@L10n.T("productsales.card_trend_title")</span>
                 </div>
                 @if (TopProducts.Count > 0)
                 {
@@ -183,7 +184,7 @@ else
                 {
                     <div class="ps-chart-placeholder">
                         <div class="spinner-border text-warning"></div>
-                        <div class="mt-2 text-muted">Đang tính xu hướng…</div>
+                        <div class="mt-2 text-muted">@L10n.T("productsales.loading_trend")</div>
                     </div>
                 }
                 else if (_trendNeedsDraw && _trendPoints.Count > 0)
@@ -201,7 +202,7 @@ else
                 else
                 {
                     <div class="ps-chart-placeholder text-muted">
-                        <i class="bi bi-arrow-left-circle me-1"></i>Chọn sản phẩm để xem xu hướng
+                        <i class="bi bi-arrow-left-circle me-1"></i>@L10n.T("productsales.trend_empty")
                     </div>
                 }
 
@@ -246,19 +247,19 @@ else
                 <div class="ps-card-header">
                     <div class="d-flex align-items-center gap-2">
                         <i class="bi bi-lightbulb-fill text-warning"></i>
-                        <span class="fw-bold">Gợi ý chiến lược bán hàng</span>
+                        <span class="fw-bold">@L10n.T("productsales.card_strategy_title")</span>
                     </div>
                 </div>
                 <div class="ps-strategy-wrap">
                     <table class="ps-strategy-table">
                         <thead>
                             <tr>
-                                <th>Khu vực</th>
-                                <th>SP bán chạy nhất</th>
-                                <th class="text-end">Số lượng</th>
-                                <th class="text-end">Doanh số</th>
-                                <th>Xu hướng</th>
-                                <th>Gợi ý</th>
+                                <th>@L10n.T("productsales.col_area")</th>
+                                <th>@L10n.T("productsales.col_top_product")</th>
+                                <th class="text-end">@L10n.T("productsales.col_qty")</th>
+                                <th class="text-end">@L10n.T("productsales.col_amount")</th>
+                                <th>@L10n.T("productsales.col_trend")</th>
+                                <th>@L10n.T("productsales.col_suggestion")</th>
                             </tr>
                         </thead>
                         <tbody>
@@ -339,7 +340,7 @@ else
     {
         "quarter" => $"Q{_periodValue}/{_year}",
         "month"   => $"T{_periodValue}/{_year}",
-        _         => $"Năm {_year}"
+        _         => L10n.T("productsales.period_year_label") + " " + _year
     };
 
     private List<StrategyRow> _strategyRowsCache = [];
@@ -371,12 +372,12 @@ else
                 var name = top.InventoryName;
                 var (tc, ti, tt, sg) = rank switch
                 {
-                    0 or 1 => ("up",   "bi-arrow-up-circle-fill",   "Tăng trưởng",
+                    0 or 1 => ("up",   "bi-arrow-up-circle-fill",   L10n.T("productsales.trend_up"),
                                $"Đẩy mạnh {name}, duy trì chiến lược hiện tại"),
                     _ when rank >= total - 2
-                          => ("down", "bi-arrow-down-circle-fill", "Cần chú ý",
+                          => ("down", "bi-arrow-down-circle-fill", L10n.T("productsales.trend_down"),
                                $"Xem xét khuyến mãi {name} tại khu vực này"),
-                    _     => ("flat", "bi-dash-circle-fill",       "Ổn định",
+                    _     => ("flat", "bi-dash-circle-fill",       L10n.T("productsales.trend_flat"),
                                $"Cơ hội mở rộng {name} sang khu vực lân cận")
                 };
                 return new StrategyRow(g.Key, top.InventoryCD, top.InventoryName,
@@ -429,7 +430,7 @@ else
 
             if (_areaData.Count == 0)
             {
-                _error = "Không có dữ liệu cho kỳ đã chọn.";
+                _error = L10n.T("productsales.error_no_data");
                 return;
             }
 
@@ -500,7 +501,7 @@ else
         finally { _trendLoading = false; StateHasChanged(); }
     }
 
-    private static List<PredictionItem> BuildPredictions(ForecastResult fc)
+    private List<PredictionItem> BuildPredictions(ForecastResult fc)
     {
         var result = new List<PredictionItem>();
         for (int i = 0; i < fc.Labels.Count; i++)
@@ -512,9 +513,9 @@ else
                 : "flat";
             var (icon, txt) = sig switch
             {
-                "up"   => ("bi-arrow-up-right-circle-fill",   "Tăng"),
-                "down" => ("bi-arrow-down-right-circle-fill", "Giảm"),
-                _      => ("bi-dash-circle-fill",              "Ổn định")
+                "up"   => ("bi-arrow-up-right-circle-fill",   L10n.T("productsales.signal_up")),
+                "down" => ("bi-arrow-down-right-circle-fill", L10n.T("productsales.signal_down")),
+                _      => ("bi-dash-circle-fill",              L10n.T("productsales.trend_flat"))
             };
             result.Add(new PredictionItem(fc.Labels[i], predQ,
                 (decimal)fc.Amount.Predicted[i], sig, icon, txt));

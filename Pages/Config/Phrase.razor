@@ -1,21 +1,22 @@
 @page "/config/phrase"
-@attribute [NavMenu(Title="Từ điển ngôn ngữ", Icon="bi-translate", Group="Cấu hình", GroupOrder=80, Order=50)]
+@attribute [NavMenu(Title="phrase.page_title", Icon="bi-translate", Group="nav.config", GroupOrder=80, Order=50)]
 @using BlazorReporting.Services
 @inject AuthService Auth
 @inject ConfigService CfgSvc
 @inject NavigationManager Nav
+@inject LocalizationService L10n
 
-<PageTitle>Từ điển ngôn ngữ</PageTitle>
+<PageTitle>@L10n.T("phrase.page_title")</PageTitle>
 
 <div class="container-fluid mt-3">
-    <h5 class="mb-3"><i class="bi bi-translate me-2"></i>Từ điển đa ngôn ngữ</h5>
+    <h5 class="mb-3"><i class="bi bi-translate me-2"></i>@L10n.T("phrase.heading")</h5>
 
     @* Search bar *@
     <div class="d-flex gap-2 mb-3 flex-wrap align-items-end">
         <div>
-            <label class="form-label small mb-1">Ngôn ngữ</label>
+            <label class="form-label small mb-1">@L10n.T("phrase.lbl_language")</label>
             <select class="form-select form-select-sm" style="width:150px" @bind="_filterLang">
-                <option value="">Tất cả</option>
+                <option value="">@L10n.T("lbl.all")</option>
                 @foreach (var l in _languages)
                 {
                     <option value="@l.LangID">@l.LangName (@l.Code)</option>
@@ -23,11 +24,11 @@
             </select>
         </div>
         <div style="flex:1;min-width:200px;max-width:400px">
-            <label class="form-label small mb-1">Tìm kiếm (code hoặc nội dung)</label>
-            <input class="form-control form-control-sm" placeholder="Nhập từ khóa..." @bind="_search" />
+            <label class="form-label small mb-1">@L10n.T("phrase.lbl_search")</label>
+            <input class="form-control form-control-sm" placeholder="@L10n.T("phrase.placeholder_search")" @bind="_search" />
         </div>
         <button class="btn btn-sm btn-primary" @onclick="SearchAsync">
-            <i class="bi bi-search me-1"></i>Tìm
+            <i class="bi bi-search me-1"></i>@L10n.T("phrase.btn_search")
         </button>
     </div>
 
@@ -47,8 +48,8 @@
         <SortableGrid Items="_phrases" Context="p" MinWidth="650px" DefaultPageSize="30">
             <Columns>
                 <GridColumn TItem="PhraseRow" Title="Phrase Code" Value="@(x => x.PhraseCode)" />
-                <GridColumn TItem="PhraseRow" Title="Ngôn ngữ"    Value="@(x => LangName(x.LanguageID))" Align="center" />
-                <GridColumn TItem="PhraseRow" Title="Nội dung"    Value="@(x => x.PhraseText)" />
+                <GridColumn TItem="PhraseRow" Title="@L10n.T("phrase.col_language")"    Value="@(x => LangName(x.LanguageID))" Align="center" />
+                <GridColumn TItem="PhraseRow" Title="@L10n.T("phrase.col_content")"    Value="@(x => x.PhraseText)" />
             </Columns>
             <RowTemplate>
                 <td class="font-monospace small text-muted">@p.PhraseCode</td>
@@ -120,7 +121,7 @@
     private async Task SavePhraseAsync(PhraseRow p)
     {
         var ok = await CfgSvc.UpdatePhraseAsync(p.PhraseCode, p.LanguageID, _editValue);
-        _ok = ok; _msg = ok ? "Cập nhật thành công." : "Có lỗi xảy ra.";
+        _ok = ok; _msg = ok ? L10n.T("phrase.msg_save_ok") : L10n.T("phrase.msg_save_error");
         if (ok)
         {
             var idx = _phrases.FindIndex(x => x.PhraseCode == p.PhraseCode && x.LanguageID == p.LanguageID);

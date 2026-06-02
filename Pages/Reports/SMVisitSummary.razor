@@ -1,20 +1,21 @@
 @page "/report/summary"
-@attribute [NavMenu(Title="Tổng hợp KPI", Icon="bi-bar-chart-line-fill", Group="Báo cáo", GroupOrder=20, Order=20)]
+@attribute [NavMenu(Title="smvisit.nav_title", Icon="bi-bar-chart-line-fill", Group="nav.reports", GroupOrder=20, Order=20)]
 @using BlazorReporting.Services
 @inject AuthService Auth
 @inject ReportService RptSvc
 @inject NavigationManager Nav
-<PageTitle>SM Visit Summary</PageTitle>
+@inject LocalizationService L10n
+<PageTitle>@L10n.T("smvisit.page_title")</PageTitle>
 <div class="container-fluid mt-3">
-    <h5 class="mb-3"><i class="bi bi-bar-chart-line-fill me-2"></i>SM Visit Summary</h5>
+    <h5 class="mb-3"><i class="bi bi-bar-chart-line-fill me-2"></i>@L10n.T("smvisit.page_title")</h5>
     <div class="card shadow-sm mb-3"><div class="card-body py-2">
         <div class="d-flex gap-2 flex-wrap align-items-end">
-            <div><label class="form-label small mb-1">Từ ngày *</label><input type="date" class="form-control form-control-sm" style="width:150px" @bind="_fromDate"/></div>
-            <div><label class="form-label small mb-1">Đến ngày *</label><input type="date" class="form-control form-control-sm" style="width:150px" @bind="_toDate"/></div>
-            <div><label class="form-label small mb-1">Tuyến</label><input class="form-control form-control-sm" style="width:160px" placeholder="RouteCD..." @bind="_routeCD"/></div>
-            <div><label class="form-label small mb-1">Giám sát</label><input class="form-control form-control-sm" style="width:140px" placeholder="SaleSupCD..." @bind="_saleSupCD"/></div>
-            <div><label class="form-label small mb-1">Nhân viên BH</label><input class="form-control form-control-sm" style="width:140px" placeholder="SalesmanCD..." @bind="_salesmanCD"/></div>
-            <button class="btn btn-sm btn-primary" @onclick="LoadAsync"><i class="bi bi-search me-1"></i>Xem</button>
+            <div><label class="form-label small mb-1">@L10n.T("smvisit.lbl_from_date")</label><input type="date" class="form-control form-control-sm" style="width:150px" @bind="_fromDate"/></div>
+            <div><label class="form-label small mb-1">@L10n.T("smvisit.lbl_to_date")</label><input type="date" class="form-control form-control-sm" style="width:150px" @bind="_toDate"/></div>
+            <div><label class="form-label small mb-1">@L10n.T("smvisit.lbl_route")</label><input class="form-control form-control-sm" style="width:160px" placeholder="RouteCD..." @bind="_routeCD"/></div>
+            <div><label class="form-label small mb-1">@L10n.T("smvisit.lbl_supervisor")</label><input class="form-control form-control-sm" style="width:140px" placeholder="SaleSupCD..." @bind="_saleSupCD"/></div>
+            <div><label class="form-label small mb-1">@L10n.T("smvisit.lbl_salesman")</label><input class="form-control form-control-sm" style="width:140px" placeholder="SalesmanCD..." @bind="_salesmanCD"/></div>
+            <button class="btn btn-sm btn-primary" @onclick="LoadAsync"><i class="bi bi-search me-1"></i>@L10n.T("smvisit.btn_view")</button>
             @if (_data.Any()){<span class="text-muted small ms-2">@_data.Count dong</span>}
         </div>
     </div></div>
@@ -26,25 +27,25 @@
             <div class="col-6 col-md-2">
                 <div class="card border-0 shadow-sm text-center py-2">
                     <div class="fw-bold fs-5 text-primary">@_data.Select(x => x.SalesmanCD).Distinct().Count()</div>
-                    <div class="small text-muted">Nhân viên BH</div>
+                    <div class="small text-muted">@L10n.T("smvisit.lbl_salesman")</div>
                 </div>
             </div>
             <div class="col-6 col-md-2">
                 <div class="card border-0 shadow-sm text-center py-2">
                     <div class="fw-bold fs-5 text-success">@mcpData.Sum(x => x.OutletVisited).ToString("N0")</div>
-                    <div class="small text-muted">CH da VT</div>
+                    <div class="small text-muted">@L10n.T("smvisit.stat_outlets_visited")</div>
                 </div>
             </div>
             <div class="col-6 col-md-2">
                 <div class="card border-0 shadow-sm text-center py-2">
                     <div class="fw-bold fs-5 text-warning">@mcpData.Sum(x => x.OrderCount).ToString("N0")</div>
-                    <div class="small text-muted">Đơn hàng</div>
+                    <div class="small text-muted">@L10n.T("smvisit.lbl_orders")</div>
                 </div>
             </div>
             <div class="col-6 col-md-3">
                 <div class="card border-0 shadow-sm text-center py-2">
                     <div class="fw-bold fs-5 text-info">@((mcpData.Sum(x => x.TotalAmount)/1_000_000m).ToString("N1"))M</div>
-                    <div class="small text-muted">Doanh số</div>
+                    <div class="small text-muted">@L10n.T("smvisit.lbl_revenue")</div>
                 </div>
             </div>
             <div class="col-6 col-md-3">
@@ -57,7 +58,7 @@
                     <div class="fw-bold fs-5 @(avgVisitPct>=80?"text-success":avgVisitPct>=50?"text-warning":"text-danger")">
                         @avgVisitPct.ToString("N1")%
                     </div>
-                    <div class="small text-muted">% VT</div>
+                    <div class="small text-muted">@L10n.T("smvisit.stat_visit_pct")</div>
                 </div>
             </div>
         </div>
@@ -68,19 +69,19 @@
     else {
         <SortableGrid Items="_data" Context="r" MinWidth="1200px" DefaultPageSize="20">
             <Columns>
-                <GridColumn TItem="SMVisitSummaryRow" Title="Nhân viên BH"         Value="@(x => x.SalesmanName)"/>
-                <GridColumn TItem="SMVisitSummaryRow" Title="Giám sát"          Value="@(x => x.SalesSupName)"/>
-                <GridColumn TItem="SMVisitSummaryRow" Title="Tuyến"       Value="@(x => x.RouteCD)"/>
-                <GridColumn TItem="SMVisitSummaryRow" Title="NPP" Value="@(x => x.DistributorName)"/>
-                <GridColumn TItem="SMVisitSummaryRow" Title="Ngày"        Value="@(x => x.VisitDate.HasValue ? x.VisitDate.Value.ToString("dd/MM") : "")" Align="center"/>
-                <GridColumn TItem="SMVisitSummaryRow" Title="CH Kế hoạch"    Value="@(x => x.OutletMustVisit)" Align="end"/>
-                <GridColumn TItem="SMVisitSummaryRow" Title="Đã viếng thăm"       Value="@(x => x.OutletVisited)" Align="end"/>
-                <GridColumn TItem="SMVisitSummaryRow" Title="% Viếng thăm"        Value="@(x => x.VisitMCP)" Align="end"/>
-                <GridColumn TItem="SMVisitSummaryRow" Title="Đơn hàng"    Value="@(x => x.OrderCount)" Align="end"/>
-                <GridColumn TItem="SMVisitSummaryRow" Title="% Có đơn"        Value="@(x => x.SOMCP)" Align="end"/>
+                <GridColumn TItem="SMVisitSummaryRow" Title="@L10n.T("smvisit.lbl_salesman")"         Value="@(x => x.SalesmanName)"/>
+                <GridColumn TItem="SMVisitSummaryRow" Title="@L10n.T("smvisit.lbl_supervisor")"          Value="@(x => x.SalesSupName)"/>
+                <GridColumn TItem="SMVisitSummaryRow" Title="@L10n.T("smvisit.lbl_route")"       Value="@(x => x.RouteCD)"/>
+                <GridColumn TItem="SMVisitSummaryRow" Title="@L10n.T("smvisit.lbl_distributor")" Value="@(x => x.DistributorName)"/>
+                <GridColumn TItem="SMVisitSummaryRow" Title="@L10n.T("smvisit.lbl_date")"        Value="@(x => x.VisitDate.HasValue ? x.VisitDate.Value.ToString("dd/MM") : "")" Align="center"/>
+                <GridColumn TItem="SMVisitSummaryRow" Title="@L10n.T("smvisit.col_outlets_planned")"    Value="@(x => x.OutletMustVisit)" Align="end"/>
+                <GridColumn TItem="SMVisitSummaryRow" Title="@L10n.T("smvisit.col_outlets_visited")"       Value="@(x => x.OutletVisited)" Align="end"/>
+                <GridColumn TItem="SMVisitSummaryRow" Title="@L10n.T("smvisit.col_visit_pct")"        Value="@(x => x.VisitMCP)" Align="end"/>
+                <GridColumn TItem="SMVisitSummaryRow" Title="@L10n.T("smvisit.lbl_orders")"    Value="@(x => x.OrderCount)" Align="end"/>
+                <GridColumn TItem="SMVisitSummaryRow" Title="@L10n.T("smvisit.col_order_pct")"        Value="@(x => x.SOMCP)" Align="end"/>
                 <GridColumn TItem="SMVisitSummaryRow" Title="LPPC"        Value="@(x => x.LPPC)" Align="end"/>
-                <GridColumn TItem="SMVisitSummaryRow" Title="Doanh số"    Value="@(x => x.TotalAmount)" Align="end"/>
-                <GridColumn TItem="SMVisitSummaryRow" Title="Đồng bộ"        Value="@(x => x.FirstSyncTime.HasValue ? x.FirstSyncTime.Value.ToString("HH:mm") : "Chua")" Align="center"/>
+                <GridColumn TItem="SMVisitSummaryRow" Title="@L10n.T("smvisit.lbl_revenue")"    Value="@(x => x.TotalAmount)" Align="end"/>
+                <GridColumn TItem="SMVisitSummaryRow" Title="@L10n.T("smvisit.col_sync_time")"        Value="@(x => x.FirstSyncTime.HasValue ? x.FirstSyncTime.Value.ToString("HH:mm") : L10n.T("smvisit.badge_not_synced"))" Align="center"/>
                 <GridColumn TItem="SMVisitSummaryRow" Title="MCP"         Value="@(x => x.strIsMCP)" Align="center"/>
             </Columns>
             <RowTemplate>
@@ -103,11 +104,11 @@
                     @if (r.FirstSyncTime.HasValue)
                     { <span class="badge bg-success">@r.FirstSyncTime.Value.ToString("HH:mm")</span> }
                     else
-                    { <span class="badge bg-secondary">Chua</span> }
+                    { <span class="badge bg-secondary">@L10n.T("smvisit.badge_not_synced")</span> }
                 </td>
                 <td class="text-center">
                     <span class="badge @(r.strIsMCP=="IsRoute"?"bg-primary":"bg-secondary")" style="font-size:.65rem">
-                        @(r.strIsMCP=="IsRoute"?"Dung tuyen":"Ngoai")
+                        @(r.strIsMCP=="IsRoute"?L10n.T("smvisit.badge_on_route"):L10n.T("smvisit.badge_off_route"))
                     </span>
                 </td>
             </RowTemplate>

@@ -2,16 +2,18 @@
    Available Fields → drag or click R/C/V → Row / Column / Values zones.
    Columns zone supports multiple fields (composite key). *@
 
+@inject LocalizationService L10n
+
 <div class="xl-pivot-panel card border-0 shadow-sm mb-3">
 
     @* ── Panel header ── *@
     <div class="card-header bg-primary text-white d-flex justify-content-between align-items-center py-2">
         <span class="fw-semibold small">
-            <i class="bi bi-grid-3x3-gap me-2"></i>PivotTable Fields
+            <i class="bi bi-grid-3x3-gap me-2"></i>@L10n.T("pivot.panel_title")
         </span>
         <button class="btn btn-sm btn-outline-light py-0 px-2"
                 @onclick="() => _collapsed = !_collapsed"
-                title="@(_collapsed ? "Expand" : "Collapse")">
+                title="@(_collapsed ? L10n.T("pivot.expand") : L10n.T("pivot.collapse"))">
             <i class="bi @(_collapsed ? "bi-chevron-down" : "bi-chevron-up")"></i>
         </button>
     </div>
@@ -33,7 +35,7 @@
                                 <i class="bi bi-search text-muted" style="font-size:.75rem"></i>
                             </span>
                             <input class="form-control border-start-0 ps-0"
-                                   placeholder="Search fields…"
+                                   placeholder="@L10n.T("pivot.search_fields")"
                                    @bind="_search"
                                    @bind:event="oninput"
                                    style="font-size:.8rem" />
@@ -56,13 +58,13 @@
                                 <i class="bi bi-grip-vertical text-muted me-1" style="font-size:.8rem"></i>
                                 <span class="flex-fill text-truncate small">@f</span>
                                 <div class="xl-qbtns">
-                                    <button class="xl-qbtn" title="Set as Row"
+                                    <button class="xl-qbtn" title="@L10n.T("pivot.set_as_row")"
                                             @onclick:stopPropagation="true"
                                             @onclick="() => QuickAssign(f, ZoneKind.Row)">R</button>
-                                    <button class="xl-qbtn" title="Add to Columns"
+                                    <button class="xl-qbtn" title="@L10n.T("pivot.add_to_columns")"
                                             @onclick:stopPropagation="true"
                                             @onclick="() => QuickAssign(f, ZoneKind.Col)">C</button>
-                                    <button class="xl-qbtn xl-qbtn-val" title="Add to Values"
+                                    <button class="xl-qbtn xl-qbtn-val" title="@L10n.T("pivot.add_to_values")"
                                             @onclick:stopPropagation="true"
                                             @onclick="() => QuickAssign(f, ZoneKind.Val)">V</button>
                                 </div>
@@ -70,11 +72,11 @@
                         }
                         @if (_available.Count == 0)
                         {
-                            <div class="px-3 py-2 text-muted small fst-italic">All fields assigned</div>
+                            <div class="px-3 py-2 text-muted small fst-italic">@L10n.T("pivot.all_fields_assigned")</div>
                         }
                         else if (!visibleFields.Any())
                         {
-                            <div class="px-3 py-2 text-muted small fst-italic">No fields match "@_search"</div>
+                            <div class="px-3 py-2 text-muted small fst-italic">@L10n.T("pivot.no_fields_match") "@_search"</div>
                         }
                     </div>
                 </div>
@@ -89,11 +91,11 @@
                          @ondragleave="() => _dropTarget = null"
                          @ondrop="() => _dropTarget = null">
                         <div class="xl-zone-hdr xl-zone-hdr-filter">
-                            <i class="bi bi-funnel me-1"></i>Filters
+                            <i class="bi bi-funnel me-1"></i>@L10n.T("pivot.zone_filters")
                         </div>
                         <div class="xl-zone-body">
                             <span class="text-muted small fst-italic" style="font-size:.72rem">
-                                Feature coming soon
+                                @L10n.T("pivot.coming_soon")
                             </span>
                         </div>
                     </div>
@@ -105,7 +107,7 @@
                          @ondragleave="() => _dropTarget = null"
                          @ondrop="() => CommitDrop(ZoneKind.Col)">
                         <div class="xl-zone-hdr xl-zone-hdr-col">
-                            <i class="bi bi-arrow-right-short me-1"></i>Columns
+                            <i class="bi bi-arrow-right-short me-1"></i>@L10n.T("pivot.zone_columns")
                             @if (Config.ColumnFields.Count > 1)
                             {
                                 <span class="badge bg-primary ms-1" style="font-size:.65rem">@Config.ColumnFields.Count</span>
@@ -122,13 +124,13 @@
                                     <span class="text-truncate">@cf</span>
                                     <button class="xl-chip-remove"
                                             @onclick="() => RemoveField(ZoneKind.Col, cf)"
-                                            title="Remove">×</button>
+                                            title="@L10n.T("pivot.remove")">×</button>
                                 </span>
                             }
                             @if (!Config.ColumnFields.Any(f => !string.IsNullOrEmpty(f)))
                             {
                                 <span class="text-muted small fst-italic" style="font-size:.72rem">
-                                    Drop fields here
+                                    @L10n.T("pivot.drop_fields_here")
                                 </span>
                             }
                         </div>
@@ -141,7 +143,7 @@
                          @ondragleave="() => _dropTarget = null"
                          @ondrop="() => CommitDrop(ZoneKind.Row)">
                         <div class="xl-zone-hdr xl-zone-hdr-row">
-                            <i class="bi bi-arrow-down-short me-1"></i>Rows
+                            <i class="bi bi-arrow-down-short me-1"></i>@L10n.T("pivot.zone_rows")
                         </div>
                         <div class="xl-zone-body">
                             @if (!string.IsNullOrEmpty(Config.RowField))
@@ -154,13 +156,13 @@
                                     <span class="text-truncate">@Config.RowField</span>
                                     <button class="xl-chip-remove"
                                             @onclick="() => RemoveField(ZoneKind.Row, Config.RowField)"
-                                            title="Remove">×</button>
+                                            title="@L10n.T("pivot.remove")">×</button>
                                 </span>
                             }
                             else
                             {
                                 <span class="text-muted small fst-italic" style="font-size:.72rem">
-                                    Drop a field here
+                                    @L10n.T("pivot.drop_field_here")
                                 </span>
                             }
                         </div>
@@ -173,7 +175,7 @@
                          @ondragleave="() => _dropTarget = null"
                          @ondrop="() => CommitDrop(ZoneKind.Val)">
                         <div class="xl-zone-hdr xl-zone-hdr-val">
-                            <i class="bi bi-calculator me-1"></i>Values
+                            <i class="bi bi-calculator me-1"></i>@L10n.T("pivot.zone_values")
                         </div>
                         <div class="xl-zone-body">
                             @foreach (var vd in Config.ValueFields.Where(v => !string.IsNullOrEmpty(v.Field)))
@@ -184,7 +186,7 @@
                                       @ondragend="EndDrag">
                                     <i class="bi bi-grip-vertical" style="font-size:.7rem;cursor:grab"></i>
                                     <span class="text-truncate" style="max-width:80px">@vd.Field</span>
-                                    <select class="xl-agg-select" @bind="vd.Aggregation" title="Aggregation">
+                                    <select class="xl-agg-select" @bind="vd.Aggregation" title="@L10n.T("pivot.aggregation")">
                                         @foreach (var a in Enum.GetValues<AggregationType>())
                                         {
                                             <option value="@a">@a</option>
@@ -192,13 +194,13 @@
                                     </select>
                                     <button class="xl-chip-remove"
                                             @onclick="() => RemoveField(ZoneKind.Val, vd.Field)"
-                                            title="Remove">×</button>
+                                            title="@L10n.T("pivot.remove")">×</button>
                                 </span>
                             }
                             @if (!Config.ValueFields.Any(v => !string.IsNullOrEmpty(v.Field)))
                             {
                                 <span class="text-muted small fst-italic" style="font-size:.72rem">
-                                    Drop fields here
+                                    @L10n.T("pivot.drop_fields_here")
                                 </span>
                             }
                         </div>
@@ -216,17 +218,17 @@
                         <div class="form-check form-check-sm mb-0">
                             <input class="form-check-input" type="checkbox"
                                    id="xlChkRowTot" @bind="Config.ShowRowTotals" />
-                            <label class="form-check-label small" for="xlChkRowTot">Row Totals</label>
+                            <label class="form-check-label small" for="xlChkRowTot">@L10n.T("pivot.row_totals")</label>
                         </div>
                         <div class="form-check form-check-sm mb-0">
                             <input class="form-check-input" type="checkbox"
                                    id="xlChkColTot" @bind="Config.ShowColTotals" />
-                            <label class="form-check-label small" for="xlChkColTot">Column Totals</label>
+                            <label class="form-check-label small" for="xlChkColTot">@L10n.T("pivot.col_totals")</label>
                         </div>
                         <div class="form-check form-check-sm mb-0">
                             <input class="form-check-input" type="checkbox"
                                    id="xlChkGrand" @bind="Config.ShowGrandTotal" />
-                            <label class="form-check-label small" for="xlChkGrand">Grand Total</label>
+                            <label class="form-check-label small" for="xlChkGrand">@L10n.T("pivot.grand_total")</label>
                         </div>
                     </div>
 
@@ -235,11 +237,11 @@
                         <button class="btn btn-primary btn-sm"
                                 @onclick="OnApplyClicked"
                                 disabled="@(!Config.IsValid)">
-                            <i class="bi bi-play-fill me-1"></i>Apply Pivot
+                            <i class="bi bi-play-fill me-1"></i>@L10n.T("pivot.apply")
                         </button>
                         <button class="btn btn-outline-secondary btn-sm"
                                 @onclick="ResetAll">
-                            <i class="bi bi-arrow-counterclockwise me-1"></i>Reset
+                            <i class="bi bi-arrow-counterclockwise me-1"></i>@L10n.T("pivot.reset")
                         </button>
                     </div>
                 </div>
@@ -251,7 +253,7 @@
                         @onclick="() => _layoutOpen = !_layoutOpen"
                         style="font-size:.78rem">
                     <i class="bi @(_layoutOpen ? "bi-chevron-up" : "bi-chevron-down") me-1"></i>
-                    Layout Save / Load
+                    @L10n.T("pivot.layout_save_load")
                 </button>
 
                 @if (_layoutOpen)
@@ -261,10 +263,10 @@
 
                             @* Layout name + Save *@
                             <div>
-                                <label class="form-label mb-1 small fw-semibold">Layout Name</label>
+                                <label class="form-label mb-1 small fw-semibold">@L10n.T("pivot.layout_name")</label>
                                 <div class="input-group input-group-sm">
                                     <input class="form-control" style="width:140px"
-                                           @bind="_layoutName" placeholder="Default" />
+                                           @bind="_layoutName" placeholder="@L10n.T("pivot.layout_default")" />
                                     <button class="btn btn-success" @onclick="SaveLayout" title="Save layout">
                                         <i class="bi bi-floppy"></i>
                                     </button>
@@ -275,11 +277,11 @@
                             @if (SavedLayouts.Count > 0)
                             {
                                 <div>
-                                    <label class="form-label mb-1 small fw-semibold">Load Layout</label>
+                                    <label class="form-label mb-1 small fw-semibold">@L10n.T("pivot.load_layout")</label>
                                     <div class="input-group input-group-sm">
                                         <select class="form-select" style="width:200px"
                                                 @bind="_selectedLayoutId">
-                                            <option value="0">— select layout —</option>
+                                            <option value="0">@L10n.T("pivot.select_layout")</option>
                                             @foreach (var l in SavedLayouts)
                                             {
                                                 <option value="@l.Id">
@@ -333,7 +335,7 @@
     private string?      _dragField;
     private ZoneKind?    _dragSource;
     private ZoneKind?    _dropTarget;
-    private string       _layoutName = "Default";
+    private string       _layoutName = "";
     private int          _selectedLayoutId;
     private string       _msg = "";
 

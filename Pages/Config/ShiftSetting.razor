@@ -1,14 +1,15 @@
 @page "/config/shift"
-@attribute [NavMenu(Title="Ca làm việc", Icon="bi-clock-fill", Group="Cấu hình", GroupOrder=80, Order=20)]
+@attribute [NavMenu(Title="shift.nav_title", Icon="bi-clock-fill", Group="nav.config", GroupOrder=80, Order=20)]
 @using BlazorReporting.Services
 @inject AuthService Auth
 @inject ConfigService CfgSvc
 @inject NavigationManager Nav
+@inject LocalizationService L10n
 
-<PageTitle>Cài đặt ca làm việc</PageTitle>
+<PageTitle>@L10n.T("shift.page_title")</PageTitle>
 
 <div class="container-fluid mt-3">
-    <h5 class="mb-3"><i class="bi bi-clock-fill me-2"></i>Cài đặt ca làm việc (AM/PM)</h5>
+    <h5 class="mb-3"><i class="bi bi-clock-fill me-2"></i>@L10n.T("shift.heading")</h5>
 
     @if (!string.IsNullOrEmpty(_msg))
     {
@@ -26,16 +27,16 @@
         <SortableGrid Items="_shifts" Context="s" MinWidth="700px" DefaultPageSize="20">
             <ToolbarContent>
                 <button class="btn btn-sm btn-primary" @onclick="OpenAdd">
-                    <i class="bi bi-plus-lg me-1"></i>Thêm ca
+                    <i class="bi bi-plus-lg me-1"></i>@L10n.T("shift.btn_add")
                 </button>
             </ToolbarContent>
             <Columns>
-                <GridColumn TItem="ShiftSettingRow" Title="Mã ca"       Value="@(x => x.ShiftID)" />
-                <GridColumn TItem="ShiftSettingRow" Title="Mô tả (VN)"  Value="@(x => x.DesVN)" />
-                <GridColumn TItem="ShiftSettingRow" Title="Mô tả (EN)"  Value="@(x => x.DesEn)" />
-                <GridColumn TItem="ShiftSettingRow" Title="Giờ bắt đầu" Value="@(x => x.StartTime)" Align="center" />
-                <GridColumn TItem="ShiftSettingRow" Title="Giờ kết thúc" Value="@(x => x.EndTime)" Align="center" />
-                <GridColumn TItem="ShiftSettingRow" Title="Trạng thái"  Value="@(x => x.Active ? "Active" : "Inactive")" Align="center" />
+                <GridColumn TItem="ShiftSettingRow" Title="@L10n.T("shift.col_id")"         Value="@(x => x.ShiftID)" />
+                <GridColumn TItem="ShiftSettingRow" Title="@L10n.T("shift.col_desc_vn")"    Value="@(x => x.DesVN)" />
+                <GridColumn TItem="ShiftSettingRow" Title="@L10n.T("shift.col_desc_en")"    Value="@(x => x.DesEn)" />
+                <GridColumn TItem="ShiftSettingRow" Title="@L10n.T("shift.col_start_time")" Value="@(x => x.StartTime)" Align="center" />
+                <GridColumn TItem="ShiftSettingRow" Title="@L10n.T("shift.col_end_time")"   Value="@(x => x.EndTime)" Align="center" />
+                <GridColumn TItem="ShiftSettingRow" Title="@L10n.T("shift.col_status")"     Value="@(x => x.Active ? "Active" : "Inactive")" Align="center" />
             </Columns>
             <RowTemplate>
                 <td><strong>@s.ShiftID</strong></td>
@@ -64,45 +65,45 @@
         <div class="modal-dialog">
             <div class="modal-content">
                 <div class="modal-header">
-                    <h5 class="modal-title">@(_isAdd ? "Thêm ca" : "Sửa ca — " + _fShiftID)</h5>
+                    <h5 class="modal-title">@(_isAdd ? L10n.T("shift.modal_title_add") : L10n.T("shift.modal_title_edit") + _fShiftID)</h5>
                     <button class="btn-close" @onclick="CloseModal"></button>
                 </div>
                 <div class="modal-body">
                     <div class="row g-2">
                         <div class="col-6">
-                            <label class="form-label">Mã ca *</label>
+                            <label class="form-label">@L10n.T("shift.lbl_id_required")</label>
                             <input class="form-control" @bind="_fShiftID" disabled="@(!_isAdd)" />
                         </div>
                         <div class="col-6">
-                            <label class="form-label">Trạng thái</label>
+                            <label class="form-label">@L10n.T("shift.col_status")</label>
                             <select class="form-select" @bind="_fActive">
                                 <option value="true">Active</option>
                                 <option value="false">Inactive</option>
                             </select>
                         </div>
                         <div class="col-6">
-                            <label class="form-label">Mô tả tiếng Việt</label>
+                            <label class="form-label">@L10n.T("shift.lbl_desc_vn")</label>
                             <input class="form-control" @bind="_fDesVN" />
                         </div>
                         <div class="col-6">
-                            <label class="form-label">Mô tả tiếng Anh</label>
+                            <label class="form-label">@L10n.T("shift.lbl_desc_en")</label>
                             <input class="form-control" @bind="_fDesEn" />
                         </div>
                         <div class="col-6">
-                            <label class="form-label">Giờ bắt đầu (HH:mm)</label>
+                            <label class="form-label">@L10n.T("shift.lbl_start_time")</label>
                             <input class="form-control" type="time" @bind="_fStart" />
                         </div>
                         <div class="col-6">
-                            <label class="form-label">Giờ kết thúc (HH:mm)</label>
+                            <label class="form-label">@L10n.T("shift.lbl_end_time")</label>
                             <input class="form-control" type="time" @bind="_fEnd" />
                         </div>
                     </div>
                 </div>
                 <div class="modal-footer">
-                    <button class="btn btn-secondary" @onclick="CloseModal">Hủy</button>
+                    <button class="btn btn-secondary" @onclick="CloseModal">@L10n.T("btn.cancel")</button>
                     <button class="btn btn-primary" @onclick="SaveAsync" disabled="@_saving">
                         @if (_saving) { <span class="spinner-border spinner-border-sm me-1"></span> }
-                        Lưu
+                        @L10n.T("btn.save")
                     </button>
                 </div>
             </div>
@@ -150,7 +151,7 @@
 
     private async Task SaveAsync()
     {
-        if (string.IsNullOrWhiteSpace(_fShiftID)) { _ok=false; _msg="Vui lòng nhập mã ca."; return; }
+        if (string.IsNullOrWhiteSpace(_fShiftID)) { _ok=false; _msg=L10n.T("shift.err_id_required"); return; }
         _saving = true;
         var row = new ShiftSettingRow
         {
@@ -160,7 +161,7 @@
         bool ok = _isAdd
             ? await CfgSvc.AddShiftAsync(row, Auth.UserName)
             : await CfgSvc.UpdateShiftAsync(row, Auth.UserName);
-        _ok = ok; _msg = ok ? "Lưu thành công." : "Có lỗi xảy ra.";
+        _ok = ok; _msg = ok ? L10n.T("shift.msg_save_ok") : L10n.T("shift.msg_save_error");
         if (ok) _shifts = await CfgSvc.GetShiftsAsync();
         _saving = false; _showModal = false;
     }

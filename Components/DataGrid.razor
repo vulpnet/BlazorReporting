@@ -1,13 +1,14 @@
 @* DataGrid — sortable, filterable, paginated.
    Columns can be hidden/shown and reordered via drag-and-drop on headers. *@
+@inject LocalizationService L10n
 
 @* ── Column Manager Button ── *@
 <div class="d-flex align-items-center gap-2 mb-2 flex-wrap">
     <div class="position-relative">
         <button class="btn btn-outline-secondary btn-sm" @onclick="ToggleColMgr"
-                title="Show / hide columns">
+                title="@L10n.T("grid.col_mgr_tooltip")">
             <i class="bi bi-layout-three-columns me-1"></i>
-            Columns
+            @L10n.T("grid.col_mgr_btn")
             <span class="badge bg-primary ms-1">
                 @_colStates.Count(c => c.Visible)/@_colStates.Count
             </span>
@@ -20,13 +21,13 @@
 
             <div class="col-mgr-panel shadow border rounded bg-white p-2">
                 <div class="d-flex justify-content-between align-items-center mb-2 border-bottom pb-1">
-                    <span class="fw-semibold small">Column Visibility</span>
+                    <span class="fw-semibold small">@L10n.T("grid.col_visibility_title")</span>
                     <div class="d-flex gap-1">
                         <button class="btn btn-xs btn-link p-0 text-success small"
-                                @onclick="ShowAll">All</button>
+                                @onclick="ShowAll">@L10n.T("grid.col_show_all")</button>
                         <span class="text-muted">|</span>
                         <button class="btn btn-xs btn-link p-0 text-danger small"
-                                @onclick="HideAll">None</button>
+                                @onclick="HideAll">@L10n.T("grid.col_hide_all")</button>
                     </div>
                 </div>
                 <div class="col-mgr-list">
@@ -52,7 +53,7 @@
                 </div>
                 <div class="mt-2 pt-1 border-top">
                     <span class="text-muted" style="font-size:.72rem">
-                        <i class="bi bi-grip-vertical"></i> Drag column headers to reorder
+                        <i class="bi bi-grip-vertical"></i> @L10n.T("grid.col_drag_hint")
                     </span>
                 </div>
             </div>
@@ -62,7 +63,7 @@
     @if (_colStates.Any(c => !c.Visible))
     {
         <button class="btn btn-outline-warning btn-sm" @onclick="ShowAll">
-            <i class="bi bi-eye me-1"></i>Show all columns
+            <i class="bi bi-eye me-1"></i>@L10n.T("grid.show_all_columns")
         </button>
     }
 </div>
@@ -96,7 +97,7 @@
     }
     else if (Data.Count == 0)
     {
-        <div class="alert alert-info py-2">No records found.</div>
+        <div class="alert alert-info py-2">@L10n.T("grid.no_records")</div>
     }
     else
     {
@@ -109,7 +110,7 @@
                         <th class="user-select-none @(_dragOver == col ? "drag-over" : "")"
                             draggable="@(_editAliasCol != col)"
                             style="white-space:nowrap; @(_editAliasCol == col ? "cursor:text" : "cursor:grab")"
-                            title="@(HasAlias(col) ? $"{col} → {DisplayName(col)}" : "Click to sort · Double-click to rename · Drag to reorder")"
+                            title="@(HasAlias(col) ? $"{col} → {DisplayName(col)}" : L10n.T("grid.col_header_tooltip"))"
                             @onclick="() => { if (_editAliasCol != col) OnSortClick(col); }"
                             @ondblclick="() => StartAlias(col)"
                             @ondragstart="() => OnDragStart(col)"
@@ -137,7 +138,7 @@
                                 <span class="me-1">@DisplayName(col)</span>
                                 @if (HasAlias(col))
                                 {
-                                    <i class="bi bi-pencil-fill text-white-50 me-1" style="font-size:.6rem" title="Renamed from: @col"></i>
+                                    <i class="bi bi-pencil-fill text-white-50 me-1" style="font-size:.6rem" title="@L10n.T("grid.col_renamed_from")"></i>
                                 }
                                 @if (SortColumn == col)
                                 {
@@ -160,7 +161,7 @@
                         {
                             <th>
                                 <input class="form-control form-control-sm"
-                                       placeholder="Filter…"
+                                       placeholder="@L10n.T("grid.col_filter_placeholder")"
                                        value="@GetFilter(col)"
                                        @oninput="e => OnFilterChange(col, e.Value?.ToString())" />
                             </th>
@@ -208,8 +209,8 @@
             </li>
         </ul>
         <p class="text-center text-muted mb-0" style="font-size:.78rem">
-            Page <strong>@PageNumber</strong> of <strong>@TotalPages</strong>
-            &nbsp;·&nbsp; <strong>@TotalCount.ToString("N0")</strong> records
+            @L10n.T("grid.page_label") <strong>@PageNumber</strong> @L10n.T("grid.page_of") <strong>@TotalPages</strong>
+            &nbsp;·&nbsp; <strong>@TotalCount.ToString("N0")</strong> @L10n.T("grid.page_records")
         </p>
     </nav>
 }

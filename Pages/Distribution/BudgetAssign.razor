@@ -1,14 +1,15 @@
 @page "/distribution/budget"
-@attribute [NavMenu(Title="Phân bổ Budget", Icon="bi-currency-dollar", Group="Phân phối", GroupOrder=30, Order=20)]
+@attribute [NavMenu(Title="budget_assign.title", Icon="bi-currency-dollar", Group="nav.distribution_group", GroupOrder=30, Order=20)]
 @using BlazorReporting.Services
 @inject AuthService Auth
 @inject DistributionService DistSvc
 @inject NavigationManager Nav
+@inject LocalizationService L10n
 
-<PageTitle>Phân bổ Budget</PageTitle>
+<PageTitle>@L10n.T("budget_assign.title")</PageTitle>
 
 <div class="container-fluid mt-3">
-    <h5 class="mb-3"><i class="bi bi-currency-dollar me-2"></i>Phân bổ Budget cho Nhân viên BH</h5>
+    <h5 class="mb-3"><i class="bi bi-currency-dollar me-2"></i>@L10n.T("budget_assign.heading")</h5>
 
     @if (!string.IsNullOrEmpty(_msg))
     {
@@ -26,15 +27,15 @@
         <SortableGrid Items="_assigns" Context="r" MinWidth="900px" DefaultPageSize="20">
             <ToolbarContent>
                 <button class="btn btn-sm btn-primary" @onclick="OpenAdd">
-                    <i class="bi bi-plus-lg me-1"></i>Phân bổ mới
+                    <i class="bi bi-plus-lg me-1"></i>@L10n.T("budget_assign.btn_new")
                 </button>
             </ToolbarContent>
             <Columns>
-                <GridColumn TItem="BudgetAssignRow" Title="Nhân viên BH"          Value="@(x => x.SalesmanName)" />
-                <GridColumn TItem="BudgetAssignRow" Title="Giám sát"           Value="@(x => x.SalesSupName)" />
-                <GridColumn TItem="BudgetAssignRow" Title="Budget"       Value="@(x => x.BudgetName)" />
-                <GridColumn TItem="BudgetAssignRow" Title="Chỉ tiêu"     Value="@(x => x.Target)" Align="end" />
-                <GridColumn TItem="BudgetAssignRow" Title="Giá trị Budget" Value="@(x => x.BudgetValue)" Align="end" />
+                <GridColumn TItem="BudgetAssignRow" Title="@L10n.T("budget_assign.col_salesman")"     Value="@(x => x.SalesmanName)" />
+                <GridColumn TItem="BudgetAssignRow" Title="@L10n.T("budget_assign.col_supervisor")"   Value="@(x => x.SalesSupName)" />
+                <GridColumn TItem="BudgetAssignRow" Title="@L10n.T("budget_assign.col_budget")"       Value="@(x => x.BudgetName)" />
+                <GridColumn TItem="BudgetAssignRow" Title="@L10n.T("budget_assign.col_target")"       Value="@(x => x.Target)" Align="end" />
+                <GridColumn TItem="BudgetAssignRow" Title="@L10n.T("budget_assign.col_budget_value")" Value="@(x => x.BudgetValue)" Align="end" />
             </Columns>
             <RowTemplate>
                 <td class="fw-semibold">@r.SalesmanName <small class="text-muted">(@r.SalesmanCode)</small></td>
@@ -44,7 +45,7 @@
                 <td class="text-end text-success fw-bold">@r.BudgetValue.ToString("N0")</td>
             </RowTemplate>
             <ActionColumn Context="r">
-                <button class="btn btn-xs btn-outline-success" title="Duyệt" @onclick="()=>ApproveAsync(r)">
+                <button class="btn btn-xs btn-outline-success" title="@L10n.T("budget_assign.btn_approve")" @onclick="()=>ApproveAsync(r)">
                     <i class="bi bi-check-circle"></i>
                 </button>
             </ActionColumn>
@@ -58,31 +59,31 @@
         <div class="modal-dialog">
             <div class="modal-content">
                 <div class="modal-header">
-                    <h5 class="modal-title">Phân bổ Budget mới</h5>
+                    <h5 class="modal-title">@L10n.T("budget_assign.modal_title")</h5>
                     <button class="btn-close" @onclick="()=>_showModal=false"></button>
                 </div>
                 <div class="modal-body">
                     <div class="row g-2">
                         <div class="col-6">
-                            <label class="form-label">Mã Nhân viên BH *</label>
+                            <label class="form-label">@L10n.T("budget_assign.lbl_salesman_code")</label>
                             <input class="form-control" @bind="_fSalesmanCode" />
                         </div>
                         <div class="col-6">
-                            <label class="form-label">Tên Nhân viên BH</label>
+                            <label class="form-label">@L10n.T("budget_assign.lbl_salesman_name")</label>
                             <input class="form-control" @bind="_fSalesmanName" />
                         </div>
                         <div class="col-6">
-                            <label class="form-label">Mã SS</label>
+                            <label class="form-label">@L10n.T("budget_assign.lbl_ss_code")</label>
                             <input class="form-control" @bind="_fSSCode" />
                         </div>
                         <div class="col-6">
-                            <label class="form-label">Tên SS</label>
+                            <label class="form-label">@L10n.T("budget_assign.lbl_ss_name")</label>
                             <input class="form-control" @bind="_fSSName" />
                         </div>
                         <div class="col-6">
-                            <label class="form-label">Budget *</label>
+                            <label class="form-label">@L10n.T("budget_assign.lbl_budget")</label>
                             <select class="form-select" @bind="_fBudgetCode">
-                                <option value="">-- Chọn Budget --</option>
+                                <option value="">@L10n.T("budget_assign.select_budget_placeholder")</option>
                                 @foreach (var b in _budgets)
                                 {
                                     <option value="@b.BudgetCode">@b.BudgetName</option>
@@ -90,16 +91,16 @@
                             </select>
                         </div>
                         <div class="col-6">
-                            <label class="form-label">Chỉ tiêu</label>
+                            <label class="form-label">@L10n.T("budget_assign.lbl_target")</label>
                             <input class="form-control" type="number" @bind="_fTarget" />
                         </div>
                     </div>
                 </div>
                 <div class="modal-footer">
-                    <button class="btn btn-secondary" @onclick="()=>_showModal=false">Hủy</button>
+                    <button class="btn btn-secondary" @onclick="()=>_showModal=false">@L10n.T("btn.cancel")</button>
                     <button class="btn btn-primary" @onclick="SaveAsync" disabled="@_saving">
                         @if (_saving) { <span class="spinner-border spinner-border-sm me-1"></span> }
-                        Lưu
+                        @L10n.T("btn.save")
                     </button>
                 </div>
             </div>
@@ -144,7 +145,7 @@
     private async Task SaveAsync()
     {
         if (string.IsNullOrWhiteSpace(_fSalesmanCode) || string.IsNullOrWhiteSpace(_fBudgetCode))
-        { _ok=false; _msg="Vui lòng nhập đầy đủ Nhân viên BH và Budget."; return; }
+        { _ok=false; _msg=L10n.T("budget_assign.err_required_fields"); return; }
 
         _saving = true;
         var budget = _budgets.FirstOrDefault(b => b.BudgetCode == _fBudgetCode);

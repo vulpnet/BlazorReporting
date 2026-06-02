@@ -1,19 +1,20 @@
 @page "/report/display-image"
-@attribute [NavMenu(Title="Hình ảnh trưng bày", Icon="bi-images", Group="Báo cáo", GroupOrder=20, Order=160)]
+@attribute [NavMenu(Title="display_image.nav_title", Icon="bi-images", Group="nav.reports", GroupOrder=20, Order=160)]
 @using BlazorReporting.Services
 @inject AuthService Auth
 @inject ReportService RptSvc
 @inject NavigationManager Nav
-<PageTitle>Display Image</PageTitle>
+@inject LocalizationService L10n
+<PageTitle>@L10n.T("display_image.page_title")</PageTitle>
 <div class="container-fluid mt-3">
-    <h5 class="mb-3"><i class="bi bi-images me-2"></i>Display Image</h5>
+    <h5 class="mb-3"><i class="bi bi-images me-2"></i>@L10n.T("display_image.page_title")</h5>
     <div class="card shadow-sm mb-3"><div class="card-body py-2">
         <div class="d-flex gap-2 flex-wrap align-items-end">
-            <div><label class="form-label small mb-1">Từ ngày</label><input type="date" class="form-control form-control-sm" style="width:150px" @bind="_from"/></div>
-            <div><label class="form-label small mb-1">Đến ngày</label><input type="date" class="form-control form-control-sm" style="width:150px" @bind="_to"/></div>
-            <div><label class="form-label small mb-1">Giám sát</label><input class="form-control form-control-sm" style="width:140px" placeholder="Giám sát..." @bind="_sup"/></div>
-            <button class="btn btn-sm btn-primary" @onclick="LoadAsync"><i class="bi bi-search me-1"></i>Xem</button>
-            @if (_data.Any()){<span class="text-muted small ms-2">@_data.Count dong</span>}
+            <div><label class="form-label small mb-1">@L10n.T("lbl.from_date")</label><input type="date" class="form-control form-control-sm" style="width:150px" @bind="_from"/></div>
+            <div><label class="form-label small mb-1">@L10n.T("lbl.to_date")</label><input type="date" class="form-control form-control-sm" style="width:150px" @bind="_to"/></div>
+            <div><label class="form-label small mb-1">@L10n.T("lbl.supervisor")</label><input class="form-control form-control-sm" style="width:140px" placeholder="@L10n.T("display_image.supervisor_placeholder")" @bind="_sup"/></div>
+            <button class="btn btn-sm btn-primary" @onclick="LoadAsync"><i class="bi bi-search me-1"></i>@L10n.T("btn.view")</button>
+            @if (_data.Any()){<span class="text-muted small ms-2">@_data.Count @L10n.T("display_image.row_count")</span>}
         </div>
     </div></div>
     @if (_error!=null){<div class="alert alert-danger py-2 alert-dismissible">@_error<button class="btn-close" @onclick="ClearErr"></button></div>}
@@ -21,12 +22,12 @@
     else {
         <SortableGrid Items="_data" Context="r" MinWidth="900px" DefaultPageSize="20">
             <Columns>
-                <GridColumn TItem="GenericReportRow" Title="Chương trình"     Value="@(x=>x.ProgramName)"/>
-                <GridColumn TItem="GenericReportRow" Title="Nhân viên BH"         Value="@(x=>x.SalesmanName)"/>
-                <GridColumn TItem="GenericReportRow" Title="Cửa hàng"      Value="@(x=>x.OutletName)"/>
-                <GridColumn TItem="GenericReportRow" Title="NPP" Value="@(x=>x.DistributorName)"/>
-                <GridColumn TItem="GenericReportRow" Title="Ngày"        Value="@(x=>x.VisitDate.HasValue?x.VisitDate.Value.ToString("dd/MM/yyyy"):"")" Align="center"/>
-                <GridColumn TItem="GenericReportRow" Title="Số ảnh"      Value="@(x=>x.ImageCount)" Align="center"/>
+                <GridColumn TItem="GenericReportRow" Title="@L10n.T("display_image.col_program")"     Value="@(x=>x.ProgramName)"/>
+                <GridColumn TItem="GenericReportRow" Title="@L10n.T("display_image.col_salesman")"         Value="@(x=>x.SalesmanName)"/>
+                <GridColumn TItem="GenericReportRow" Title="@L10n.T("display_image.col_outlet")"      Value="@(x=>x.OutletName)"/>
+                <GridColumn TItem="GenericReportRow" Title="@L10n.T("lbl.distributor")" Value="@(x=>x.DistributorName)"/>
+                <GridColumn TItem="GenericReportRow" Title="@L10n.T("lbl.date")"        Value="@(x=>x.VisitDate.HasValue?x.VisitDate.Value.ToString("dd/MM/yyyy"):"")" Align="center"/>
+                <GridColumn TItem="GenericReportRow" Title="@L10n.T("display_image.col_image_count")"      Value="@(x=>x.ImageCount)" Align="center"/>
             </Columns>
             <RowTemplate>
                 <td class="small">@r.ProgramName</td>

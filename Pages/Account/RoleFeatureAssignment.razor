@@ -1,20 +1,21 @@
 @page "/account/role-features"
-@attribute [NavMenu(Title="Phân quyền Feature", Icon="bi-diagram-3-fill", Group="Quản trị", GroupOrder=90, Order=20)]
+@attribute [NavMenu(Title="role_feature.nav_title", Icon="bi-diagram-3-fill", Group="nav.admin_group", GroupOrder=90, Order=20)]
 @using BlazorReporting.Services
 @inject AuthService Auth
 @inject UserManagementService UserSvc
 @inject NavigationManager Nav
+@inject LocalizationService L10n
 
-<PageTitle>Phân quyền Feature</PageTitle>
+<PageTitle>@L10n.T("role_feature.nav_title")</PageTitle>
 
 <div class="container-fluid mt-3">
-    <h5 class="mb-3"><i class="bi bi-diagram-3-fill me-2"></i>Phân quyền Feature theo Role</h5>
+    <h5 class="mb-3"><i class="bi bi-diagram-3-fill me-2"></i>@L10n.T("role_feature.page_heading")</h5>
 
     <div class="row g-3">
         <div class="col-md-3">
-            <label class="form-label fw-bold">Chọn Role</label>
+            <label class="form-label fw-bold">@L10n.T("role_feature.select_role_label")</label>
             <select class="form-select" @onchange="OnRoleChanged">
-                <option value="0">-- Chọn Role --</option>
+                <option value="0">@L10n.T("role_feature.select_role_placeholder")</option>
                 @foreach (var r in _roles)
                 {
                     <option value="@r.ID">@r.RoleName</option>
@@ -26,11 +27,11 @@
         {
             <div class="col-md-9">
                 <div class="d-flex align-items-center mb-2">
-                    <label class="fw-bold me-3">Features (@_features.Count tổng)</label>
-                    <span class="text-muted small">Đã chọn: @_selectedFeatures.Count</span>
+                    <label class="fw-bold me-3">Features (@_features.Count @L10n.T("role_feature.total_suffix"))</label>
+                    <span class="text-muted small">@L10n.T("role_feature.selected_prefix") @_selectedFeatures.Count</span>
                     <button class="btn btn-sm btn-primary ms-auto" @onclick="SaveAsync" disabled="@_saving">
                         @if (_saving) { <span class="spinner-border spinner-border-sm me-1"></span> }
-                        <i class="bi bi-save me-1"></i>Lưu phân quyền
+                        <i class="bi bi-save me-1"></i>@L10n.T("role_feature.btn_save")
                     </button>
                 </div>
 
@@ -40,7 +41,7 @@
                 }
 
                 <div class="border rounded p-2" style="max-height:500px;overflow-y:auto">
-                    @foreach (var grp in _features.GroupBy(f => f.Group ?? "Khác").OrderBy(g => g.Key))
+                    @foreach (var grp in _features.GroupBy(f => f.Group ?? L10n.T("role_feature.group_other")).OrderBy(g => g.Key))
                     {
                         <div class="mb-2">
                             <div class="fw-semibold text-primary small mb-1 border-bottom">@grp.Key</div>
@@ -108,6 +109,6 @@
         await UserSvc.SaveRoleFeatureAsync(_selectedRoleId, _selectedFeatures);
         _saving = false;
         _saveOk = true;
-        _saveMsg = "Lưu phân quyền thành công.";
+        _saveMsg = L10n.T("role_feature.save_success");
     }
 }

@@ -4,11 +4,12 @@
 @inject AuthService Auth
 @inject ConfigService CfgSvc
 @inject NavigationManager Nav
+@inject LocalizationService L10n
 
-<PageTitle>Tham số hệ thống</PageTitle>
+<PageTitle>@L10n.T("syssetting.title")</PageTitle>
 
 <div class="container-fluid mt-3">
-    <h5 class="mb-3"><i class="bi bi-gear-fill me-2"></i>Tham số hệ thống Calendar</h5>
+    <h5 class="mb-3"><i class="bi bi-gear-fill me-2"></i>@L10n.T("syssetting.heading")</h5>
 
     @if (!string.IsNullOrEmpty(_msg))
     {
@@ -26,13 +27,13 @@
         <SortableGrid Items="_settings" Context="s" MinWidth="600px" DefaultPageSize="20">
             <ToolbarContent>
                 <button class="btn btn-sm btn-primary" @onclick="OpenAdd">
-                    <i class="bi bi-plus-lg me-1"></i>Thêm tham số
+                    <i class="bi bi-plus-lg me-1"></i>@L10n.T("syssetting.btn_add")
                 </button>
             </ToolbarContent>
             <Columns>
                 <GridColumn TItem="SystemSettingRow" Title="ID"    Value="@(x => x.ID)" />
-                <GridColumn TItem="SystemSettingRow" Title="Mô tả" Value="@(x => x.Desr)" />
-                <GridColumn TItem="SystemSettingRow" Title="Giá trị số" Value="@(x => x.Number)" Align="end" />
+                <GridColumn TItem="SystemSettingRow" Title="@L10n.T("syssetting.col_description")" Value="@(x => x.Desr)" />
+                <GridColumn TItem="SystemSettingRow" Title="@L10n.T("syssetting.col_number")" Value="@(x => x.Number)" Align="end" />
             </Columns>
             <RowTemplate>
                 <td class="font-monospace"><strong>@s.ID</strong></td>
@@ -54,7 +55,7 @@
         <div class="modal-dialog">
             <div class="modal-content">
                 <div class="modal-header">
-                    <h5 class="modal-title">@(_isAdd ? "Thêm tham số" : "Sửa — " + _fID)</h5>
+                    <h5 class="modal-title">@(_isAdd ? L10n.T("syssetting.modal_title_add") : L10n.T("syssetting.modal_title_edit") + _fID)</h5>
                     <button class="btn-close" @onclick="()=>_showModal=false"></button>
                 </div>
                 <div class="modal-body">
@@ -63,19 +64,19 @@
                         <input class="form-control" @bind="_fID" disabled="@(!_isAdd)" />
                     </div>
                     <div class="mb-2">
-                        <label class="form-label">Mô tả</label>
+                        <label class="form-label">@L10n.T("syssetting.lbl_description")</label>
                         <input class="form-control" @bind="_fDesr" />
                     </div>
                     <div class="mb-2">
-                        <label class="form-label">Giá trị số</label>
+                        <label class="form-label">@L10n.T("syssetting.lbl_number")</label>
                         <input class="form-control" type="number" @bind="_fNumber" />
                     </div>
                 </div>
                 <div class="modal-footer">
-                    <button class="btn btn-secondary" @onclick="()=>_showModal=false">Hủy</button>
+                    <button class="btn btn-secondary" @onclick="()=>_showModal=false">@L10n.T("btn.cancel")</button>
                     <button class="btn btn-primary" @onclick="SaveAsync" disabled="@_saving">
                         @if (_saving) { <span class="spinner-border spinner-border-sm me-1"></span> }
-                        Lưu
+                        @L10n.T("btn.save")
                     </button>
                 </div>
             </div>
@@ -118,13 +119,13 @@
 
     private async Task SaveAsync()
     {
-        if (string.IsNullOrWhiteSpace(_fID)) { _ok=false; _msg="Vui lòng nhập ID."; return; }
+        if (string.IsNullOrWhiteSpace(_fID)) { _ok=false; _msg=L10n.T("syssetting.err_id_required"); return; }
         _saving = true;
         var row = new SystemSettingRow { ID=_fID, Desr=_fDesr, Number=_fNumber };
         bool ok = _isAdd
             ? await CfgSvc.AddSystemSettingAsync(row, Auth.UserName)
             : await CfgSvc.UpdateSystemSettingAsync(row, Auth.UserName);
-        _ok = ok; _msg = ok ? "Lưu thành công." : "Có lỗi xảy ra.";
+        _ok = ok; _msg = ok ? L10n.T("syssetting.msg_save_ok") : L10n.T("syssetting.msg_save_err");
         if (ok) _settings = await CfgSvc.GetSystemSettingsAsync();
         _saving = false; _showModal = false;
     }

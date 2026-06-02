@@ -4,14 +4,15 @@
 @inject AuthService Auth
 @inject ReportService RptSvc
 @inject NavigationManager Nav
+@inject LocalizationService L10n
 <PageTitle>Outlet GPS Invalid</PageTitle>
 <div class="container-fluid mt-3">
-    <h5 class="mb-3"><i class="bi bi-geo-fill me-2 text-danger"></i>Outlet vi tri GPS khong hop le</h5>
+    <h5 class="mb-3"><i class="bi bi-geo-fill me-2 text-danger"></i>@L10n.T("report.outlet_invalid_location.page_title")</h5>
     <div class="card shadow-sm mb-3"><div class="card-body py-2">
         <div class="d-flex gap-2 flex-wrap align-items-end">
-            <div><label class="form-label small mb-1">Giám sát</label><input class="form-control form-control-sm" style="width:150px" @bind="_sup"/></div>
-            <button class="btn btn-sm btn-primary" @onclick="LoadAsync"><i class="bi bi-search me-1"></i>Xem</button>
-            @if (_data.Any()){<span class="text-muted small ms-2">@_data.Count dong</span>}
+            <div><label class="form-label small mb-1">@L10n.T("lbl.supervisor")</label><input class="form-control form-control-sm" style="width:150px" @bind="_sup"/></div>
+            <button class="btn btn-sm btn-primary" @onclick="LoadAsync"><i class="bi bi-search me-1"></i>@L10n.T("btn.view")</button>
+            @if (_data.Any()){<span class="text-muted small ms-2">@L10n.T("report.outlet_invalid_location.row_count")</span>}
         </div>
     </div></div>
     @if (_error!=null){<div class="alert alert-danger py-2 alert-dismissible">@_error<button class="btn-close" @onclick="ClearErr"></button></div>}
@@ -21,13 +22,13 @@
             <Columns>
                 <GridColumn TItem="GenericReportRow" Title="Location CD"  Value="@(x=>x.LocationCD)"/>
                 <GridColumn TItem="GenericReportRow" Title="Outlet CD"    Value="@(x=>x.OutletCD)"/>
-                <GridColumn TItem="GenericReportRow" Title="Tên cửa hàng"   Value="@(x=>x.OutletName)"/>
-                <GridColumn TItem="GenericReportRow" Title="Giám sát"           Value="@(x=>x.SalesSupName)"/>
-                <GridColumn TItem="GenericReportRow" Title="Tuyến"        Value="@(x=>x.RouteCD)"/>
+                <GridColumn TItem="GenericReportRow" Title="@L10n.T("report.outlet_invalid_location.col_outlet_name")"   Value="@(x=>x.OutletName)"/>
+                <GridColumn TItem="GenericReportRow" Title="@L10n.T("lbl.supervisor")"           Value="@(x=>x.SalesSupName)"/>
+                <GridColumn TItem="GenericReportRow" Title="@L10n.T("lbl.route")"        Value="@(x=>x.RouteCD)"/>
                 <GridColumn TItem="GenericReportRow" Title="NPP"  Value="@(x=>x.DistributorName)"/>
                 <GridColumn TItem="GenericReportRow" Title="Lat"          Value="@(x=>x.Latitude)" Align="end"/>
                 <GridColumn TItem="GenericReportRow" Title="Lng"          Value="@(x=>x.Longitude)" Align="end"/>
-                <GridColumn TItem="GenericReportRow" Title="Trạng thái"   Value="@(x=>x.IsActive?"Active":"Inactive")" Align="center"/>
+                <GridColumn TItem="GenericReportRow" Title="@L10n.T("lbl.status")"   Value="@(x=>x.IsActive?"Active":"Inactive")" Align="center"/>
             </Columns>
             <RowTemplate>
                 <td class="small font-monospace text-danger">@r.LocationCD</td>

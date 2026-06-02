@@ -1,18 +1,19 @@
 @page "/report/sales-effective"
-@attribute [NavMenu(Title="Bán hàng hiệu quả", Icon="bi-check2-circle", Group="Báo cáo", GroupOrder=20, Order=40)]
+@attribute [NavMenu(Title="sales_effective.nav_title", Icon="bi-check2-circle", Group="nav.reports", GroupOrder=20, Order=40)]
 @using BlazorReporting.Services
 @inject AuthService Auth
 @inject ReportService RptSvc
 @inject NavigationManager Nav
-<PageTitle>Ban hang hieu qua</PageTitle>
+@inject LocalizationService L10n
+<PageTitle>@L10n.T("sales_effective.page_title")</PageTitle>
 <div class="container-fluid mt-3">
-    <h5 class="mb-3"><i class="bi bi-check2-circle me-2"></i>Bao cao ban hang hieu qua</h5>
+    <h5 class="mb-3"><i class="bi bi-check2-circle me-2"></i>@L10n.T("sales_effective.heading")</h5>
     <div class="card shadow-sm mb-3"><div class="card-body py-2">
         <div class="d-flex gap-2 flex-wrap align-items-end">
-            <div><label class="form-label small mb-1">Ngày</label><input type="date" class="form-control form-control-sm" style="width:150px" @bind="_date"/></div>
-            <div><label class="form-label small mb-1">Tuyến</label><input class="form-control form-control-sm" style="width:150px" @bind="_route"/></div>
-            <div><label class="form-label small mb-1">Giám sát</label><input class="form-control form-control-sm" style="width:140px" @bind="_sup"/></div>
-            <button class="btn btn-sm btn-primary" @onclick="LoadAsync"><i class="bi bi-search me-1"></i>Xem</button>
+            <div><label class="form-label small mb-1">@L10n.T("lbl.date")</label><input type="date" class="form-control form-control-sm" style="width:150px" @bind="_date"/></div>
+            <div><label class="form-label small mb-1">@L10n.T("lbl.route")</label><input class="form-control form-control-sm" style="width:150px" @bind="_route"/></div>
+            <div><label class="form-label small mb-1">@L10n.T("lbl.supervisor")</label><input class="form-control form-control-sm" style="width:140px" @bind="_sup"/></div>
+            <button class="btn btn-sm btn-primary" @onclick="LoadAsync"><i class="bi bi-search me-1"></i>@L10n.T("btn.view")</button>
         </div>
     </div></div>
     @if (_error!=null){<div class="alert alert-danger py-2 alert-dismissible">@_error<button class="btn-close" @onclick="ClearErr"></button></div>}
@@ -20,15 +21,15 @@
     else {
         <SortableGrid Items="_data" Context="r" MinWidth="900px" DefaultPageSize="20">
             <Columns>
-                <GridColumn TItem="GenericReportRow" Title="Nhân viên BH"        Value="@(x=>x.SalesmanName)"/>
-                <GridColumn TItem="GenericReportRow" Title="Tuyến"      Value="@(x=>x.RouteCD)"/>
-                <GridColumn TItem="GenericReportRow" Title="NPP" Value="@(x=>x.DistributorName)"/>
-                <GridColumn TItem="GenericReportRow" Title="CH Kế hoạch"   Value="@(x=>x.OutletMustVisit)" Align="end"/>
-                <GridColumn TItem="GenericReportRow" Title="Đã viếng thăm"      Value="@(x=>x.OutletVisited)" Align="end"/>
-                <GridColumn TItem="GenericReportRow" Title="Đơn hàng"   Value="@(x=>x.OrderCount)" Align="end"/>
-                <GridColumn TItem="GenericReportRow" Title="Doanh số"   Value="@(x=>x.TotalAmount)" Align="end"/>
-                <GridColumn TItem="GenericReportRow" Title="% Viếng thăm"   Value="@(x=>x.VisitMCP)" Align="end"/>
-                <GridColumn TItem="GenericReportRow" Title="% Có đơn"   Value="@(x=>x.SOMCP)" Align="end"/>
+                <GridColumn TItem="GenericReportRow" Title="@L10n.T("sales_effective.col_salesman")"        Value="@(x=>x.SalesmanName)"/>
+                <GridColumn TItem="GenericReportRow" Title="@L10n.T("lbl.route")"      Value="@(x=>x.RouteCD)"/>
+                <GridColumn TItem="GenericReportRow" Title="@L10n.T("lbl.distributor")" Value="@(x=>x.DistributorName)"/>
+                <GridColumn TItem="GenericReportRow" Title="@L10n.T("sales_effective.col_outlet_plan")"   Value="@(x=>x.OutletMustVisit)" Align="end"/>
+                <GridColumn TItem="GenericReportRow" Title="@L10n.T("sales_effective.col_outlet_visited")"      Value="@(x=>x.OutletVisited)" Align="end"/>
+                <GridColumn TItem="GenericReportRow" Title="@L10n.T("sales_effective.col_order_count")"   Value="@(x=>x.OrderCount)" Align="end"/>
+                <GridColumn TItem="GenericReportRow" Title="@L10n.T("sales_effective.col_revenue")"   Value="@(x=>x.TotalAmount)" Align="end"/>
+                <GridColumn TItem="GenericReportRow" Title="@L10n.T("sales_effective.col_visit_pct")"   Value="@(x=>x.VisitMCP)" Align="end"/>
+                <GridColumn TItem="GenericReportRow" Title="@L10n.T("sales_effective.col_so_pct")"   Value="@(x=>x.SOMCP)" Align="end"/>
                 <GridColumn TItem="GenericReportRow" Title="LPPC"       Value="@(x=>x.LPPC)" Align="end"/>
             </Columns>
             <RowTemplate>

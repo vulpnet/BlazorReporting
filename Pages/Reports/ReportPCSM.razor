@@ -1,20 +1,21 @@
 @page "/report/pc-sm"
-@attribute [NavMenu(Title="PC theo nhân viên", Icon="bi-percent", Group="Báo cáo", GroupOrder=20, Order=70)]
+@attribute [NavMenu(Title="rpt_pcsm.nav_title", Icon="bi-percent", Group="nav.reports", GroupOrder=20, Order=70)]
 @using BlazorReporting.Services
 @inject AuthService Auth
 @inject ReportService RptSvc
 @inject NavigationManager Nav
+@inject LocalizationService L10n
 <PageTitle>PC by SM</PageTitle>
 <div class="container-fluid mt-3">
-    <h5 class="mb-3"><i class="bi bi-percent me-2"></i>Bao cao PC theo Nhân viên BH</h5>
+    <h5 class="mb-3"><i class="bi bi-percent me-2"></i>@L10n.T("rpt_pcsm.page_title")</h5>
     <div class="card shadow-sm mb-3"><div class="card-body py-2">
         <div class="d-flex gap-2 flex-wrap align-items-end">
-            <div><label class="form-label small mb-1">Ngày</label><input type="date" class="form-control form-control-sm" style="width:150px" @bind="_date"/></div>
-            <div><label class="form-label small mb-1">Tuyến</label><input class="form-control form-control-sm" style="width:150px" @bind="_route"/></div>
-            <div><label class="form-label small mb-1">Giám sát</label><input class="form-control form-control-sm" style="width:140px" @bind="_sup"/></div>
-            <div><label class="form-label small mb-1">% PC >=</label><input type="number" class="form-control form-control-sm" style="width:80px" @bind="_percent"/></div>
-            <button class="btn btn-sm btn-primary" @onclick="LoadAsync"><i class="bi bi-search me-1"></i>Xem</button>
-            @if (_data.Any()){<span class="text-muted small ms-2">@_data.Count dong</span>}
+            <div><label class="form-label small mb-1">@L10n.T("lbl.date")</label><input type="date" class="form-control form-control-sm" style="width:150px" @bind="_date"/></div>
+            <div><label class="form-label small mb-1">@L10n.T("lbl.route")</label><input class="form-control form-control-sm" style="width:150px" @bind="_route"/></div>
+            <div><label class="form-label small mb-1">@L10n.T("lbl.supervisor")</label><input class="form-control form-control-sm" style="width:140px" @bind="_sup"/></div>
+            <div><label class="form-label small mb-1">@L10n.T("rpt_pcsm.filter_pc_min")</label><input type="number" class="form-control form-control-sm" style="width:80px" @bind="_percent"/></div>
+            <button class="btn btn-sm btn-primary" @onclick="LoadAsync"><i class="bi bi-search me-1"></i>@L10n.T("btn.view")</button>
+            @if (_data.Any()){<span class="text-muted small ms-2">@L10n.T("rpt_pcsm.row_count")</span>}
         </div>
     </div></div>
     @if (_error!=null){<div class="alert alert-danger py-2 alert-dismissible">@_error<button class="btn-close" @onclick="ClearErr"></button></div>}
@@ -22,17 +23,17 @@
     else {
         <SortableGrid Items="_data" Context="r" MinWidth="1000px" DefaultPageSize="20">
             <Columns>
-                <GridColumn TItem="GenericReportRow" Title="Ngày"        Value="@(x=>x.VisitDate.HasValue?x.VisitDate.Value.ToString("dd/MM"):"")" Align="center"/>
-                <GridColumn TItem="GenericReportRow" Title="Nhân viên BH"         Value="@(x=>x.SalesmanName)"/>
-                <GridColumn TItem="GenericReportRow" Title="Giám sát"          Value="@(x=>x.SalesSupName)"/>
-                <GridColumn TItem="GenericReportRow" Title="Tuyến"       Value="@(x=>x.RouteCD)"/>
-                <GridColumn TItem="GenericReportRow" Title="PC Đạt"     Value="@(x=>x.PCPass)" Align="end"/>
-                <GridColumn TItem="GenericReportRow" Title="PC Không đạt"     Value="@(x=>x.PCNotPass)" Align="end"/>
+                <GridColumn TItem="GenericReportRow" Title="@L10n.T("lbl.date")"        Value="@(x=>x.VisitDate.HasValue?x.VisitDate.Value.ToString("dd/MM"):"")" Align="center"/>
+                <GridColumn TItem="GenericReportRow" Title="@L10n.T("lbl.salesman")"         Value="@(x=>x.SalesmanName)"/>
+                <GridColumn TItem="GenericReportRow" Title="@L10n.T("lbl.supervisor")"          Value="@(x=>x.SalesSupName)"/>
+                <GridColumn TItem="GenericReportRow" Title="@L10n.T("lbl.route")"       Value="@(x=>x.RouteCD)"/>
+                <GridColumn TItem="GenericReportRow" Title="@L10n.T("rpt_pcsm.col_pc_pass")"     Value="@(x=>x.PCPass)" Align="end"/>
+                <GridColumn TItem="GenericReportRow" Title="@L10n.T("rpt_pcsm.col_pc_not_pass")"     Value="@(x=>x.PCNotPass)" Align="end"/>
                 <GridColumn TItem="GenericReportRow" Title="MCP"         Value="@(x=>x.MCP)" Align="end"/>
-                <GridColumn TItem="GenericReportRow" Title="Đơn hàng"    Value="@(x=>x.OrderCount)" Align="end"/>
-                <GridColumn TItem="GenericReportRow" Title="% PC MCP"    Value="@(x=>x.PC_MCP)" Align="end"/>
-                <GridColumn TItem="GenericReportRow" Title="MTD PC Đạt" Value="@(x=>x.MTDPCPass)" Align="end"/>
-                <GridColumn TItem="GenericReportRow" Title="% MTD PC"    Value="@(x=>x.MTDPC_MCP)" Align="end"/>
+                <GridColumn TItem="GenericReportRow" Title="@L10n.T("rpt_pcsm.col_order_count")"    Value="@(x=>x.OrderCount)" Align="end"/>
+                <GridColumn TItem="GenericReportRow" Title="@L10n.T("rpt_pcsm.col_pc_mcp_pct")"    Value="@(x=>x.PC_MCP)" Align="end"/>
+                <GridColumn TItem="GenericReportRow" Title="@L10n.T("rpt_pcsm.col_mtd_pc_pass")" Value="@(x=>x.MTDPCPass)" Align="end"/>
+                <GridColumn TItem="GenericReportRow" Title="@L10n.T("rpt_pcsm.col_mtd_pc_pct")"    Value="@(x=>x.MTDPC_MCP)" Align="end"/>
             </Columns>
             <RowTemplate>
                 <td class="text-center small">@(r.VisitDate.HasValue?r.VisitDate.Value.ToString("dd/MM"):"-")</td>

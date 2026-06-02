@@ -1,5 +1,6 @@
 @typeparam TItem
 @using System.Linq.Expressions
+@inject LocalizationService L10n
 
 @* ══════════════════════════════════════════════════════════════
    SortableGrid<TItem> — Generic grid với sort + filter + paging
@@ -26,9 +27,9 @@
     @* ── Toolbar ── *@
     <div class="d-flex align-items-center flex-wrap gap-2 mb-2">
         <input class="form-control form-control-sm" style="max-width:220px"
-               placeholder="Tìm kiếm..." value="@_search"
+               placeholder="@L10n.T("grid.search_placeholder")" value="@_search"
                @oninput="OnSearch" />
-        <span class="text-muted small ms-1">@_filtered.Count / @Items.Count() dòng</span>
+        <span class="text-muted small ms-1">@_filtered.Count / @Items.Count() @L10n.T("grid.rows_suffix")</span>
         <div class="ms-auto d-flex gap-2 align-items-center">
             @if (ToolbarContent is not null)
             {
@@ -67,7 +68,7 @@
                     }
                     @if (ActionColumn is not null)
                     {
-                        <th class="text-center" style="white-space:nowrap">Thao tác</th>
+                        <th class="text-center" style="white-space:nowrap">@L10n.T("grid.action")</th>
                     }
                 </tr>
                 @* Filter row *@
@@ -79,7 +80,7 @@
                             {
                                 <input class="form-control form-control-sm py-0"
                                        style="font-size:.75rem;min-width:60px"
-                                       placeholder="Lọc..."
+                                       placeholder="@L10n.T("grid.filter_placeholder")"
                                        value="@col.FilterValue"
                                        @oninput="e => OnColFilter(col, e.Value?.ToString() ?? string.Empty)" />
                             }
@@ -92,7 +93,7 @@
                             {
                                 <button class="btn btn-xs btn-outline-secondary py-0"
                                         style="font-size:.7rem" @onclick="ClearFilters">
-                                    <i class="bi bi-x"></i> Xóa
+                                    <i class="bi bi-x"></i> @L10n.T("grid.clear_filters")
                                 </button>
                             }
                         </td>
@@ -104,7 +105,7 @@
                 {
                     var colCount = _columns.Count + (ActionColumn is not null ? 1 : 0);
                     <tr><td colspan="@colCount" class="text-center text-muted py-4">
-                        <i class="bi bi-inbox me-2"></i>Không có dữ liệu
+                        <i class="bi bi-inbox me-2"></i>@L10n.T("lbl.no_data")
                     </td></tr>
                 }
                 else if (_paged.Count > 100)
@@ -148,7 +149,7 @@
             {
                 var from = (_page - 1) * _pageSize + 1;
                 var to   = Math.Min(_page * _pageSize, _filtered.Count);
-                <span>@from–@to / @_filtered.Count dòng</span>
+                <span>@from–@to / @_filtered.Count @L10n.T("grid.rows_suffix")</span>
             }
         </div>
         @if (_totalPages > 1)

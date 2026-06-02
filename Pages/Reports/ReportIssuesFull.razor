@@ -1,25 +1,26 @@
 @page "/report/issues-full"
-@attribute [NavMenu(Title="Báo cáo Issues", Icon="bi-exclamation-circle-fill", Group="Báo cáo", GroupOrder=20, Order=100)]
+@attribute [NavMenu(Title="report_issues.nav_title", Icon="bi-exclamation-circle-fill", Group="nav.reports", GroupOrder=20, Order=100)]
 @using BlazorReporting.Services
 @inject AuthService Auth
 @inject ReportService RptSvc
 @inject NavigationManager Nav
-<PageTitle>Issues Report</PageTitle>
+@inject LocalizationService L10n
+<PageTitle>@L10n.T("report_issues.page_title")</PageTitle>
 <div class="container-fluid mt-3">
-    <h5 class="mb-3"><i class="bi bi-exclamation-circle-fill me-2 text-warning"></i>Issues Report</h5>
+    <h5 class="mb-3"><i class="bi bi-exclamation-circle-fill me-2 text-warning"></i>@L10n.T("report_issues.page_title")</h5>
     <div class="card shadow-sm mb-3"><div class="card-body py-2">
         <div class="d-flex gap-2 flex-wrap align-items-end">
-            <div><label class="form-label small mb-1">Từ ngày</label><input type="date" class="form-control form-control-sm" style="width:150px" @bind="_from"/></div>
-            <div><label class="form-label small mb-1">Đến ngày</label><input type="date" class="form-control form-control-sm" style="width:150px" @bind="_to"/></div>
-            <div><label class="form-label small mb-1">Trạng thái</label>
+            <div><label class="form-label small mb-1">@L10n.T("lbl.from_date")</label><input type="date" class="form-control form-control-sm" style="width:150px" @bind="_from"/></div>
+            <div><label class="form-label small mb-1">@L10n.T("lbl.to_date")</label><input type="date" class="form-control form-control-sm" style="width:150px" @bind="_to"/></div>
+            <div><label class="form-label small mb-1">@L10n.T("lbl.status")</label>
                 <select class="form-select form-select-sm" style="width:140px" @bind="_status">
-                    <option value="0">Chua xu ly</option>
-                    <option value="1">Da xu ly</option>
-                    <option value="-1">Tat ca</option>
+                    <option value="0">@L10n.T("issue.status_pending")</option>
+                    <option value="1">@L10n.T("issue.status_resolved")</option>
+                    <option value="-1">@L10n.T("lbl.all")</option>
                 </select>
             </div>
-            <button class="btn btn-sm btn-primary" @onclick="LoadAsync"><i class="bi bi-search me-1"></i>Xem</button>
-            @if (_data.Any()){<span class="text-muted small ms-2">@_data.Count dong</span>}
+            <button class="btn btn-sm btn-primary" @onclick="LoadAsync"><i class="bi bi-search me-1"></i>@L10n.T("btn.view")</button>
+            @if (_data.Any()){<span class="text-muted small ms-2">@L10n.T("report_issues.row_count")</span>}
         </div>
     </div></div>
     @if (_error!=null){<div class="alert alert-danger py-2 alert-dismissible">@_error<button class="btn-close" @onclick="ClearErr"></button></div>}
@@ -28,13 +29,13 @@
         <SortableGrid Items="_data" Context="r" MinWidth="1000px" DefaultPageSize="20">
             <Columns>
                 <GridColumn TItem="GenericReportRow" Title="Issue ID"    Value="@(x=>x.IssueID)"/>
-                <GridColumn TItem="GenericReportRow" Title="Nhân viên BH"         Value="@(x=>x.SalesmanName)"/>
+                <GridColumn TItem="GenericReportRow" Title="@L10n.T("lbl.salesman")"         Value="@(x=>x.SalesmanName)"/>
                 <GridColumn TItem="GenericReportRow" Title="NPP" Value="@(x=>x.DistributorName)"/>
-                <GridColumn TItem="GenericReportRow" Title="Cửa hàng"      Value="@(x=>x.OutletName)"/>
-                <GridColumn TItem="GenericReportRow" Title="Ngày"        Value="@(x=>x.VisitDate.HasValue?x.VisitDate.Value.ToString("dd/MM/yyyy"):"")" Align="center"/>
-                <GridColumn TItem="GenericReportRow" Title="Nội dung"    Value="@(x=>x.Content)"/>
-                <GridColumn TItem="GenericReportRow" Title="Số ảnh"      Value="@(x=>x.ImageCount)" Align="center"/>
-                <GridColumn TItem="GenericReportRow" Title="Trạng thái"  Value="@(x=>x.Status==0?"Chua xu ly":"Da xu ly")" Align="center"/>
+                <GridColumn TItem="GenericReportRow" Title="@L10n.T("lbl.outlet")"      Value="@(x=>x.OutletName)"/>
+                <GridColumn TItem="GenericReportRow" Title="@L10n.T("lbl.date")"        Value="@(x=>x.VisitDate.HasValue?x.VisitDate.Value.ToString("dd/MM/yyyy"):"")" Align="center"/>
+                <GridColumn TItem="GenericReportRow" Title="@L10n.T("report_issues.col_content")"    Value="@(x=>x.Content)"/>
+                <GridColumn TItem="GenericReportRow" Title="@L10n.T("report_issues.col_image_count")"      Value="@(x=>x.ImageCount)" Align="center"/>
+                <GridColumn TItem="GenericReportRow" Title="@L10n.T("lbl.status")"  Value="@(x=>x.Status==0?L10n.T("issue.status_pending"):L10n.T("issue.status_resolved"))" Align="center"/>
             </Columns>
             <RowTemplate>
                 <td class="small font-monospace">@r.IssueID</td>
@@ -44,7 +45,7 @@
                 <td class="text-center small">@(r.VisitDate.HasValue?r.VisitDate.Value.ToString("dd/MM/yyyy"):"—")</td>
                 <td class="small">@r.Content</td>
                 <td class="text-center">@r.ImageCount</td>
-                <td class="text-center"><span class="badge @(r.Status==0?"bg-warning text-dark":"bg-success")">@(r.Status==0?"Chua":"Da xu ly")</span></td>
+                <td class="text-center"><span class="badge @(r.Status==0?"bg-warning text-dark":"bg-success")">@(r.Status==0?L10n.T("issue.status_pending_short"):L10n.T("issue.status_resolved"))</span></td>
             </RowTemplate>
         </SortableGrid>
     }

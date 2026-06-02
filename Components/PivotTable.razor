@@ -2,11 +2,13 @@
    Supports composite column keys (multiple column fields joined with PivotConfig.ColKeySep).
    Clicking any data cell opens a drill-down modal. *@
 
+@inject LocalizationService L10n
+
 @if (Pivot is null || Pivot.RowKeys.Count == 0)
 {
     <div class="alert alert-secondary py-2">
         <i class="bi bi-info-circle me-2"></i>
-        No pivot data. Configure the fields above and click <strong>Apply Pivot</strong>.
+        @L10n.T("pivot.no_data_hint")
     </div>
 }
 else
@@ -45,11 +47,11 @@ else
                     {
                         @if (multi)
                         {
-                            <th class="text-center pivot-total-group" colspan="@nv">Total</th>
+                            <th class="text-center pivot-total-group" colspan="@nv">@L10n.T("pivot.total")</th>
                         }
                         else
                         {
-                            <th class="text-end pivot-total-group">Total</th>
+                            <th class="text-end pivot-total-group">@L10n.T("pivot.total")</th>
                         }
                     }
                 </tr>
@@ -94,7 +96,7 @@ else
                                 var val = GetCell(rk, ck, vd.Label);
                                 <td class="text-end @(val != null ? "pivot-cell" : "text-muted")"
                                     style="@(val != null ? "cursor:pointer" : "")"
-                                    title="@(val != null ? $"Click to drill-down: {rk} / {PivotConfig.DisplayColKey(ck)}" : "")"
+                                    title="@(val != null ? L10n.T("pivot.cell_tooltip") : "")"
                                     @onclick="() => DrillDown(rk, ck, val)">
                                     @FmtVal(val)
                                 </td>
@@ -118,7 +120,7 @@ else
             {
                 <tfoot>
                     <tr>
-                        <td class="fw-bold pivot-grand-label">Grand Total</td>
+                        <td class="fw-bold pivot-grand-label">@L10n.T("pivot.grand_total")</td>
 
                         @foreach (var ck in Pivot.ColumnKeys)
                         {
@@ -155,7 +157,7 @@ else
                 <div class="modal-header bg-dark text-white py-2">
                     <h6 class="modal-title mb-0">
                         <i class="bi bi-zoom-in me-2"></i>
-                        Drill-Down &nbsp;
+                        @L10n.T("pivot.drilldown_title") &nbsp;
                         <span class="badge bg-secondary">@_drillRowKey</span>
                         <i class="bi bi-x mx-1 opacity-50"></i>
                         <span class="badge bg-primary">@PivotConfig.DisplayColKey(_drillColKey)</span>
@@ -176,16 +178,16 @@ else
                     }
                     else if (_drillData.Count == 0)
                     {
-                        <p class="p-4 text-muted">No detail rows found.</p>
+                        <p class="p-4 text-muted">@L10n.T("pivot.drilldown_no_rows")</p>
                     }
                     else
                     {
                         @* Column chooser for drill-down *@
                         <div class="px-3 pt-2 d-flex align-items-center gap-2 flex-wrap border-bottom pb-2">
-                            <span class="badge bg-secondary">@_drillData.Count.ToString("N0") rows</span>
+                            <span class="badge bg-secondary">@L10n.T("pivot.drilldown_rows_badge")</span>
                             @if (_drillData.Count > 500)
                             {
-                                <span class="text-muted small">Showing first 500</span>
+                                <span class="text-muted small">@L10n.T("pivot.drilldown_showing_first")</span>
                             }
                         </div>
 
@@ -219,9 +221,9 @@ else
 
                 <div class="modal-footer py-2">
                     <span class="me-auto text-muted small">
-                        @_drillData.Count.ToString("N0") detail rows
+                        @L10n.T("pivot.drilldown_row_count")
                     </span>
-                    <button class="btn btn-secondary btn-sm" @onclick="CloseDrill">Close</button>
+                    <button class="btn btn-secondary btn-sm" @onclick="CloseDrill">@L10n.T("btn.close")</button>
                 </div>
             </div>
         </div>

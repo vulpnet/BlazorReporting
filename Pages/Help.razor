@@ -1,6 +1,7 @@
 @page "/help"
+@inject LocalizationService L10n
 @attribute [NavMenu(Title="Hướng dẫn sử dụng", Icon="bi-question-circle", Group="Hệ thống", GroupOrder=90, Order=10, OpenInNewTab=true)]
-<PageTitle>Hướng dẫn sử dụng – DMSPRO Reporting</PageTitle>
+<PageTitle>@L10n.T("help.title") – DMSPRO Reporting</PageTitle>
 
 <div class="container-lg py-4">
 
@@ -11,14 +12,14 @@
             <i class="bi bi-book-half text-white"></i>
         </div>
         <div>
-            <h2 class="mb-0 fw-bold">Hướng dẫn sử dụng</h2>
-            <p class="text-muted mb-0 small">DMSPRO Reporting — Tài liệu đầy đủ tất cả tính năng</p>
+            <h2 class="mb-0 fw-bold">@L10n.T("help.title")</h2>
+            <p class="text-muted mb-0 small">@L10n.T("help.subtitle")</p>
         </div>
         <div class="ms-auto d-flex gap-2 flex-wrap">
-            <a class="btn btn-outline-secondary btn-sm" href="/map"><i class="bi bi-geo-alt me-1"></i>Bản đồ</a>
+            <a class="btn btn-outline-secondary btn-sm" href="/map"><i class="bi bi-geo-alt me-1"></i>@L10n.T("help.btn_map")</a>
             <a class="btn btn-outline-info btn-sm"      href="/territory-map"><i class="bi bi-map me-1"></i>Territory</a>
-            <a class="btn btn-outline-warning btn-sm"   href="/product-sales"><i class="bi bi-box-seam me-1"></i>Sản phẩm</a>
-            <a class="btn btn-primary btn-sm"           href="/report"><i class="bi bi-table me-1"></i>Báo cáo</a>
+            <a class="btn btn-outline-warning btn-sm"   href="/product-sales"><i class="bi bi-box-seam me-1"></i>@L10n.T("help.btn_product")</a>
+            <a class="btn btn-primary btn-sm"           href="/report"><i class="bi bi-table me-1"></i>@L10n.T("help.btn_report")</a>
         </div>
     </div>
 
@@ -34,7 +35,7 @@
 
     @* ══ 1. Tổng quan ══════════════════════════════════════════════ *@
     <section id="overview" class="mb-5">
-        <h4 class="section-heading"><i class="bi bi-info-circle-fill me-2 text-primary"></i>Tổng quan hệ thống</h4>
+        <h4 class="section-heading"><i class="bi bi-info-circle-fill me-2 text-primary"></i>@L10n.T("help.section_overview")</h4>
         <div class="card shadow-sm border-0">
             <div class="card-body">
                 <p>
@@ -58,7 +59,7 @@
 
     @* ══ 2. Đăng nhập ══════════════════════════════════════════════ *@
     <section id="login" class="mb-5">
-        <h4 class="section-heading"><i class="bi bi-shield-lock-fill me-2 text-success"></i>Đăng nhập</h4>
+        <h4 class="section-heading"><i class="bi bi-shield-lock-fill me-2 text-success"></i>@L10n.T("help.section_login")</h4>
         <div class="card shadow-sm border-0">
             <div class="card-body">
                 <ul class="guide-steps mb-3">
@@ -80,11 +81,11 @@
 
     @* ══ 3. Báo cáo ════════════════════════════════════════════════ *@
     <section id="report" class="mb-5">
-        <h4 class="section-heading"><i class="bi bi-table me-2 text-primary"></i>Trang Báo cáo <code class="small">/report</code></h4>
+        <h4 class="section-heading"><i class="bi bi-table me-2 text-primary"></i>@L10n.T("help.section_report") <code class="small">/report</code></h4>
 
         <div class="card shadow-sm border-0 mb-3">
             <div class="card-header fw-semibold bg-primary text-white">
-                <i class="bi bi-sliders me-1"></i>Thanh cấu hình (Config Bar)
+                <i class="bi bi-sliders me-1"></i>@L10n.T("help.report_config_bar")
             </div>
             <div class="card-body">
                 <table class="table table-sm table-hover align-middle mb-0">
@@ -106,7 +107,7 @@
         <div class="row g-3 mb-3">
             <div class="col-md-6">
                 <div class="card h-100 shadow-sm border-0">
-                    <div class="card-header fw-semibold bg-success text-white"><i class="bi bi-table me-1"></i>Lưới dữ liệu</div>
+                    <div class="card-header fw-semibold bg-success text-white"><i class="bi bi-table me-1"></i>@L10n.T("help.report_data_grid")</div>
                     <div class="card-body small">
                         <ul class="ps-3 mb-0">
                             <li><strong>Sắp xếp:</strong> click tiêu đề cột → ASC / DESC</li>
@@ -137,7 +138,7 @@
         </div>
 
         <div class="card shadow-sm border-0">
-            <div class="card-header fw-semibold bg-danger text-white"><i class="bi bi-download me-1"></i>Xuất dữ liệu</div>
+            <div class="card-header fw-semibold bg-danger text-white"><i class="bi bi-download me-1"></i>@L10n.T("help.report_export")</div>
             <div class="card-body">
                 <table class="table table-sm table-hover small mb-0">
                     <thead class="table-secondary"><tr><th>Định dạng</th><th>Lưới dữ liệu</th><th>Pivot</th></tr></thead>
@@ -153,11 +154,11 @@
 
     @* ══ 4. Bản đồ Salesman ════════════════════════════════════════ *@
     <section id="map" class="mb-5">
-        <h4 class="section-heading"><i class="bi bi-geo-alt-fill me-2 text-success"></i>Bản đồ Salesman <code class="small">/map</code></h4>
+        <h4 class="section-heading"><i class="bi bi-geo-alt-fill me-2 text-success"></i>@L10n.T("help.section_map") <code class="small">/map</code></h4>
 
         <div class="card shadow-sm border-0 mb-3">
             <div class="card-header fw-semibold bg-success text-white">
-                <i class="bi bi-map me-1"></i>Tính năng bản đồ
+                <i class="bi bi-map me-1"></i>@L10n.T("help.map_features")
             </div>
             <div class="card-body">
                 <div class="row g-3">
@@ -202,7 +203,7 @@
             <div class="col-md-6">
                 <div class="card h-100 shadow-sm border-0">
                     <div class="card-header fw-semibold bg-primary text-white">
-                        <i class="bi bi-bar-chart-fill me-1"></i>Biểu đồ Doanh số
+                        <i class="bi bi-bar-chart-fill me-1"></i>@L10n.T("help.map_sales_chart")
                     </div>
                     <div class="card-body small">
                         <p>Nhấn nút <strong>📊 Doanh số</strong> → panel trượt lên từ dưới bản đồ.</p>
@@ -218,7 +219,7 @@
             <div class="col-md-6">
                 <div class="card h-100 shadow-sm border-0">
                     <div class="card-header fw-semibold bg-warning text-dark">
-                        <i class="bi bi-box-seam-fill me-1"></i>Phân tích Sản phẩm (trong Map)
+                        <i class="bi bi-box-seam-fill me-1"></i>@L10n.T("help.map_product_analysis")
                     </div>
                     <div class="card-body small">
                         <p>Nhấn nút <strong>📦 Sản phẩm</strong> → panel vàng trượt lên (62% chiều cao).</p>
@@ -249,7 +250,7 @@
 
         <div class="card shadow-sm border-0 mb-3">
             <div class="card-header fw-semibold bg-info text-white">
-                <i class="bi bi-info-circle me-1"></i>Tổng quan
+                <i class="bi bi-info-circle me-1"></i>@L10n.T("help.section_overview_short")
             </div>
             <div class="card-body small">
                 <p class="mb-2">
@@ -263,7 +264,7 @@
         @* Toolbar *@
         <div class="card shadow-sm border-0 mb-3">
             <div class="card-header fw-semibold" style="background:#0e7490;color:#fff">
-                <i class="bi bi-sliders me-1"></i>Thanh công cụ (Toolbar)
+                <i class="bi bi-sliders me-1"></i>@L10n.T("help.territory_toolbar")
             </div>
             <div class="card-body">
                 <table class="table table-sm table-hover align-middle small mb-0">
@@ -283,7 +284,7 @@
         @* Tree filter *@
         <div class="card shadow-sm border-0 mb-3">
             <div class="card-header fw-semibold bg-secondary text-white">
-                <i class="bi bi-diagram-3-fill me-1"></i>Bộ lọc cây tổ chức
+                <i class="bi bi-diagram-3-fill me-1"></i>@L10n.T("help.territory_tree_filter")
             </div>
             <div class="card-body small">
                 <p class="mb-2">Click nút <strong>— Tất cả —</strong> → dropdown cây xổ xuống với 6 cấp độ:</p>
@@ -310,7 +311,7 @@
         @* Route *@
         <div class="card shadow-sm border-0 mb-3">
             <div class="card-header fw-semibold" style="background:#4f46e5;color:#fff">
-                <i class="bi bi-signpost-2-fill me-1"></i>Lộ trình Salesman
+                <i class="bi bi-signpost-2-fill me-1"></i>@L10n.T("help.territory_route")
             </div>
             <div class="card-body small">
                 <p class="mb-2">Click nút <i class="bi bi-signpost-2-fill text-primary"></i> trên thẻ SM → hệ thống tải lộ trình từ <code>pp_GetVisitSMTracking</code> (giống DMS2.0).</p>
@@ -347,7 +348,7 @@
         @* Replay *@
         <div class="card shadow-sm border-0 mb-3">
             <div class="card-header fw-semibold" style="background:#7c3aed;color:#fff">
-                <i class="bi bi-play-circle-fill me-1"></i>Replay lộ trình (Animation)
+                <i class="bi bi-play-circle-fill me-1"></i>@L10n.T("help.territory_replay")
             </div>
             <div class="card-body small">
                 <p class="mb-2">Sau khi xem lộ trình, nút <span class="badge" style="background:#7c3aed">▶ Replay</span> xuất hiện trên thẻ SM trong sidebar.</p>
@@ -376,7 +377,7 @@
         @* Alerts *@
         <div class="card shadow-sm border-0 mb-3">
             <div class="card-header fw-semibold bg-warning text-dark">
-                <i class="bi bi-exclamation-triangle-fill me-1"></i>Cảnh báo bất thường (Alert)
+                <i class="bi bi-exclamation-triangle-fill me-1"></i>@L10n.T("help.territory_alerts")
             </div>
             <div class="card-body small">
                 <p class="mb-2">Hệ thống tự động phát hiện 5 loại bất thường từ <code>pp_ReportSMVisitSummary</code> và <code>OrderHeader</code>:</p>
@@ -422,7 +423,7 @@
         <div class="row g-3 mb-3">
             <div class="col-md-6">
                 <div class="card h-100 shadow-sm border-0">
-                    <div class="card-header fw-semibold bg-dark text-white"><i class="bi bi-list-ul me-1"></i>Sidebar SM</div>
+                    <div class="card-header fw-semibold bg-dark text-white"><i class="bi bi-list-ul me-1"></i>@L10n.T("help.territory_sidebar")</div>
                     <div class="card-body small">
                         <ul class="ps-3 mb-0">
                             <li>Danh sách SM đang hiển thị trên bản đồ</li>
@@ -436,7 +437,7 @@
             </div>
             <div class="col-md-6">
                 <div class="card h-100 shadow-sm border-0">
-                    <div class="card-header fw-semibold bg-primary text-white"><i class="bi bi-bar-chart-fill me-1"></i>Biểu đồ &amp; Phân tích sản phẩm</div>
+                    <div class="card-header fw-semibold bg-primary text-white"><i class="bi bi-bar-chart-fill me-1"></i>@L10n.T("help.territory_chart_product")</div>
                     <div class="card-body small">
                         <p class="mb-1"><strong>📊 Doanh số:</strong> panel trượt lên — nhóm theo Tuyến / SM / Tỉnh. Click slice → fly-to khu vực.</p>
                         <p class="mb-0"><strong>📦 Sản phẩm:</strong> phân tích Top N sản phẩm × khu vực, xu hướng ML.NET SSA, bảng chiến lược — giống trang /map.</p>
@@ -449,7 +450,7 @@
 
     @* ══ 6. Phân tích Sản phẩm ════════════════════════════════════ *@
     <section id="product-sales" class="mb-5">
-        <h4 class="section-heading"><i class="bi bi-box-seam-fill me-2 text-warning"></i>Phân tích Sản phẩm <code class="small">/product-sales</code></h4>
+        <h4 class="section-heading"><i class="bi bi-box-seam-fill me-2 text-warning"></i>@L10n.T("help.section_product") <code class="small">/product-sales</code></h4>
         <div class="card shadow-sm border-0 mb-3">
             <div class="card-body">
                 <div class="row g-3">
@@ -524,7 +525,7 @@
 
     @* ══ 6. AI Chatbot ═════════════════════════════════════════════ *@
     <section id="chatbot" class="mb-5">
-        <h4 class="section-heading"><i class="bi bi-robot me-2" style="color:#7c3aed"></i>AI Chatbot</h4>
+        <h4 class="section-heading"><i class="bi bi-robot me-2" style="color:#7c3aed"></i>@L10n.T("help.section_chatbot")</h4>
         <div class="card shadow-sm border-0 mb-3">
             <div class="card-body">
                 <p>
@@ -582,7 +583,7 @@
 
     @* ══ 7. URL Deep Links ════════════════════════════════════════ *@
     <section id="url-params" class="mb-5">
-        <h4 class="section-heading"><i class="bi bi-link-45deg me-2 text-info"></i>Liên kết URL trực tiếp</h4>
+        <h4 class="section-heading"><i class="bi bi-link-45deg me-2 text-info"></i>@L10n.T("help.section_url_params")</h4>
         <div class="card shadow-sm border-0">
             <div class="card-body">
                 <table class="table table-sm table-hover small mb-0">
@@ -616,7 +617,7 @@
 
     @* ══ 8. Danh mục báo cáo ══════════════════════════════════════ *@
     <section id="report-catalog" class="mb-5">
-        <h4 class="section-heading"><i class="bi bi-collection-fill me-2 text-warning"></i>Danh mục báo cáo</h4>
+        <h4 class="section-heading"><i class="bi bi-collection-fill me-2 text-warning"></i>@L10n.T("help.section_report_catalog")</h4>
         <div class="card shadow-sm border-0">
             <div class="card-body">
                 <p>
@@ -645,7 +646,7 @@ SELECT N'Tổng hợp doanh số', 'vw_Sales', 'View', NULL;</code></pre>
 
     @* ══ 9. Hiệu năng ═════════════════════════════════════════════ *@
     <section id="performance" class="mb-5">
-        <h4 class="section-heading"><i class="bi bi-speedometer2 me-2 text-danger"></i>Hiệu năng &amp; Dữ liệu lớn</h4>
+        <h4 class="section-heading"><i class="bi bi-speedometer2 me-2 text-danger"></i>@L10n.T("help.section_performance")</h4>
         <div class="card shadow-sm border-0">
             <div class="card-body">
                 <div class="row g-3">
@@ -678,7 +679,7 @@ SELECT N'Tổng hợp doanh số', 'vw_Sales', 'View', NULL;</code></pre>
 
     @* ══ 10. Phím tắt ═════════════════════════════════════════════ *@
     <section id="shortcuts" class="mb-5">
-        <h4 class="section-heading"><i class="bi bi-keyboard me-2 text-secondary"></i>Phím tắt &amp; Thao tác nhanh</h4>
+        <h4 class="section-heading"><i class="bi bi-keyboard me-2 text-secondary"></i>@L10n.T("help.section_shortcuts")</h4>
         <div class="card shadow-sm border-0">
             <div class="card-body">
                 <table class="table table-sm table-hover align-middle small mb-0">
@@ -704,7 +705,7 @@ SELECT N'Tổng hợp doanh số', 'vw_Sales', 'View', NULL;</code></pre>
     @* ══ 11. Chiến lược kinh doanh ML.NET ════════════════════════ *@
     <section id="sales-strategy" class="mb-5">
         <h4 class="section-heading">
-            <i class="bi bi-robot me-2" style="color:#7c3aed"></i>Chiến lược kinh doanh – Cơ chế dự đoán
+            <i class="bi bi-robot me-2" style="color:#7c3aed"></i>@L10n.T("help.section_sales_strategy")
             <code class="small">/sales-strategy</code>
         </h4>
 
@@ -1083,39 +1084,39 @@ SELECT N'Tổng hợp doanh số', 'vw_Sales', 'View', NULL;</code></pre>
 
     @* ══ Footer ════════════════════════════════════════════════════ *@
     <div class="text-center py-3 border-top d-flex justify-content-center gap-2 flex-wrap">
-        <a href="#" class="btn btn-outline-secondary btn-sm"><i class="bi bi-arrow-up me-1"></i>Đầu trang</a>
-        <a href="/map"             class="btn btn-outline-success btn-sm"><i class="bi bi-geo-alt me-1"></i>Bản đồ SM</a>
+        <a href="#" class="btn btn-outline-secondary btn-sm"><i class="bi bi-arrow-up me-1"></i>@L10n.T("help.footer_top")</a>
+        <a href="/map"             class="btn btn-outline-success btn-sm"><i class="bi bi-geo-alt me-1"></i>@L10n.T("help.footer_map")</a>
         <a href="/territory-map"  class="btn btn-outline-info btn-sm"><i class="bi bi-map me-1"></i>Territory</a>
-        <a href="/product-sales"  class="btn btn-outline-warning btn-sm"><i class="bi bi-box-seam me-1"></i>Sản phẩm</a>
-        <a href="/report"         class="btn btn-primary btn-sm"><i class="bi bi-table me-1"></i>Báo cáo</a>
-        <a href="/sales-strategy" class="btn btn-sm" style="background:#7c3aed;color:#fff"><i class="bi bi-robot me-1"></i>Chiến lược</a>
+        <a href="/product-sales"  class="btn btn-outline-warning btn-sm"><i class="bi bi-box-seam me-1"></i>@L10n.T("help.btn_product")</a>
+        <a href="/report"         class="btn btn-primary btn-sm"><i class="bi bi-table me-1"></i>@L10n.T("help.btn_report")</a>
+        <a href="/sales-strategy" class="btn btn-sm" style="background:#7c3aed;color:#fff"><i class="bi bi-robot me-1"></i>@L10n.T("help.footer_strategy")</a>
     </div>
 
 </div>
 
 @code {
-    private static readonly (string Label, string Anchor, string Icon, string Color)[] _sections =
+    private (string Label, string Anchor, string Icon, string Color)[] _sections =>
     [
-        ("Tổng quan",        "overview",       "bi-info-circle",       "#4f46e5"),
-        ("Đăng nhập",        "login",          "bi-shield-lock",       "#16a34a"),
-        ("Báo cáo",          "report",         "bi-table",             "#2563eb"),
-        ("Bản đồ SM",        "map",            "bi-geo-alt",           "#16a34a"),
-        ("Territory Perf",   "territory",      "bi-map",               "#0e7490"),
-        ("Phân tích SP",     "product-sales",  "bi-box-seam",          "#d97706"),
-        ("AI Chatbot",       "chatbot",        "bi-robot",             "#7c3aed"),
-        ("URL Links",        "url-params",     "bi-link-45deg",        "#0891b2"),
-        ("Danh mục BC",      "report-catalog", "bi-collection",        "#ca8a04"),
-        ("Hiệu năng",        "performance",    "bi-speedometer2",      "#dc2626"),
-        ("Phím tắt",         "shortcuts",      "bi-keyboard",          "#475569"),
-        ("Chiến lược ML",    "sales-strategy", "bi-robot",             "#7c3aed"),
+        (L10n.T("help.section_overview_short"), "overview",       "bi-info-circle",       "#4f46e5"),
+        (L10n.T("help.section_login"),          "login",          "bi-shield-lock",       "#16a34a"),
+        (L10n.T("help.btn_report"),             "report",         "bi-table",             "#2563eb"),
+        (L10n.T("help.footer_map"),             "map",            "bi-geo-alt",           "#16a34a"),
+        ("Territory Perf",                      "territory",      "bi-map",               "#0e7490"),
+        ("Phân tích SP",                        "product-sales",  "bi-box-seam",          "#d97706"),
+        (L10n.T("help.section_chatbot"),        "chatbot",        "bi-robot",             "#7c3aed"),
+        ("URL Links",                           "url-params",     "bi-link-45deg",        "#0891b2"),
+        ("Danh mục BC",                         "report-catalog", "bi-collection",        "#ca8a04"),
+        ("Hiệu năng",                           "performance",    "bi-speedometer2",      "#dc2626"),
+        ("Phím tắt",                            "shortcuts",      "bi-keyboard",          "#475569"),
+        ("Chiến lược ML",                       "sales-strategy", "bi-robot",             "#7c3aed"),
     ];
 
-    private static readonly (string Icon, string Title, string Sub, string Bg)[] _overviewCards =
+    private (string Icon, string Title, string Sub, string Bg)[] _overviewCards =>
     [
-        ("bi-table",         "Báo cáo linh hoạt",   "SP · View · Table · Pivot · Export",              "#f0f9ff"),
-        ("bi-geo-alt-fill",  "Bản đồ Salesman",      "GPS · Lộ trình · Doanh số · Địa chỉ",            "#f0fdf4"),
-        ("bi-map-fill",      "Territory Performance","Cây tổ chức · Cảnh báo · Replay · Alert",         "#ecfeff"),
-        ("bi-box-seam-fill", "Phân tích Sản phẩm",  "ML.NET SSA · Khu vực · Dự đoán 3 tháng",        "#fffbeb"),
-        ("bi-robot",         "AI Chatbot",           "Ollama local · Điều hướng · Lịch sử",            "#faf5ff"),
+        ("bi-table",         L10n.T("help.overview_card_report_title"),   "SP · View · Table · Pivot · Export",              "#f0f9ff"),
+        ("bi-geo-alt-fill",  L10n.T("help.overview_card_map_title"),      "GPS · Lộ trình · Doanh số · Địa chỉ",            "#f0fdf4"),
+        ("bi-map-fill",      "Territory Performance",                      "Cây tổ chức · Cảnh báo · Replay · Alert",         "#ecfeff"),
+        ("bi-box-seam-fill", L10n.T("help.overview_card_product_title"),  "ML.NET SSA · Khu vực · Dự đoán 3 tháng",        "#fffbeb"),
+        ("bi-robot",         L10n.T("help.section_chatbot"),              "Ollama local · Điều hướng · Lịch sử",            "#faf5ff"),
     ];
 }

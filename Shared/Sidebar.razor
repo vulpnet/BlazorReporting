@@ -2,6 +2,7 @@
 @inject NavMenuService MenuSvc
 @inject AuthService Auth
 @inject NavigationManager Nav
+@inject LocalizationService L10n
 @implements IDisposable
 
 <aside class="dm-sidebar @(Collapsed ? "is-collapsed" : "")">
@@ -13,18 +14,18 @@
             </div>
             <div class="dm-brand-text">
                 <div class="dm-brand-title">DMSPRO</div>
-                <div class="dm-brand-sub">Reporting Suite</div>
+                <div class="dm-brand-sub">@L10n.T("sidebar.brand_sub")</div>
             </div>
         </a>
         <button class="dm-collapse-btn" type="button" @onclick="ToggleCollapse"
-                title="@(Collapsed ? "Mở rộng" : "Thu gọn")">
+                title="@(Collapsed ? L10n.T("sidebar.expand") : L10n.T("sidebar.collapse"))">
             <i class="bi @(Collapsed ? "bi-chevron-double-right" : "bi-chevron-double-left")"></i>
         </button>
     </div>
 
     <div class="dm-sidebar__search">
         <i class="bi bi-search"></i>
-        <input type="text" placeholder="Tìm menu..." value="@_query"
+        <input type="text" placeholder="@L10n.T("sidebar.search_placeholder")" value="@_query"
                @oninput="OnSearch" />
         @if (!string.IsNullOrEmpty(_query))
         {
@@ -42,7 +43,7 @@
                 <div class="dm-nav-group__label @(isOpen ? "is-open" : "")"
                      @onclick="() => ToggleGroup(group.Name)"
                      style="cursor:pointer; user-select:none; display:flex; align-items:center; justify-content:space-between">
-                    <span>@group.Name</span>
+                    <span>@L10n.T(group.Name)</span>
                     <i class="bi @(isOpen ? "bi-chevron-down" : "bi-chevron-right") ms-1"
                        style="font-size:.7rem; opacity:.7; transition:transform .2s"></i>
                 </div>
@@ -55,9 +56,9 @@
                         <a class="dm-nav-item @(active ? "is-active" : "")"
                            href="@item.Href"
                            target="@(item.OpenInNewTab ? "_blank" : null)"
-                           title="@item.Title">
+                           title="@L10n.T(item.Title)">
                             <i class="bi @item.Icon"></i>
-                            <span class="dm-nav-item__text">@item.Title</span>
+                            <span class="dm-nav-item__text">@L10n.T(item.Title)</span>
                             @if (!string.IsNullOrEmpty(item.Badge))
                             {
                                 <span class="dm-nav-badge">@item.Badge</span>
@@ -69,7 +70,7 @@
         }
         @if (!FilteredGroups().Any())
         {
-            <div class="dm-nav-empty">Không có menu phù hợp</div>
+            <div class="dm-nav-empty">@L10n.T("sidebar.no_menu_match")</div>
         }
     </nav>
 
@@ -81,7 +82,7 @@
             <div class="dm-user-name">@Auth.FullName</div>
             <div class="dm-user-role">@Auth.Role</div>
         </div>
-        <button class="dm-logout" @onclick="OnLogout" title="Đăng xuất">
+        <button class="dm-logout" @onclick="OnLogout" title="@L10n.T("sidebar.logout_tooltip")">
             <i class="bi bi-box-arrow-right"></i>
         </button>
     </div>
@@ -163,7 +164,7 @@
                 g.Name,
                 g.Order,
                 g.Items.Where(i =>
-                    i.Title.Contains(q, StringComparison.OrdinalIgnoreCase) ||
+                    L10n.T(i.Title).Contains(q, StringComparison.OrdinalIgnoreCase) ||
                     g.Name.Contains(q, StringComparison.OrdinalIgnoreCase)).ToList()))
             .Where(g => g.Items.Count > 0)
             .ToList();

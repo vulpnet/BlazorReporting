@@ -1,19 +1,20 @@
 @page "/report/timekeeping"
-@attribute [NavMenu(Title="Chấm công", Icon="bi-fingerprint", Group="Báo cáo", GroupOrder=20, Order=120)]
+@attribute [NavMenu(Title="timekeeping.nav_title", Icon="bi-fingerprint", Group="nav.reports", GroupOrder=20, Order=120)]
 @using BlazorReporting.Services
 @inject AuthService Auth
 @inject ReportService RptSvc
 @inject NavigationManager Nav
+@inject LocalizationService L10n
 <PageTitle>Timekeeping</PageTitle>
 <div class="container-fluid mt-3">
-    <h5 class="mb-3"><i class="bi bi-fingerprint me-2"></i>Bao cao cham cong Nhân viên BH</h5>
+    <h5 class="mb-3"><i class="bi bi-fingerprint me-2"></i>@L10n.T("timekeeping.page_title")</h5>
     <div class="card shadow-sm mb-3"><div class="card-body py-2">
         <div class="d-flex gap-2 flex-wrap align-items-end">
-            <div><label class="form-label small mb-1">Từ ngày</label><input type="date" class="form-control form-control-sm" style="width:150px" @bind="_from"/></div>
-            <div><label class="form-label small mb-1">Đến ngày</label><input type="date" class="form-control form-control-sm" style="width:150px" @bind="_to"/></div>
-            <div><label class="form-label small mb-1">Nhân viên BH</label><input class="form-control form-control-sm" style="width:150px" placeholder="SalesmanID..." @bind="_sm"/></div>
-            <button class="btn btn-sm btn-primary" @onclick="LoadAsync"><i class="bi bi-search me-1"></i>Xem</button>
-            @if (_data.Any()){<span class="text-muted small ms-2">@_data.Count dong</span>}
+            <div><label class="form-label small mb-1">@L10n.T("lbl.from_date")</label><input type="date" class="form-control form-control-sm" style="width:150px" @bind="_from"/></div>
+            <div><label class="form-label small mb-1">@L10n.T("lbl.to_date")</label><input type="date" class="form-control form-control-sm" style="width:150px" @bind="_to"/></div>
+            <div><label class="form-label small mb-1">@L10n.T("timekeeping.lbl_salesman")</label><input class="form-control form-control-sm" style="width:150px" placeholder="SalesmanID..." @bind="_sm"/></div>
+            <button class="btn btn-sm btn-primary" @onclick="LoadAsync"><i class="bi bi-search me-1"></i>@L10n.T("btn.view")</button>
+            @if (_data.Any()){<span class="text-muted small ms-2">@L10n.T("timekeeping.row_count")</span>}
         </div>
     </div></div>
     @if (_error!=null){<div class="alert alert-danger py-2 alert-dismissible">@_error<button class="btn-close" @onclick="ClearErr"></button></div>}
@@ -21,13 +22,13 @@
     else {
         <SortableGrid Items="_data" Context="r" MinWidth="900px" DefaultPageSize="20">
             <Columns>
-                <GridColumn TItem="GenericReportRow" Title="Nhân viên BH"          Value="@(x=>x.SalesmanName)"/>
+                <GridColumn TItem="GenericReportRow" Title="@L10n.T("timekeeping.lbl_salesman")"          Value="@(x=>x.SalesmanName)"/>
                 <GridColumn TItem="GenericReportRow" Title="Region"       Value="@(x=>x.RegionName)"/>
                 <GridColumn TItem="GenericReportRow" Title="Area"         Value="@(x=>x.AreaName)"/>
-                <GridColumn TItem="GenericReportRow" Title="Ngày có lịch" Value="@(x=>x.ScheduleDateWork)" Align="end"/>
-                <GridColumn TItem="GenericReportRow" Title="Đã đồng bộ"   Value="@(x=>x.SynchronizeDate)" Align="end"/>
-                <GridColumn TItem="GenericReportRow" Title="Có doanh số"  Value="@(x=>x.VisitedDate)" Align="end"/>
-                <GridColumn TItem="GenericReportRow" Title="% Ngày làm"   Value="@(x=>x.VisitedDateRate)" Align="end"/>
+                <GridColumn TItem="GenericReportRow" Title="@L10n.T("timekeeping.col_scheduled_days")" Value="@(x=>x.ScheduleDateWork)" Align="end"/>
+                <GridColumn TItem="GenericReportRow" Title="@L10n.T("timekeeping.col_synced_days")"   Value="@(x=>x.SynchronizeDate)" Align="end"/>
+                <GridColumn TItem="GenericReportRow" Title="@L10n.T("timekeeping.col_sales_days")"  Value="@(x=>x.VisitedDate)" Align="end"/>
+                <GridColumn TItem="GenericReportRow" Title="@L10n.T("timekeeping.col_work_day_pct")"   Value="@(x=>x.VisitedDateRate)" Align="end"/>
             </Columns>
             <RowTemplate>
                 <td class="fw-semibold small">@r.SalesmanName</td>

@@ -4,11 +4,12 @@
 @inject AuthService Auth
 @inject ConfigService CfgSvc
 @inject NavigationManager Nav
+@inject LocalizationService L10n
 
-<PageTitle>Cấu hình hệ thống</PageTitle>
+<PageTitle>@L10n.T("config.custom_setting.title")</PageTitle>
 
 <div class="container-fluid mt-3">
-    <h5 class="mb-3"><i class="bi bi-sliders me-2"></i>Cấu hình hệ thống (CustomSetting)</h5>
+    <h5 class="mb-3"><i class="bi bi-sliders me-2"></i>@L10n.T("config.custom_setting.heading")</h5>
 
     @if (!string.IsNullOrEmpty(_msg))
     {
@@ -34,10 +35,10 @@
                     <table class="table table-sm table-hover align-middle mb-0">
                         <thead class="table-secondary">
                             <tr>
-                                <th style="width:30%">Tên cấu hình</th>
-                                <th style="width:25%">Code</th>
-                                <th>Giá trị</th>
-                                <th class="text-center" style="width:80px">Sửa</th>
+                                <th style="width:30%">@L10n.T("config.custom_setting.col_name")</th>
+                                <th style="width:25%">@L10n.T("config.custom_setting.col_code")</th>
+                                <th>@L10n.T("config.custom_setting.col_value")</th>
+                                <th class="text-center" style="width:80px">@L10n.T("config.custom_setting.col_edit")</th>
                             </tr>
                         </thead>
                         <tbody>
@@ -107,7 +108,7 @@
     private async Task SaveAsync(CustomSettingRow s)
     {
         var ok = await CfgSvc.UpdateCustomSettingAsync(s.SettingCode, s.SettingGroup, _editValue);
-        _ok = ok; _msg = ok ? $"Đã cập nhật [{s.SettingCode}]." : "Có lỗi xảy ra.";
+        _ok = ok; _msg = ok ? L10n.T("config.custom_setting.msg_updated") : L10n.T("config.custom_setting.msg_error");
         if (ok)
         {
             var idx = _settings.FindIndex(x => x.SettingCode == s.SettingCode && x.SettingGroup == s.SettingGroup);

@@ -1,18 +1,19 @@
 @page "/report/daily-plan"
-@attribute [NavMenu(Title="Kế hoạch ngày", Icon="bi-journal-check", Group="Báo cáo", GroupOrder=20, Order=60)]
+@attribute [NavMenu(Title="daily_plan.title", Icon="bi-journal-check", Group="nav.reports", GroupOrder=20, Order=60)]
 @using BlazorReporting.Services
 @inject AuthService Auth
 @inject ReportService RptSvc
 @inject NavigationManager Nav
-<PageTitle>Ke hoach ngay</PageTitle>
+@inject LocalizationService L10n
+<PageTitle>@L10n.T("daily_plan.title")</PageTitle>
 <div class="container-fluid mt-3">
-    <h5 class="mb-3"><i class="bi bi-journal-check me-2"></i>Ke hoach ngay</h5>
+    <h5 class="mb-3"><i class="bi bi-journal-check me-2"></i>@L10n.T("daily_plan.title")</h5>
     <div class="card shadow-sm mb-3"><div class="card-body py-2">
         <div class="d-flex gap-2 flex-wrap align-items-end">
-            <div><label class="form-label small mb-1">Ngày</label><input type="date" class="form-control form-control-sm" style="width:150px" @bind="_date"/></div>
-            <div><label class="form-label small mb-1">Tuyến</label><input class="form-control form-control-sm" style="width:150px" @bind="_route"/></div>
-            <div><label class="form-label small mb-1">Giám sát</label><input class="form-control form-control-sm" style="width:140px" @bind="_sup"/></div>
-            <button class="btn btn-sm btn-primary" @onclick="LoadAsync"><i class="bi bi-search me-1"></i>Xem</button>
+            <div><label class="form-label small mb-1">@L10n.T("lbl.date")</label><input type="date" class="form-control form-control-sm" style="width:150px" @bind="_date"/></div>
+            <div><label class="form-label small mb-1">@L10n.T("lbl.route")</label><input class="form-control form-control-sm" style="width:150px" @bind="_route"/></div>
+            <div><label class="form-label small mb-1">@L10n.T("lbl.supervisor")</label><input class="form-control form-control-sm" style="width:140px" @bind="_sup"/></div>
+            <button class="btn btn-sm btn-primary" @onclick="LoadAsync"><i class="bi bi-search me-1"></i>@L10n.T("btn.view")</button>
         </div>
     </div></div>
     @if (_error!=null){<div class="alert alert-danger py-2 alert-dismissible">@_error<button class="btn-close" @onclick="ClearErr"></button></div>}
@@ -20,14 +21,14 @@
     else {
         <SortableGrid Items="_data" Context="r" MinWidth="900px" DefaultPageSize="20">
             <Columns>
-                <GridColumn TItem="GenericReportRow" Title="Nhân viên BH"        Value="@(x=>x.SalesmanName)"/>
-                <GridColumn TItem="GenericReportRow" Title="Tuyến"      Value="@(x=>x.RouteCD)"/>
-                <GridColumn TItem="GenericReportRow" Title="Giám sát"         Value="@(x=>x.SalesSupName)"/>
-                <GridColumn TItem="GenericReportRow" Title="NPP" Value="@(x=>x.DistributorName)"/>
-                <GridColumn TItem="GenericReportRow" Title="CH Kế hoạch"   Value="@(x=>x.OutletMustVisit)" Align="end"/>
-                <GridColumn TItem="GenericReportRow" Title="Đã viếng thăm"      Value="@(x=>x.OutletVisited)" Align="end"/>
-                <GridColumn TItem="GenericReportRow" Title="Đơn hàng"   Value="@(x=>x.OrderCount)" Align="end"/>
-                <GridColumn TItem="GenericReportRow" Title="Doanh số"   Value="@(x=>x.TotalAmount)" Align="end"/>
+                <GridColumn TItem="GenericReportRow" Title="@L10n.T("daily_plan.col_salesman")"        Value="@(x=>x.SalesmanName)"/>
+                <GridColumn TItem="GenericReportRow" Title="@L10n.T("lbl.route")"      Value="@(x=>x.RouteCD)"/>
+                <GridColumn TItem="GenericReportRow" Title="@L10n.T("lbl.supervisor")"         Value="@(x=>x.SalesSupName)"/>
+                <GridColumn TItem="GenericReportRow" Title="@L10n.T("lbl.distributor")" Value="@(x=>x.DistributorName)"/>
+                <GridColumn TItem="GenericReportRow" Title="@L10n.T("daily_plan.col_planned_outlets")"   Value="@(x=>x.OutletMustVisit)" Align="end"/>
+                <GridColumn TItem="GenericReportRow" Title="@L10n.T("daily_plan.col_visited_outlets")"      Value="@(x=>x.OutletVisited)" Align="end"/>
+                <GridColumn TItem="GenericReportRow" Title="@L10n.T("daily_plan.col_orders")"   Value="@(x=>x.OrderCount)" Align="end"/>
+                <GridColumn TItem="GenericReportRow" Title="@L10n.T("daily_plan.col_revenue")"   Value="@(x=>x.TotalAmount)" Align="end"/>
             </Columns>
             <RowTemplate>
                 <td class="fw-semibold small">@r.SalesmanName</td>
