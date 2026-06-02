@@ -42,6 +42,9 @@ builder.Services.AddSingleton<DeviceSessionService>();
 // User & Role management
 builder.Services.AddScoped<UserManagementService>();
 
+// Route permission (singleton — cache seed, check per request)
+builder.Services.AddSingleton<RoutePermissionService>();
+
 // Dashboard
 builder.Services.AddScoped<DashboardService>();
 
@@ -105,5 +108,12 @@ app.UseRouting();
 
 app.MapBlazorHub();
 app.MapFallbackToPage("/_Host");
+
+// Seed route features vào DB
+using (var scope = app.Services.CreateScope())
+{
+    var routeSvc = scope.ServiceProvider.GetRequiredService<RoutePermissionService>();
+    try { await routeSvc.SeedRoutesAsync(); } catch { /* bỏ qua nếu DB chưa sẵn sàng */ }
+}
 
 app.Run();

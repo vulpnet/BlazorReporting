@@ -1,8 +1,10 @@
-@page "/report/visit"
+﻿@page "/report/visit"
 @attribute [NavMenu(Title="report_visit.title", Icon="bi-shop-window", Group="nav.reports", GroupOrder=20, Order=10)]
 @using BlazorReporting.Services
 @inject AuthService Auth
 @inject ReportService RptSvc
+@inject IExportService ExportSvc
+@inject IJSRuntime JS
 @inject NavigationManager Nav
 @inject LocalizationService L10n
 
@@ -11,6 +13,7 @@
 <div class="container-fluid mt-3">
     <h5 class="mb-3"><i class="bi bi-shop-window me-2"></i>@L10n.T("report_visit.title_detail")</h5>
 
+    
     <div class="card shadow-sm mb-3">
         <div class="card-body py-2">
             <div class="d-flex gap-2 flex-wrap align-items-end">
@@ -19,21 +22,36 @@
                     <input type="date" class="form-control form-control-sm" style="width:150px" @bind="_date" />
                 </div>
                 <div>
-                    <label class="form-label small mb-1">@L10n.T("report_visit.lbl_route")</label>
-                    <input class="form-control form-control-sm" style="width:160px" placeholder="RouteCD..." @bind="_routeCD" />
+                    <label class="form-label small mb-1">@L10n.T("lbl.region")</label>
+                    <input class="form-control form-control-sm" style="width:120px" placeholder="RegionCD..." @bind="_st0" />
+                </div>
+                <div>
+                    <label class="form-label small mb-1">Area</label>
+                    <input class="form-control form-control-sm" style="width:110px" placeholder="AreaCD..." @bind="_st1" />
+                </div>
+                <div>
+                    <label class="form-label small mb-1">@L10n.T("lbl.distributor")</label>
+                    <input type="number" class="form-control form-control-sm" style="width:100px" @bind="_distId" />
                 </div>
                 <div>
                     <label class="form-label small mb-1">@L10n.T("report_visit.lbl_supervisor")</label>
-                    <input class="form-control form-control-sm" style="width:140px" placeholder="SaleSupCD..." @bind="_saleSupCD" />
+                    <input class="form-control form-control-sm" style="width:130px" placeholder="SaleSupCD..." @bind="_saleSupCD" />
+                </div>
+                <div>
+                    <label class="form-label small mb-1">@L10n.T("report_visit.lbl_route")</label>
+                    <input class="form-control form-control-sm" style="width:130px" placeholder="RouteCD..." @bind="_routeCD" />
                 </div>
                 <button class="btn btn-sm btn-primary" @onclick="LoadAsync">
                     <i class="bi bi-search me-1"></i>@L10n.T("btn.view")
                 </button>
-                @if (_data.Any())
+                @if (_visitData.Any())
                 {
-                    <span class="text-muted small ms-2">
-                        @_data.Count @L10n.T("report_visit.visits_count_suffix") —
-                        <span class="text-success fw-semibold">@_data.Count(x => x.HasOrder == 1) @L10n.T("report_visit.has_order_suffix")</span>
+                    <button class="btn btn-sm btn-success" @onclick="ExportExcel">
+                        <i class="bi bi-file-earmark-excel me-1"></i>Excel
+                    </button>
+                    <span class="text-muted small ms-1">
+                        @_visitData.Count @L10n.T("report_visit.visits_count_suffix") â€”
+                        <span class="text-success fw-semibold">@_visitData.Count(x => x.HasOrder == 1) @L10n.T("report_visit.has_order_suffix")</span>
                     </span>
                 }
             </div>
@@ -42,8 +60,27 @@
 
     @if (!string.IsNullOrEmpty(_error))
     {
-        <div class="alert alert-danger py-2">@_error</div>
+        <div class="alert alert-danger py-2 alert-dismissible">@_error<button class="btn-close" @onclick="ClearError"></button></div>
     }
+
+    
+    <ul class="nav nav-tabs mb-3">
+        <li class="nav-item">
+            <a class="nav-link @(_tab==0?"active":"")" style="cursor:pointer" @onclick='()=>_tab=0'>
+                <i class="bi bi-bar-chart me-1"></i>@L10n.T("report_visit.tab_summary")
+            </a>
+        </li>
+        <li class="nav-item">
+            <a class="nav-link @(_tab==1?"active":"")" style="cursor:pointer" @onclick='()=>_tab=1'>
+                <i class="bi bi-list-ul me-1"></i>@L10n.T("report_visit.tab_visit")
+            </a>
+        </li>
+        <li class="nav-item">
+            <a class="nav-link @(_tab==2?"active":"")" style="cursor:pointer" @onclick='()=>_tab=2'>
+                <i class="bi bi-images me-1"></i>@L10n.T("report_visit.tab_image")
+            </a>
+        </li>
+    </ul>
 
     @if (_loading)
     {
@@ -51,53 +88,131 @@
     }
     else
     {
-        <SortableGrid Items="_data" Context="r" MinWidth="1200px" DefaultPageSize="20">
-            <Columns>
-                <GridColumn TItem="ReportVisitRow" Title="@L10n.T("report_visit.col_salesman")"         Value="@(x => x.SalesmanName)" />
-                <GridColumn TItem="ReportVisitRow" Title="@L10n.T("report_visit.col_route")"       Value="@(x => x.RouteCD)" />
-                <GridColumn TItem="ReportVisitRow" Title="@L10n.T("report_visit.col_distributor")" Value="@(x => x.DistributorName)" />
-                <GridColumn TItem="ReportVisitRow" Title="@L10n.T("report_visit.col_outlet")"      Value="@(x => x.OutletName)" />
-                <GridColumn TItem="ReportVisitRow" Title="@L10n.T("report_visit.col_start_time")"    Value="@(x => x.StartTime.HasValue ? x.StartTime.Value.ToString("HH:mm") : "")" Align="center" />
-                <GridColumn TItem="ReportVisitRow" Title="@L10n.T("report_visit.col_end_time")"   Value="@(x => x.EndTime.HasValue ? x.EndTime.Value.ToString("HH:mm") : "")" Align="center" />
-                <GridColumn TItem="ReportVisitRow" Title="@L10n.T("report_visit.col_duration_min")" Value="@(x => x.TimeVisit)" Align="end" />
-                <GridColumn TItem="ReportVisitRow" Title="Km"          Value="@(x => x.Distance)" Align="end" />
-                <GridColumn TItem="ReportVisitRow" Title="SKU"         Value="@(x => x.TotalSKU)" Align="end" />
-                <GridColumn TItem="ReportVisitRow" Title="@L10n.T("report_visit.col_revenue")"    Value="@(x => x.TotalAmount)" Align="end" />
-                <GridColumn TItem="ReportVisitRow" Title="MCP"         Value="@(x => x.strIsMCP)" Align="center" />
-                <GridColumn TItem="ReportVisitRow" Title="@L10n.T("report_visit.col_order")"   Value="@(x => x.HasOrder == 1 ? L10n.T("report_visit.has_order_yes") : L10n.T("report_visit.has_order_no"))" Align="center" />
-            </Columns>
-            <RowTemplate>
-                <td class="fw-semibold small">@r.SalesmanName</td>
-                <td class="small font-monospace">@r.RouteCD</td>
-                <td class="small">@r.DistributorName</td>
-                <td class="small">@r.OutletName</td>
-                <td class="text-center small">@(r.StartTime.HasValue ? r.StartTime.Value.ToString("HH:mm") : "—")</td>
-                <td class="text-center small">@(r.EndTime.HasValue ? r.EndTime.Value.ToString("HH:mm") : "—")</td>
-                <td class="text-end">@r.TimeVisit</td>
-                <td class="text-end small">@((r.Distance/1000m).ToString("N1"))</td>
-                <td class="text-end">@r.TotalSKU.ToString("N0")</td>
-                <td class="text-end small">@((r.TotalAmount/1_000_000m).ToString("N2"))M</td>
-                <td class="text-center">
-                    <span class="badge @(r.strIsMCP=="IsRoute"?"bg-primary":"bg-secondary")" style="font-size:.65rem">
-                        @(r.strIsMCP=="IsRoute" ? L10n.T("report_visit.mcp_on_route") : L10n.T("report_visit.mcp_off_route"))
-                    </span>
-                </td>
-                <td class="text-center">
-                    @if (r.HasOrder == 1)
-                    { <i class="bi bi-check-circle-fill text-success"></i> }
-                    else
-                    { <i class="bi bi-x-circle text-secondary"></i> }
-                </td>
-            </RowTemplate>
-        </SortableGrid>
+        @if (_tab == 0)
+        {
+            
+            <SortableGrid Items="_kpiData" Context="r" MinWidth="1100px" DefaultPageSize="20">
+                <Columns>
+                    <GridColumn TItem="GenericReportRow" Title="@L10n.T("lbl.distributor")"  Value="@(x=>x.DistributorName)"/>
+                    <GridColumn TItem="GenericReportRow" Title="@L10n.T("lbl.supervisor")"   Value="@(x=>x.SalesSupName)"/>
+                    <GridColumn TItem="GenericReportRow" Title="@L10n.T("lbl.route")"        Value="@(x=>x.RouteCD)"/>
+                    <GridColumn TItem="GenericReportRow" Title="@L10n.T("lbl.salesman")"     Value="@(x=>x.SalesmanName)"/>
+                    <GridColumn TItem="GenericReportRow" Title="@L10n.T("report_visit.kpi_must_visit")"  Value="@(x=>x.MustVisit)"  Align="end"/>
+                    <GridColumn TItem="GenericReportRow" Title="@L10n.T("report_visit.kpi_visited")"     Value="@(x=>x.Visited)"    Align="end"/>
+                    <GridColumn TItem="GenericReportRow" Title="@L10n.T("report_visit.kpi_visit_rate")"  Value="@(x=>x.VisitRate.ToString("P0"))" Align="end"/>
+                    <GridColumn TItem="GenericReportRow" Title="@L10n.T("report_visit.kpi_has_order")"   Value="@(x=>x.HasOrderCount)" Align="end"/>
+                    <GridColumn TItem="GenericReportRow" Title="@L10n.T("report_visit.kpi_order_rate")"  Value="@(x=>x.OrderRate.ToString("P0"))" Align="end"/>
+                    <GridColumn TItem="GenericReportRow" Title="@L10n.T("report_visit.kpi_revenue")"     Value="@(x=>(x.TotalAmount/1_000_000m).ToString("N2")+"M")" Align="end"/>
+                </Columns>
+                <RowTemplate>
+                    <td class="small">@r.DistributorName</td>
+                    <td class="small">@r.SalesSupName</td>
+                    <td class="small font-monospace">@r.RouteCD</td>
+                    <td class="fw-semibold small">@r.SalesmanName</td>
+                    <td class="text-end">@r.MustVisit</td>
+                    <td class="text-end">@r.Visited</td>
+                    <td class="text-end @(r.VisitRate>=0.8m?"text-success":r.VisitRate>=0.5m?"text-warning":"text-danger")">@r.VisitRate.ToString("P0")</td>
+                    <td class="text-end">@r.HasOrderCount</td>
+                    <td class="text-end">@r.OrderRate.ToString("P0")</td>
+                    <td class="text-end small fw-semibold">@((r.TotalAmount/1_000_000m).ToString("N2"))M</td>
+                </RowTemplate>
+            </SortableGrid>
+        }
+        else if (_tab == 1)
+        {
+            
+            <SortableGrid Items="_visitData" Context="r" MinWidth="1200px" DefaultPageSize="20">
+                <Columns>
+                    <GridColumn TItem="ReportVisitRow" Title="@L10n.T("report_visit.col_salesman")"    Value="@(x=>x.SalesmanName)"/>
+                    <GridColumn TItem="ReportVisitRow" Title="@L10n.T("report_visit.col_route")"       Value="@(x=>x.RouteCD)"/>
+                    <GridColumn TItem="ReportVisitRow" Title="@L10n.T("report_visit.col_distributor")" Value="@(x=>x.DistributorName)"/>
+                    <GridColumn TItem="ReportVisitRow" Title="@L10n.T("report_visit.col_outlet")"      Value="@(x=>x.OutletName)"/>
+                    <GridColumn TItem="ReportVisitRow" Title="@L10n.T("report_visit.col_start_time")"  Value="@(x=>x.StartTime.HasValue?x.StartTime.Value.ToString("HH:mm"):"")" Align="center"/>
+                    <GridColumn TItem="ReportVisitRow" Title="@L10n.T("report_visit.col_end_time")"    Value="@(x=>x.EndTime.HasValue?x.EndTime.Value.ToString("HH:mm"):"")" Align="center"/>
+                    <GridColumn TItem="ReportVisitRow" Title="@L10n.T("report_visit.col_duration_min")" Value="@(x=>x.TimeVisit)" Align="end"/>
+                    <GridColumn TItem="ReportVisitRow" Title="Km"   Value="@(x=>x.Distance)" Align="end"/>
+                    <GridColumn TItem="ReportVisitRow" Title="SKU"  Value="@(x=>x.TotalSKU)" Align="end"/>
+                    <GridColumn TItem="ReportVisitRow" Title="@L10n.T("report_visit.col_revenue")"     Value="@(x=>x.TotalAmount)" Align="end"/>
+                    <GridColumn TItem="ReportVisitRow" Title="MCP"  Value="@(x=>x.strIsMCP)" Align="center"/>
+                    <GridColumn TItem="ReportVisitRow" Title="@L10n.T("report_visit.col_order")"       Value="@(x=>x.HasOrder==1?L10n.T("report_visit.has_order_yes"):L10n.T("report_visit.has_order_no"))" Align="center"/>
+                </Columns>
+                <RowTemplate>
+                    <td class="fw-semibold small">@r.SalesmanName</td>
+                    <td class="small font-monospace">@r.RouteCD</td>
+                    <td class="small">@r.DistributorName</td>
+                    <td class="small">@r.OutletName</td>
+                    <td class="text-center small">@(r.StartTime.HasValue?r.StartTime.Value.ToString("HH:mm"):"â€”")</td>
+                    <td class="text-center small">@(r.EndTime.HasValue?r.EndTime.Value.ToString("HH:mm"):"â€”")</td>
+                    <td class="text-end">@r.TimeVisit</td>
+                    <td class="text-end small">@((r.Distance/1000m).ToString("N1"))</td>
+                    <td class="text-end">@r.TotalSKU.ToString("N0")</td>
+                    <td class="text-end small">@((r.TotalAmount/1_000_000m).ToString("N2"))M</td>
+                    <td class="text-center">
+                        <span class="badge @(r.strIsMCP=="IsRoute"?"bg-primary":"bg-secondary")" style="font-size:.65rem">
+                            @(r.strIsMCP=="IsRoute"?L10n.T("report_visit.mcp_on_route"):L10n.T("report_visit.mcp_off_route"))
+                        </span>
+                    </td>
+                    <td class="text-center">
+                        @if (r.HasOrder==1) { <i class="bi bi-check-circle-fill text-success"></i> }
+                        else { <i class="bi bi-x-circle text-secondary"></i> }
+                    </td>
+                </RowTemplate>
+            </SortableGrid>
+        }
+        else
+        {
+            
+            @if (!_imageData.Any())
+            {
+                <div class="text-muted text-center py-5"><i class="bi bi-images fs-1 d-block mb-2 opacity-25"></i>@L10n.T("lbl.no_data")</div>
+            }
+            else
+            {
+                <div class="row g-3">
+                    @foreach (var r in _imageData)
+                    {
+                        <div class="col-6 col-md-4 col-lg-3">
+                            <div class="card h-100 shadow-sm">
+                                @if (!string.IsNullOrEmpty(r.ImageFile))
+                                {
+                                    <img src="@r.ImageFile" class="card-img-top" style="height:160px;object-fit:cover"
+                                         onerror="this.src='/images/no-image.png'" loading="lazy" />
+                                }
+                                else
+                                {
+                                    <div class="bg-light d-flex align-items-center justify-content-center" style="height:160px">
+                                        <i class="bi bi-image text-secondary fs-1 opacity-25"></i>
+                                    </div>
+                                }
+                                <div class="card-body p-2">
+                                    <div class="small fw-semibold text-truncate">@r.OutletName</div>
+                                    <div class="small text-muted text-truncate">@r.SalesmanName</div>
+                                    <div class="small text-muted text-truncate">@r.PlanogramName</div>
+                                    @if (r.SyncDate.HasValue)
+                                    {
+                                        <div class="small text-muted">@r.SyncDate.Value.ToString("dd/MM HH:mm")</div>
+                                    }
+                                </div>
+                            </div>
+                        </div>
+                    }
+                </div>
+            }
+        }
     }
 </div>
 
 @code {
-    private List<ReportVisitRow> _data = new();
+    private List<ReportVisitRow> _visitData = new();
+    private List<GenericReportRow> _kpiData = new();
+    private List<GenericReportRow> _imageData = new();
     private bool _loading;
-    private string _error = "", _routeCD = "", _saleSupCD = "";
+    private string _error = "", _routeCD = "", _saleSupCD = "", _st0 = "", _st1 = "";
     private DateTime _date = DateTime.Today;
+    private int _distId = 0;
+    private int _tab = 0;
+
+    private void ClearError() => _error = "";
 
     protected override void OnInitialized()
     {
@@ -109,10 +224,39 @@
         _loading = true; _error = "";
         try
         {
-            _data = await RptSvc.GetReportVisitAsync(_date, Auth.UserName,
-                routeCD: _routeCD, saleSupCD: _saleSupCD);
+            var t1 = RptSvc.GetReportVisitKpiAsync(_date, Auth.UserName, _st0, _st1, _distId, _saleSupCD, _routeCD);
+            var t2 = RptSvc.GetReportVisitAsync(_date, Auth.UserName, _st0, _st1, "", _distId, _saleSupCD, _routeCD);
+            var t3 = RptSvc.GetReportVisitImageAsync(_date, Auth.UserName, _st0, _st1, _distId, _saleSupCD, _routeCD);
+            await Task.WhenAll(t1, t2, t3);
+            _kpiData   = t1.Result;
+            _visitData = t2.Result;
+            _imageData = t3.Result;
         }
         catch (Exception ex) { _error = ex.Message; }
         finally { _loading = false; }
     }
+
+    private async Task ExportExcel()
+    {
+        var rows = _visitData.Select(r => new Dictionary<string, object?>
+        {
+            [L10n.T("report_visit.col_salesman")]    = r.SalesmanName,
+            [L10n.T("report_visit.col_route")]        = r.RouteCD,
+            [L10n.T("report_visit.col_distributor")]  = r.DistributorName,
+            [L10n.T("report_visit.col_outlet")]       = r.OutletName,
+            [L10n.T("report_visit.col_start_time")]   = r.StartTime?.ToString("HH:mm"),
+            [L10n.T("report_visit.col_end_time")]     = r.EndTime?.ToString("HH:mm"),
+            [L10n.T("report_visit.col_duration_min")] = r.TimeVisit,
+            ["Km"]   = (r.Distance/1000m).ToString("N1"),
+            ["SKU"]  = r.TotalSKU,
+            [L10n.T("report_visit.col_revenue")] = r.TotalAmount,
+            ["MCP"]  = r.strIsMCP,
+            [L10n.T("report_visit.col_order")] = r.HasOrder == 1 ? "âœ“" : "",
+        }).ToList();
+        var bytes = await ExportSvc.ToExcelAsync(rows, L10n.T("report_visit.title"));
+        var b64 = Convert.ToBase64String(bytes);
+        await JS.InvokeVoidAsync("downloadBase64", b64, $"ReportVisit_{_date:yyyyMMdd}.xlsx",
+            "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
+    }
 }
+

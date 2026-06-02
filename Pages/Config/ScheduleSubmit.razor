@@ -1,5 +1,5 @@
-@page "/config/schedule-submit"
-@attribute [NavMenu(Title="Mở/Đóng lịch", Icon="bi-calendar-check-fill", Group="Cấu hình", GroupOrder=80, Order=40)]
+﻿@page "/config/schedule-submit"
+@attribute [NavMenu(Title="schedule_submit.nav_title", Icon="bi-calendar-check-fill", Group="nav.config_menu", GroupOrder=80, Order=40)]
 @using BlazorReporting.Services
 @inject AuthService Auth
 @inject ConfigService CfgSvc
@@ -207,3 +207,5 @@
         if (ok) _items.RemoveAll(x=>x.ID==id);
     }
 }
+
+

@@ -1,6 +1,6 @@
-@page "/help"
+﻿@page "/help"
 @inject LocalizationService L10n
-@attribute [NavMenu(Title="Hướng dẫn sử dụng", Icon="bi-question-circle", Group="Hệ thống", GroupOrder=90, Order=10, OpenInNewTab=true)]
+@attribute [NavMenu(Title="help.nav_title", Icon="bi-question-circle", Group="nav.system", GroupOrder=90, Order=10, OpenInNewTab=true)]
 <PageTitle>@L10n.T("help.title") – DMSPRO Reporting</PageTitle>
 
 <div class="container-lg py-4">
@@ -1082,6 +1082,68 @@ SELECT N'Tổng hợp doanh số', 'vw_Sales', 'View', NULL;</code></pre>
         </div>
     </section>
 
+    @* ══ Screen Directory ════════════════════════════════════════ *@
+    <section id="screen-directory" class="mb-5">
+        <h4 class="section-heading">
+            <i class="bi bi-grid-3x3-gap-fill me-2 text-primary"></i>
+            Danh mục màn hình &nbsp;<span class="text-muted fw-normal fs-6">/ Screen Directory</span>
+        </h4>
+        <p class="text-muted small mb-3">
+            Toàn bộ màn hình trong hệ thống, phân theo nhóm. Click tên màn hình để truy cập trực tiếp.
+            <br/><em>All screens in the system grouped by module. Click any name to navigate directly.</em>
+        </p>
+
+        @foreach (var grp in _screenGroups)
+        {
+            <div class="card shadow-sm border-0 mb-3">
+                <div class="card-header py-2 d-flex align-items-center gap-2"
+                     style="background:@grp.HeaderBg;color:@grp.HeaderColor">
+                    <i class="bi @grp.Icon"></i>
+                    <span class="fw-semibold">@grp.Name</span>
+                    <span class="badge bg-white text-dark ms-auto" style="font-size:.65rem">@grp.Screens.Length màn hình</span>
+                </div>
+                <div class="card-body p-0">
+                    <table class="table table-sm table-hover mb-0">
+                        <thead class="table-light">
+                            <tr>
+                                <th style="width:220px" class="small">Route</th>
+                                <th class="small">Màn hình / Screen</th>
+                                <th class="small d-none d-md-table-cell">Mô tả / Description</th>
+                                <th style="width:130px" class="small d-none d-lg-table-cell">Role</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach (var s in grp.Screens)
+                            {
+                                <tr>
+                                    <td class="small font-monospace text-muted align-middle">
+                                        <a href="@s.Route" class="text-decoration-none text-secondary">@s.Route</a>
+                                    </td>
+                                    <td class="align-middle">
+                                        <a href="/help/@s.Route.TrimStart('/')" class="text-decoration-none fw-semibold small text-dark">
+                                            <i class="bi @s.Icon me-1 text-primary opacity-75"></i>@s.Name
+                                        </a>
+                                        @if (!string.IsNullOrEmpty(s.NameEn))
+                                        {
+                                            <div class="text-muted" style="font-size:.68rem">@s.NameEn</div>
+                                        }
+                                    </td>
+                                    <td class="small text-muted align-middle d-none d-md-table-cell">@s.Desc</td>
+                                    <td class="align-middle d-none d-lg-table-cell">
+                                        @foreach (var r in s.Roles)
+                                        {
+                                            <span class="badge bg-secondary me-1" style="font-size:.6rem">@r</span>
+                                        }
+                                    </td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        }
+    </section>
+
     @* ══ Footer ════════════════════════════════════════════════════ *@
     <div class="text-center py-3 border-top d-flex justify-content-center gap-2 flex-wrap">
         <a href="#" class="btn btn-outline-secondary btn-sm"><i class="bi bi-arrow-up me-1"></i>@L10n.T("help.footer_top")</a>
@@ -1095,6 +1157,90 @@ SELECT N'Tổng hợp doanh số', 'vw_Sales', 'View', NULL;</code></pre>
 </div>
 
 @code {
+    // ── Screen directory data ────────────────────────────────────────
+    private record ScreenDef(string Route, string Name, string NameEn, string Icon, string Desc, string[] Roles);
+    private record ScreenGroup(string Name, string Icon, string HeaderBg, string HeaderColor, ScreenDef[] Screens);
+
+    private ScreenGroup[] _screenGroups =>
+    [
+        new("Tổng quan / Overview", "bi-speedometer2", "#1e293b", "#f8fafc", [
+            new("/dashboard", "Dashboard KPI", "Dashboard", "bi-speedometer2",
+                "Tổng hợp KPI, biểu đồ doanh số, trạng thái NVBH theo thời gian thực.",
+                ["All"]),
+        ]),
+        new("Báo cáo / Reports", "bi-bar-chart-line-fill", "#1d4ed8", "#ffffff", [
+            new("/report/visit",            "Viếng thăm",              "Visit Report",           "bi-shop-window",        "KPI tổng hợp + chi tiết từng lần viếng thăm + hình ảnh trưng bày (3 tab).",        ["All"]),
+            new("/report/summary",          "Tổng hợp thăm SM",        "SM Visit Summary",       "bi-bar-chart-line-fill","Tổng hợp KPI theo TDV: outlet, đơn hàng, doanh số.",                               ["All"]),
+            new("/report/summary-sales",    "Tổng hợp doanh số",       "Summary Sales",          "bi-graph-up-arrow",     "Doanh số tổng hợp theo tuyến, NPP, khu vực.",                                       ["All"]),
+            new("/report/sales-effective",  "Hiệu quả bán hàng",       "Sales Effectiveness",    "bi-check2-circle",      "Tỷ lệ viếng thăm, đơn hàng, doanh số theo ngày.",                                   ["All"]),
+            new("/report/sales-daily",      "Doanh số ngày MTD",       "Sales Daily MTD",        "bi-calendar3",          "Doanh số từng ngày cộng dồn MTD.",                                                  ["All"]),
+            new("/report/daily-plan",       "Kế hoạch ngày",           "Daily Plan",             "bi-journal-check",      "Kế hoạch viếng thăm theo ngày của TDV.",                                            ["All"]),
+            new("/report/pc-sm",            "Báo cáo PCSM",            "PCSM Report",            "bi-percent",            "Tỷ lệ PC theo TDV và supervisor.",                                                  ["All"]),
+            new("/report/3g-offline",       "3G Offline",              "3G Offline Report",      "bi-wifi-off",           "Thống kê TDV mất kết nối 3G trong ngày.",                                           ["All"]),
+            new("/report/outlet-invalid-location","Outlet GPS sai",    "Invalid GPS",            "bi-geo-fill",           "Danh sách outlet có tọa độ GPS không hợp lệ.",                                      ["All"]),
+            new("/report/issues-full",      "Báo cáo vấn đề",          "Issues Report",          "bi-exclamation-circle-fill","Tổng hợp sự cố theo khu vực và trạng thái.",                                   ["All"]),
+            new("/report/user-log",         "Nhật ký người dùng",      "User Log",               "bi-clock-history",      "Lịch sử hoạt động đăng nhập, thao tác của user.",                                  ["Admin","SuperAdmin"]),
+            new("/report/timekeeping",      "Chấm công",               "Timekeeping",            "bi-fingerprint",        "Thống kê ngày làm việc, đồng bộ, viếng thăm theo TDV.",                            ["All"]),
+            new("/report/visit-reason",     "Lý do thăm viếng",        "Visit Reason",           "bi-chat-square-text",   "Thống kê lý do viếng thăm không có đơn.",                                          ["All"]),
+            new("/report/outlet-not-visit-mcp","CH không thăm MCP",    "Outlets Not in MCP",     "bi-shop-window",        "Cửa hàng trong tuyến nhưng chưa được viếng thăm.",                                  ["All"]),
+            new("/report/user-mobility",    "Di chuyển nhân viên",     "User Mobility",          "bi-phone-fill",         "Trạng thái SM, ASM — đã đăng ký, đã đồng bộ.",                                     ["All"]),
+            new("/report/display-image",    "Hình ảnh trưng bày",      "Display Image",          "bi-images",             "Xem hình ảnh trưng bày theo chương trình.",                                         ["All"]),
+            new("/report/synchronous",      "Báo cáo Đồng bộ",         "Sync Report",            "bi-arrow-repeat",       "Thông tin đồng bộ GPS, thời gian, khoảng cách.",                                    ["All"]),
+            new("/report/review-work-with", "Review Work With",        "Review Work With",       "bi-people",             "Tổng hợp kết quả đi cùng ASM/SS theo ngày.",                                        ["All"]),
+            new("/report/work-with",        "Work With",               "Work With",              "bi-person-check",       "Kết quả làm việc cùng TDV theo tuyến.",                                             ["All"]),
+            new("/report/reason-visit",     "Lý do viếng thăm",        "Visit Reason Detail",    "bi-chat-square-dots",   "Chi tiết lý do từng lần viếng thăm không đơn.",                                     ["All"]),
+            new("/report/visit-distance",   "Khoảng cách",             "Visit Distance",         "bi-signpost-split",     "Khoảng cách di chuyển giữa các outlet.",                                            ["All"]),
+            new("/report/new-outlet",       "Outlet mới",              "New Outlet",             "bi-shop",               "Danh sách outlet mới tạo, trạng thái duyệt.",                                       ["All"]),
+            new("/report/update-outlet",    "Outlet cập nhật",         "Updated Outlet",         "bi-shop-window",        "Outlet đã được cập nhật thông tin.",                                                ["All"]),
+            new("/report/adoption",         "Adoption",                "Adoption",               "bi-graph-up",           "Tỷ lệ outlet mới được adoption bởi TDV.",                                           ["All"]),
+            new("/report/golden-store",     "Golden Store",            "Golden Store",           "bi-star-fill",          "Danh sách cửa hàng đạt chuẩn Golden Store.",                                        ["All"]),
+            new("/report/general-manager",  "General Manager",         "General Manager",        "bi-building",           "Tổng hợp KPI dành cho cấp Giám đốc.",                                               ["Admin","SuperAdmin","RSM"]),
+            new("/report/inday-dsr",        "InDay DSR",               "InDay DSR",              "bi-calendar-day",       "Kết quả bán hàng trong ngày theo TDV.",                                             ["All"]),
+            new("/report/sales-fundamentals","Sales Fundamentals",     "Sales Fundamentals",     "bi-bar-chart-steps",    "Chỉ số cơ bản bán hàng theo khoảng cách và lần thăm.",                              ["All"]),
+            new("/report/evaluation",       "Evaluation",              "Evaluation Report",      "bi-clipboard-check",    "Kết quả chấm điểm trưng bày theo chương trình.",                                    ["All"]),
+            new("/report/eval-reason",      "Lý do Evaluation",        "Eval Reason",            "bi-chat-right-text",    "Lý do không đạt trong đánh giá trưng bày.",                                         ["All"]),
+            new("/report/eval-inventory",   "Tồn kho Evaluation",      "Eval Inventory",         "bi-boxes",              "Tồn kho sản phẩm theo chương trình đánh giá.",                                      ["All"]),
+            new("/report/review-order",     "Duyệt đơn hàng",          "Review Order",           "bi-cart-check",         "Xem và duyệt đơn hàng theo trạng thái.",                                            ["Admin","SuperAdmin","RSM"]),
+        ]),
+        new("Phân tích / Analysis", "bi-map", "#0e7490", "#ffffff", [
+            new("/territory-map",   "Territory Map",           "Territory Map",          "bi-map",          "Bản đồ khu vực, lộ trình, cảnh báo KPI, replay hành trình.",    ["All"]),
+            new("/product-sales",   "Phân tích sản phẩm",      "Product Analysis",       "bi-box-seam",     "ML.NET SSA dự đoán nhu cầu 3 tháng theo Tỉnh × Sản phẩm.",     ["All"]),
+            new("/sales-strategy",  "Chiến lược bán hàng",     "Sales Strategy (AI)",    "bi-robot",        "Đề xuất nhập/xuất/duy trì tồn kho dựa trên dự đoán AI.",        ["Admin","SuperAdmin","RSM"]),
+            new("/report",          "Báo cáo Pivot",           "Pivot Report",           "bi-table",        "Chạy SP/View/Table tùy chỉnh, pivot, export Excel/PDF.",         ["All"]),
+        ]),
+        new("Phân phối & MCP / Distribution & MCP", "bi-box-seam-fill", "#15803d", "#ffffff", [
+            new("/distribution",        "Phân phối SKU",       "Distribution",           "bi-box-seam-fill",  "Quản lý phân phối SKU theo NPP.",                             ["All"]),
+            new("/distribution/budget", "Phân bổ ngân sách",   "Budget Assignment",      "bi-currency-dollar","Phân bổ ngân sách KPI cho TDV.",                              ["Admin","SuperAdmin","RSM"]),
+            new("/mcp/report",          "Báo cáo MCP",         "MCP Report",             "bi-map-fill",       "Tỷ lệ phủ MCP theo tuyến.",                                   ["All"]),
+            new("/mcp/detail",          "Chi tiết MCP",        "MCP Detail",             "bi-geo-alt-fill",   "Xem chi tiết outlet trong MCP.",                              ["All"]),
+        ]),
+        new("Issues & Tracking", "bi-exclamation-triangle-fill", "#b45309", "#ffffff", [
+            new("/issues",                  "Danh sách sự cố",     "Issue List",             "bi-exclamation-triangle-fill","Quản lý và xử lý sự cố từ TDV.",             ["All"]),
+            new("/issues/tasks",            "Quản lý Task",        "Task Management",        "bi-list-check",              "Tạo và theo dõi task giao cho TDV.",          ["Admin","SuperAdmin"]),
+            new("/issues/digital",          "Nội dung số",         "Digital Content",        "bi-file-earmark-play",       "Upload file nội dung số cho ứng dụng mobile.",    ["Admin","SuperAdmin"]),
+            new("/issues/pda-active",       "PDA Salesman Active", "PDA Active",             "bi-phone",                   "Quản lý IMEI và kích hoạt thiết bị TDV.",     ["Admin","SuperAdmin"]),
+            new("/issues/report-usage-app", "Báo cáo dùng App",    "App Usage Report",       "bi-bar-chart-line",          "Thống kê tần suất sử dụng app theo Role.",    ["Admin","SuperAdmin"]),
+            new("/tracking",               "Theo dõi NVBH",        "Live Tracking",          "bi-broadcast-pin",           "Theo dõi vị trí TDV realtime trên bản đồ.",   ["Admin","SuperAdmin","RSM","ASM"]),
+        ]),
+        new("Quản trị / Administration", "bi-shield-fill", "#7c3aed", "#ffffff", [
+            new("/user",                    "Quản lý người dùng",  "User Management",        "bi-people-fill",    "CRUD tài khoản, gán Role, Active/Inactive.",        ["Admin","SuperAdmin"]),
+            new("/user/action-log-territory","Log khu vực",        "Territory Action Log",   "bi-geo-alt",        "Lịch sử thay đổi khu vực quản lý của user.",        ["Admin","SuperAdmin"]),
+            new("/account/roles",           "Quản lý Role",        "Role Manager",           "bi-shield-shaded",  "Tạo, sửa, xóa Role trong hệ thống.",                ["Admin","SuperAdmin"]),
+            new("/account/role-features",   "Phân quyền Feature",  "Role-Feature Assignment","bi-diagram-3-fill", "Gán Feature cho từng Role.",                         ["Admin","SuperAdmin"]),
+            new("/admin/route-permission",  "Phân quyền Route",    "Route Permission",       "bi-shield-lock",    "Cấu hình Role nào được truy cập màn hình nào.",      ["Admin","SuperAdmin"]),
+            new("/admin/security",          "Security Dashboard",  "Security",               "bi-shield-lock-fill","Giám sát phiên, thiết bị, cảnh báo bảo mật.",       ["Admin","SuperAdmin"]),
+            new("/account/change-password", "Đổi mật khẩu",        "Change Password",        "bi-key-fill",       "Đổi mật khẩu tài khoản đang đăng nhập.",            ["All"]),
+        ]),
+        new("Cấu hình / Configuration", "bi-gear-fill", "#475569", "#ffffff", [
+            new("/config/settings",        "Cấu hình hệ thống",   "System Settings",        "bi-sliders",              "Tùy chỉnh cấu hình chung của hệ thống.",           ["Admin","SuperAdmin"]),
+            new("/config/system",          "Tham số hệ thống",    "System Parameters",      "bi-gear-fill",            "Các tham số vận hành hệ thống.",                   ["Admin","SuperAdmin"]),
+            new("/config/shift",           "Ca làm việc",         "Shift Setting",          "bi-clock-fill",           "Cấu hình ca làm việc cho TDV.",                    ["Admin","SuperAdmin"]),
+            new("/config/schedule-submit", "Mở/Đóng lịch",        "Schedule Submit",        "bi-calendar-check-fill",  "Mở hoặc đóng chu kỳ nộp lịch.",                   ["Admin","SuperAdmin"]),
+            new("/config/phrase",          "Quản lý cụm từ",      "Phrase Management",      "bi-translate",            "Quản lý từ điển đa ngôn ngữ (VI/EN/ID).",          ["Admin","SuperAdmin"]),
+            new("/home/custom-setting",    "Cài màu UI",          "UI Custom Color",        "bi-palette-fill",         "Tuỳ chỉnh màu sắc giao diện.",                     ["Admin","SuperAdmin"]),
+        ]),
+    ];
+
     private (string Label, string Anchor, string Icon, string Color)[] _sections =>
     [
         (L10n.T("help.section_overview_short"), "overview",       "bi-info-circle",       "#4f46e5"),
@@ -1109,6 +1255,7 @@ SELECT N'Tổng hợp doanh số', 'vw_Sales', 'View', NULL;</code></pre>
         ("Hiệu năng",                           "performance",    "bi-speedometer2",      "#dc2626"),
         ("Phím tắt",                            "shortcuts",      "bi-keyboard",          "#475569"),
         ("Chiến lược ML",                       "sales-strategy", "bi-robot",             "#7c3aed"),
+        ("Danh mục màn hình",                   "screen-directory","bi-grid-3x3-gap",      "#1e40af"),
     ];
 
     private (string Icon, string Title, string Sub, string Bg)[] _overviewCards =>
@@ -1120,3 +1267,5 @@ SELECT N'Tổng hợp doanh số', 'vw_Sales', 'View', NULL;</code></pre>
         ("bi-robot",         L10n.T("help.section_chatbot"),              "Ollama local · Điều hướng · Lịch sử",            "#faf5ff"),
     ];
 }
+
+

@@ -1,0 +1,103 @@
+﻿@page "/report/work-with"
+@attribute [NavMenu(Title="ww.nav_title", Icon="bi-person-check", Group="nav.reports", GroupOrder=20, Order=190)]
+@using BlazorReporting.Services
+@inject AuthService Auth
+@inject ReportService RptSvc
+@inject IExportService ExportSvc
+@inject IJSRuntime JS
+@inject NavigationManager Nav
+@inject LocalizationService L10n
+<PageTitle>@L10n.T("ww.page_title")</PageTitle>
+<div class="container-fluid mt-3">
+    <h5 class="mb-3"><i class="bi bi-person-check me-2"></i>@L10n.T("ww.page_title")</h5>
+    <div class="card shadow-sm mb-3"><div class="card-body py-2">
+        <div class="d-flex gap-2 flex-wrap align-items-end">
+            <div><label class="form-label small mb-1">@L10n.T("lbl.from_date")</label><input type="date" class="form-control form-control-sm" style="width:150px" @bind="_from"/></div>
+            <div><label class="form-label small mb-1">@L10n.T("lbl.region")</label><input class="form-control form-control-sm" style="width:120px" placeholder="RegionCD..." @bind="_regionId"/></div>
+            <div><label class="form-label small mb-1">@L10n.T("lbl.area")</label><input class="form-control form-control-sm" style="width:120px" placeholder="AreaCD..." @bind="_areaId"/></div>
+            <div><label class="form-label small mb-1">@L10n.T("lbl.supervisor")</label><input class="form-control form-control-sm" style="width:120px" placeholder="SupCD..." @bind="_supId"/></div>
+            <button class="btn btn-sm btn-primary" @onclick="LoadAsync"><i class="bi bi-search me-1"></i>@L10n.T("btn.view")</button>
+            @if (_data.Any())
+            {
+                <button class="btn btn-sm btn-success" @onclick="ExportExcel"><i class="bi bi-file-earmark-excel me-1"></i>Excel</button>
+                <span class="text-muted small ms-1">@_data.Count dÃ²ng</span>
+            }
+        </div>
+    </div></div>
+
+    @if (_error != null) { <div class="alert alert-danger py-2 alert-dismissible">@_error<button class="btn-close" @onclick="()=>_error=null"></button></div> }
+    @if (_loading) { <div class="text-center py-4"><span class="spinner-border text-primary"></span></div> }
+    else
+    {
+        <SortableGrid Items="_data" Context="r" MinWidth="1200px" DefaultPageSize="20">
+            <Columns>
+                <GridColumn TItem="GenericReportRow" Title="@L10n.T("lbl.region")"          Value="@(x=>x.RegionName)"/>
+                <GridColumn TItem="GenericReportRow" Title="@L10n.T("lbl.area")"                            Value="@(x=>x.AreaName)"/>
+                <GridColumn TItem="GenericReportRow" Title="@L10n.T("ww.col_npp_cd")"       Value="@(x=>x.DistributorCode)"/>
+                <GridColumn TItem="GenericReportRow" Title="@L10n.T("lbl.distributor")"     Value="@(x=>x.DistributorName)"/>
+                <GridColumn TItem="GenericReportRow" Title="@L10n.T("lbl.route")"           Value="@(x=>x.RouteID)"/>
+                <GridColumn TItem="GenericReportRow" Title="@L10n.T("lbl.route_name")"                      Value="@(x=>x.RouteName)"/>
+                <GridColumn TItem="GenericReportRow" Title="@L10n.T("lbl.salesman")"        Value="@(x=>x.SalesManName)"/>
+                <GridColumn TItem="GenericReportRow" Title="@L10n.T("rww.col_sm_am")"       Value="@(x=>x.SMWorkAM)" Align="end"/>
+                <GridColumn TItem="GenericReportRow" Title="@L10n.T("rww.col_sm_pm")"       Value="@(x=>x.SMWorkPM)" Align="end"/>
+                <GridColumn TItem="GenericReportRow" Title="@L10n.T("rww.col_order_am")"    Value="@(x=>x.OrderSuccessAM)" Align="end"/>
+                <GridColumn TItem="GenericReportRow" Title="@L10n.T("rww.col_order_pm")"    Value="@(x=>x.OrderSuccessPM)" Align="end"/>
+                <GridColumn TItem="GenericReportRow" Title="@L10n.T("rww.col_gps_invalid")" Value="@(x=>x.GPSInvalid)" Align="end"/>
+                <GridColumn TItem="GenericReportRow" Title="@L10n.T("ww.col_visit_valid")"  Value="@(x=>x.VisitValid)" Align="end"/>
+            </Columns>
+            <RowTemplate>
+                <td class="small">@r.RegionName</td>
+                <td class="small">@r.AreaName</td>
+                <td class="small font-monospace">@r.DistributorCode</td>
+                <td class="small">@r.DistributorName</td>
+                <td class="small font-monospace">@r.RouteID</td>
+                <td class="small">@r.RouteName</td>
+                <td class="small font-monospace">@r.SalesManID</td>
+                <td class="fw-semibold small">@r.SalesManName</td>
+                <td class="text-end small">@r.SMWorkAM</td>
+                <td class="text-end small">@r.SMWorkPM</td>
+                <td class="text-end small">@r.OrderSuccessAM</td>
+                <td class="text-end small">@r.OrderSuccessPM</td>
+                <td class="text-end small @(r.GPSInvalid>0?"text-danger":"")">@r.GPSInvalid</td>
+                <td class="text-end fw-semibold">@r.VisitValid</td>
+            </RowTemplate>
+        </SortableGrid>
+    }
+</div>
+
+@code {
+    private List<GenericReportRow> _data = new();
+    private bool _loading; private string? _error;
+    private DateTime _from = DateTime.Today;
+    private string _regionId = "", _areaId = "", _supId = "";
+
+    protected override void OnInitialized() { if (!Auth.IsLoggedIn) Nav.NavigateTo("/", replace: true); }
+
+    private async Task LoadAsync()
+    {
+        _loading = true; _error = null;
+        try { _data = await RptSvc.GetReportWorkWithAsync(_from, Auth.UserName, _regionId, _areaId, supId: _supId); }
+        catch (Exception ex) { _error = ex.Message; }
+        finally { _loading = false; }
+    }
+
+    private async Task ExportExcel()
+    {
+        var rows = _data.Select(r => new Dictionary<string, object?>
+        {
+            ["Region"] = r.RegionName, ["Area"] = r.AreaName,
+            ["NPP CD"] = r.DistributorCode, ["NPP"] = r.DistributorName,
+            ["Route"] = r.RouteID, ["Route Name"] = r.RouteName,
+            ["Salesman CD"] = r.SalesManID, ["Salesman"] = r.SalesManName,
+            ["SM AM"] = r.SMWorkAM, ["SM PM"] = r.SMWorkPM,
+            ["ÄÆ¡n AM"] = r.OrderSuccessAM, ["ÄÆ¡n PM"] = r.OrderSuccessPM,
+            ["GPS Sai"] = r.GPSInvalid, ["Visit Valid"] = r.VisitValid,
+        }).ToList();
+        var bytes = await ExportSvc.ToExcelAsync(rows, "Work With");
+        var b64 = Convert.ToBase64String(bytes);
+        await JS.InvokeVoidAsync("downloadBase64", b64, $"WorkWith_{_from:yyyyMMdd}.xlsx", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
+    }
+}
+
+
+

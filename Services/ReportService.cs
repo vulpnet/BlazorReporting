@@ -145,11 +145,84 @@ public sealed class GenericReportRow
     public int    TimeLimit      { get; set; }
     public int    ActualTime     { get; set; }
     public int    Evaluate       { get; set; }
+    // Synchronous specific
+    public decimal LongtitudeBase  { get; set; }
+    public decimal LatitudeBase    { get; set; }
+    public decimal LongtitudeSync  { get; set; }
+    public decimal LatitudeSync    { get; set; }
+    public decimal DistanceWithBase{ get; set; }
+    public int    ValidDistance    { get; set; }
+    public DateTime? SystemSyncDate{ get; set; }
+    public string SyncType         { get; set; } = "";
+    public int    IsTimeValid      { get; set; }
+    public TimeSpan? TimeDisparity { get; set; }
+    public string SalesSupCD       { get; set; } = "";
+    // WorkWith / ReviewWorkWith specific
+    public string WWID             { get; set; } = "";
+    public string WWName           { get; set; } = "";
+    public string WWTitle          { get; set; } = "";
+    public string RouteID          { get; set; } = "";
+    public string SalesManID       { get; set; } = "";
+    public string SalesManName     { get; set; } = "";
+    public int    SMWorkAM         { get; set; }
+    public int    SMWorkPM         { get; set; }
+    public int    OrderSuccessAM   { get; set; }
+    public int    OrderSuccessPM   { get; set; }
+    public int    GPSInvalid       { get; set; }
+    public int    APMInvalid       { get; set; }
+    public int    VisitValidAM     { get; set; }
+    public int    VisitValidPM     { get; set; }
+    public int    VisitValid       { get; set; }
+    public string DistributorCode  { get; set; } = "";
+    public string VisitDateStr     { get; set; } = "";
     // Outlet GPS Invalid specific
     public string LocationCD     { get; set; } = "";
     public string OutletCD       { get; set; } = "";
     public bool   IsActive       { get; set; }
     public string City           { get; set; } = "";
+    // Eval Report specific
+    public string EvalState          { get; set; } = "";
+    public string MarkingAssign      { get; set; } = "";
+    public int    TotalImg           { get; set; }
+    public int    ImagMarking        { get; set; }
+    public int    ImgApproved        { get; set; }
+    public int    ImgPassProgram     { get; set; }
+    public int    ImgRejected        { get; set; }
+    public int    ImgReMarking       { get; set; }
+    public int    TotalOulet         { get; set; }
+    public int    OuletHasMarking    { get; set; }
+    // Review Order specific
+    public string OrderCode          { get; set; } = "";
+    public string OutletCD3          { get; set; } = "";
+    public int    DeliveryStatus     { get; set; }
+    public DateTime? OrderDate       { get; set; }
+    public decimal TotalOrder        { get; set; }
+    // Digital Content specific
+    public string FileName           { get; set; } = "";
+    public DateTime? StartTime       { get; set; }
+    public DateTime? EndTime         { get; set; }
+    // PDA / IMEI specific
+    public string IMEI               { get; set; } = "";
+    public DateTime? ActiveDate      { get; set; }
+    public DateTime? CreateDatetime  { get; set; }
+    // UserActionLogTerritory specific
+    public string TerritoryCD        { get; set; } = "";
+    public string TerritoryName      { get; set; } = "";
+    public string ActionType         { get; set; } = "";
+    public DateTime? ActionDate      { get; set; }
+    // KPI Summary (pp_GetBLSalesKPI) specific
+    public int    MustVisit      { get; set; }
+    public int    Visited        { get; set; }
+    public decimal VisitRate     { get; set; }
+    public int    HasOrderCount  { get; set; }
+    public decimal OrderRate     { get; set; }
+    public decimal Revenue       { get; set; }
+    public string ProgramName2   { get; set; } = "";
+    // Image Program specific
+    public string ImageFile      { get; set; } = "";
+    public string PlanogramName  { get; set; } = "";
+    public DateTime? SyncDate    { get; set; }
+    public string MerchandiseReason { get; set; } = "";
     // Visit Reason specific
     public string VisitNotOrder  { get; set; } = "";
     public decimal VisitNotOrderRate { get; set; }
@@ -158,6 +231,39 @@ public sealed class GenericReportRow
     public int    MTDOutletMustVisit { get; set; }
     public int    MTDOutletVisited   { get; set; }
     public int    MTDOrderCount      { get; set; }
+    // Visit Distance / Sales Fundamentals specific
+    public string OutletCD2          { get; set; } = "";
+    public decimal VisitDistance     { get; set; }
+    public decimal TotalDistance     { get; set; }
+    public int    VisitCount         { get; set; }
+    // New/Update Outlet specific
+    public string Address            { get; set; } = "";
+    public string OutletType         { get; set; } = "";
+    public string Channel            { get; set; } = "";
+    public string ApprovalStatus     { get; set; } = "";
+    public DateTime? CreatedDate     { get; set; }
+    // Adoption specific
+    public int    NewOutlet          { get; set; }
+    public int    AdoptionOutlet     { get; set; }
+    public decimal AdoptionRate      { get; set; }
+    // Golden Store specific
+    public string GoldenStoreLevel   { get; set; } = "";
+    public int    GoldenScore        { get; set; }
+    // General Manager specific
+    public decimal SalesActMTD       { get; set; }
+    public decimal SalesObj          { get; set; }
+    public int    OutletHasOrder     { get; set; }
+    // InDay DSR specific
+    public int    OutletMustVisitMTD { get; set; }
+    public int    OutletVisitedMTD   { get; set; }
+    public int    OutletHasOrderMTD  { get; set; }
+    public int    CountVisitDateMTD  { get; set; }
+    public string SalesmanID         { get; set; } = "";
+    // Visit Reason specific
+    public int    VisitNotOrderCount { get; set; }
+    public string ReasonCode         { get; set; } = "";
+    public string ReasonName         { get; set; } = "";
+    public int    ReasonCount        { get; set; }
 }
 
 // ── Service ─────────────────────────────────────────────────────────
@@ -170,6 +276,22 @@ public sealed class ReportService
         => _cs = cfg.GetConnectionString("DefaultConnection")!;
 
     private SqlConnection Conn() => new(_cs);
+
+    // ── Report Visit KPI Summary (Tab 1) ─────────────────────────────
+
+    public Task<List<GenericReportRow>> GetReportVisitKpiAsync(
+        DateTime date, string username,
+        string st0="", string st1="", int distId=0, string sup="", string route="", string stCode="")
+        => ExecAsync("EXEC pp_GetBLSalesKPI @VisitDate,@STLvl0CD,@STLvl1CD,@STLvl2CD,@STLvl3CD,@STLvl4CD,@DistributorID,@SaleSupCD,@RouteCD,@UserName,@STCode",
+            new{VisitDate=date,STLvl0CD=st0,STLvl1CD=st1,STLvl2CD="",STLvl3CD="",STLvl4CD="",DistributorID=distId,SaleSupCD=sup,RouteCD=route,UserName=username,STCode=stCode});
+
+    // ── Report Visit Image Program (Tab 3) ────────────────────────────
+
+    public Task<List<GenericReportRow>> GetReportVisitImageAsync(
+        DateTime date, string username,
+        string st0="", string st1="", int distId=0, string sup="", string route="", string stCode="")
+        => ExecAsync("EXEC pp_ReportImageProgram @VisitDate,@STLvl0CD,@STLvl1CD,@STLvl2CD,@STLvl3CD,@STLvl4CD,@DistributorID,@SaleSupCD,@RouteCD,@UserName,@STCode",
+            new{VisitDate=date,STLvl0CD=st0,STLvl1CD=st1,STLvl2CD="",STLvl3CD="",STLvl4CD="",DistributorID=distId,SaleSupCD=sup,RouteCD=route,UserName=username,STCode=stCode});
 
     // ── Report Visit (chi tiết từng lần viếng thăm) ──────────────────
 
@@ -352,6 +474,92 @@ public sealed class ReportService
         => ExecAsync("EXEC pp_ReportUserUseMobility @FromDate,@ToDate,@UserName",
             new{FromDate=from,ToDate=to,UserName=username});
 
+    // ── 16. Synchronous (đồng bộ) ────────────────────────────────────
+
+    public Task<List<GenericReportRow>> GetReportSynchronousAsync(
+        DateTime from, DateTime to, string username,
+        string st0="", string st1="", int distId=0, string sup="", string stCode="", TimeSpan? timeRegular=null)
+        => ExecAsync("EXEC pp_ReportSyschronous @FromDate,@ToDate,@STLvl0CD,@STLvl1CD,@STLvl2CD,@STLvl3CD,@STLvl4CD,@DistributorID,@SaleSupCD,@TimeRegular,@UserName,@STCode",
+            new{FromDate=from,ToDate=to,STLvl0CD=st0,STLvl1CD=st1,STLvl2CD="",STLvl3CD="",STLvl4CD="",DistributorID=distId,SaleSupCD=sup,TimeRegular=timeRegular??new TimeSpan(8,0,0),UserName=username,STCode=stCode});
+
+    // ── 17. Review WorkWith ───────────────────────────────────────────
+
+    public Task<List<GenericReportRow>> GetReportReviewWorkWithAsync(
+        DateTime from, string username, string regionId="", string areaId="", int distId=0)
+        => ExecAsync("EXEC pp_ReportReviewWorkWith @FromDate,@ToDate,@RegionID,@AreaID,@DistributorID,@SaleSupID,@SalesmanID,@UserName",
+            new{FromDate=from,ToDate=DateTime.Now,RegionID=regionId,AreaID=areaId,DistributorID=distId,SaleSupID="",SalesmanID="",UserName=username});
+
+    // ── 18. WorkWith ──────────────────────────────────────────────────
+
+    public Task<List<GenericReportRow>> GetReportWorkWithAsync(
+        DateTime from, string username, string regionId="", string areaId="", int distId=0, string supId="")
+        => ExecAsync("EXEC pp_ReportWorkWith @FromDate,@RegionID,@AreaID,@DistributorID,@SaleSupID,@SalesmanID,@UserName,@Type",
+            new{FromDate=from,RegionID=regionId,AreaID=areaId,DistributorID=distId,SaleSupID=supId,SalesmanID="",UserName=username,Type=3});
+
+    // ── 19. Reason Visit ──────────────────────────────────────────────
+
+    public Task<List<GenericReportRow>> GetReportReasonVisitAsync(
+        DateTime from, DateTime to, string username,
+        string st0="", string st1="", int distId=0, string sup="", string route="", string stCode="")
+        => ExecAsync("EXEC pp_ReportVisitReason @FromDate,@ToDate,@Level1ID,@Level2ID,@Level3ID,@Level4ID,@Level5ID,@DistributorID,@SaleSupCD,@RouteCD,@UserName,@STCode",
+            new{FromDate=from,ToDate=to,Level1ID=st0,Level2ID=st1,Level3ID="",Level4ID="",Level5ID="",DistributorID=distId,SaleSupCD=sup,RouteCD=route,UserName=username,STCode=stCode});
+
+    // ── 20. Visit Distance ────────────────────────────────────────────
+
+    public Task<List<GenericReportRow>> GetReportVisitDistanceAsync(
+        DateTime from, DateTime to, string username, int distId=0, string sup="", string salesmanId="")
+        => ExecAsync("EXEC pp_GetOutletVisitDistance @FromDate,@ToDate,@DistributorID,@SaleSupID,@SalesmanID,@UserName",
+            new{FromDate=from,ToDate=to,DistributorID=distId,SaleSupID=sup,SalesmanID=salesmanId,UserName=username});
+
+    // ── 21. New Outlet ────────────────────────────────────────────────
+
+    public Task<List<GenericReportRow>> GetReportNewOutletAsync(
+        DateTime from, DateTime to, string username, int distId=0, string sup="", string salesmanId="")
+        => ExecAsync("EXEC BSDH_ReportNewOutlets @FromDate,@ToDate,@DistributorID,@SaleSupCode,@SalesmanID,@UserName",
+            new{FromDate=from,ToDate=to,DistributorID=distId,SaleSupCode=sup,SalesmanID=salesmanId,UserName=username});
+
+    // ── 22. Update Outlet ─────────────────────────────────────────────
+
+    public Task<List<GenericReportRow>> GetReportUpdateOutletAsync(
+        DateTime from, DateTime to, string username, int distId=0, string sup="", string salesmanId="")
+        => ExecAsync("EXEC BSDH_ReportUpdateOutlets @FromDate,@ToDate,@DistributorID,@SaleSupCode,@SalesmanID,@UserName",
+            new{FromDate=from,ToDate=to,DistributorID=distId,SaleSupCode=sup,SalesmanID=salesmanId,UserName=username});
+
+    // ── 23. Adoption ──────────────────────────────────────────────────
+
+    public Task<List<GenericReportRow>> GetReportAdoptionAsync(
+        DateTime from, DateTime to, string username, int distId=0, int supId=0, string salesmanId="")
+        => ExecAsync("EXEC BSDH_ReportAdoption @FromDate,@ToDate,@DistributorID,@SaleSupID,@SalesmanID,@UserName",
+            new{FromDate=from,ToDate=to,DistributorID=distId,SaleSupID=supId,SalesmanID=salesmanId,UserName=username});
+
+    // ── 24. Golden Store ──────────────────────────────────────────────
+
+    public Task<List<GenericReportRow>> GetReportGoldenStoreAsync(
+        DateTime from, string username, int distId=0, int supId=0, string salesmanId="")
+        => ExecAsync("EXEC BSDH_ReportGoldenStore @FromDate,@DistributorID,@SaleSupID,@SalesmanID,@UserName",
+            new{FromDate=from,DistributorID=distId,SaleSupID=supId,SalesmanID=salesmanId,UserName=username});
+
+    // ── 25. General Manager ───────────────────────────────────────────
+
+    public Task<List<GenericReportRow>> GetReportGeneralManagerAsync(
+        DateTime from, string username, int distId=0, int supId=0)
+        => ExecAsync("EXEC BSDH_ReportGeneralManager @FromDate,@DistributorID,@SaleSupID,@UserName",
+            new{FromDate=from,DistributorID=distId,SaleSupID=supId,UserName=username});
+
+    // ── 26. InDay DSR ─────────────────────────────────────────────────
+
+    public Task<List<GenericReportRow>> GetReportInDayDSRAsync(
+        DateTime from, string username, int distId=0, int supId=0, string salesmanId="")
+        => ExecAsync("EXEC BSDH_ReportInDayDSR @FromDate,@DistributorID,@SaleSupID,@SalesmanID,@UserName",
+            new{FromDate=from,DistributorID=distId,SaleSupID=supId,SalesmanID=salesmanId,UserName=username}, timeout:120);
+
+    // ── 27. Sales Fundamentals (dùng chung SP với VisitDistance) ─────
+
+    public Task<List<GenericReportRow>> GetReportSalesFundamentalsAsync(
+        DateTime from, DateTime to, string username, int distId=0, string sup="", string salesmanId="")
+        => ExecAsync("EXEC pp_GetOutletVisitDistance @FromDate,@ToDate,@DistributorID,@SaleSupID,@SalesmanID,@UserName",
+            new{FromDate=from,ToDate=to,DistributorID=distId,SaleSupID=sup,SalesmanID=salesmanId,UserName=username});
+
     // ── SM Visit Summary (tổng hợp KPI theo TDV) ────────────────────
 
     public async Task<List<SMVisitSummaryRow>> GetSMVisitSummaryAsync(
@@ -383,5 +591,74 @@ public sealed class ReportService
             },
             commandTimeout: 60);
         return rows.ToList();
+    }
+
+    // ── Issues: Usage App ─────────────────────────────────────────────
+
+    public Task<List<GenericReportRow>> GetReportUsageAppAsync(
+        DateTime from, DateTime to, string username, int distId=0, string roleId="")
+        => ExecAsync("EXEC pp_ReportSFUsageApp @FromDate,@ToDate,@DistributorID,@RoleID",
+            new{FromDate=from,ToDate=to,DistributorID=distId,RoleID=roleId});
+
+    // ── Issues: PDA Salesman Active ───────────────────────────────────
+
+    public Task<List<GenericReportRow>> GetPDASalesmanActiveAsync(string salesmanCd="", string imei="")
+        => ExecAsync("EXEC pp_PDAGetSalesmanActive @SalesmanCD,@imei",
+            new{SalesmanCD=salesmanCd,imei=imei});
+
+    public async Task ResetIMEIAsync(string salesmanCd, string createdBy)
+    {
+        await using var conn = new Microsoft.Data.SqlClient.SqlConnection(_cs);
+        await conn.ExecuteAsync("EXEC pp_PDAResetSalesmanActive @UserName,@CreateByUser",
+            new{UserName=salesmanCd,CreateByUser=createdBy});
+    }
+
+    // ── Issues: Digital Content (read from DB table) ──────────────────
+
+    public async Task<List<GenericReportRow>> GetDigitalContentAsync()
+    {
+        await using var conn = new Microsoft.Data.SqlClient.SqlConnection(_cs);
+        var rows = await conn.QueryAsync<GenericReportRow>(
+            "SELECT FileName,Desc AS Content,StartTime=StartDate,EndTime=EndDate,UserName=CreatedByID,IsValid=CAST(Active AS INT) FROM DigitalContentFileUpload ORDER BY CreatedDateTime DESC",
+            commandTimeout: 30);
+        return rows.ToList();
+    }
+
+    // ── Eval Reports ──────────────────────────────────────────────────
+
+    public Task<List<GenericReportRow>> GetReportEvaluationAsync(
+        DateTime from, DateTime to, string username,
+        string regionId="", string areaId="", int distId=0, string supId="",
+        string routeId="", string salesmanId="", string programId="", string evalId="")
+        => ExecAsync("EXEC usp_GetReportEvalBy @FromDate,@ToDate,@RegionID,@AreaID,@SaleSupID,@RouteID,@SalesmanID,@ProgramID,@EvaluationID,@Auditor",
+            new{FromDate=from,ToDate=to,RegionID=regionId,AreaID=areaId,SaleSupID=supId,RouteID=routeId,SalesmanID=salesmanId,ProgramID=programId,EvaluationID=evalId,Auditor=username});
+
+    public Task<List<GenericReportRow>> GetReportEvalReasonAsync(
+        DateTime from, DateTime to, string username,
+        string routeId="", string salesmanId="", string programId="", string evalId="")
+        => ExecAsync("EXEC usp_GetReportReasonBySS @Role,@FromDate,@ToDate,@SaleSupID,@RouteID,@SalesmanID,@ProgramID,@EvaluationID,@Auditor",
+            new{Role="Admin",FromDate=from,ToDate=to,SaleSupID="",RouteID=routeId,SalesmanID=salesmanId,ProgramID=programId,EvaluationID=evalId,Auditor=username});
+
+    public Task<List<GenericReportRow>> GetReportEvalInventoryAsync(
+        DateTime from, DateTime to, string username,
+        string regionId="", string areaId="", int distId=0, string routeId="",
+        string salesmanId="", string programId="", string evalId="",
+        int groupInventory=0, int groupSaleteam=0)
+        => ExecAsync("EXEC usp_GetReporInventoryBy @Role,@GroupInventory,@GroupSaleteam,@FromDate,@ToDate,@RegionID,@AreaID,@DistributorID,@SaleSupID,@RouteID,@SalesmanID,@ProgramID,@EvaluationID,@Auditor",
+            new{Role="Admin",GroupInventory=groupInventory,GroupSaleteam=groupSaleteam,FromDate=from,ToDate=to,RegionID=regionId,AreaID=areaId,DistributorID=distId,SaleSupID="",RouteID=routeId,SalesmanID=salesmanId,ProgramID=programId,EvaluationID=evalId,Auditor=username});
+
+    // ── Review Order Management ───────────────────────────────────────
+
+    public Task<List<GenericReportRow>> GetReviewOrderListAsync(
+        DateTime from, DateTime to, string salesmanId="", int status=2)
+        => ExecAsync("EXEC pp_ReportGetListReviewOrder @OrderID,@StartDate,@EndDate,@Status,@SalesmanID",
+            new{OrderID="",StartDate=from,EndDate=to,Status=status,SalesmanID=salesmanId});
+
+    public async Task UploadDigitalContentAsync(string fileName, string desc, DateTime? startDate, DateTime? endDate, bool active, string createdBy)
+    {
+        await using var conn = new Microsoft.Data.SqlClient.SqlConnection(_cs);
+        await conn.ExecuteAsync(
+            "INSERT INTO DigitalContentFileUpload(FileName,Desc,StartDate,EndDate,Active,CreatedByID,CreatedDateTime) VALUES(@FileName,@Desc,@StartDate,@EndDate,@Active,@CreatedByID,GETDATE())",
+            new{FileName=fileName,Desc=desc,StartDate=startDate,EndDate=endDate,Active=active,CreatedByID=createdBy});
     }
 }

@@ -1,0 +1,128 @@
+﻿@page "/report/synchronous"
+@attribute [NavMenu(Title="sync.nav_title", Icon="bi-arrow-repeat", Group="nav.reports", GroupOrder=20, Order=170)]
+@using BlazorReporting.Services
+@inject AuthService Auth
+@inject ReportService RptSvc
+@inject IExportService ExportSvc
+@inject IJSRuntime JS
+@inject NavigationManager Nav
+@inject LocalizationService L10n
+<PageTitle>@L10n.T("sync.page_title")</PageTitle>
+<div class="container-fluid mt-3">
+    <h5 class="mb-3"><i class="bi bi-arrow-repeat me-2"></i>@L10n.T("sync.page_title")</h5>
+    <div class="card shadow-sm mb-3"><div class="card-body py-2">
+        <div class="d-flex gap-2 flex-wrap align-items-end">
+            <div><label class="form-label small mb-1">@L10n.T("lbl.from_date")</label><input type="date" class="form-control form-control-sm" style="width:150px" @bind="_from"/></div>
+            <div><label class="form-label small mb-1">@L10n.T("lbl.to_date")</label><input type="date" class="form-control form-control-sm" style="width:150px" @bind="_to"/></div>
+            <div><label class="form-label small mb-1">@L10n.T("sync.lbl_time_regular")</label><input type="time" class="form-control form-control-sm" style="width:120px" @bind="_timeRegular"/></div>
+            <div><label class="form-label small mb-1">@L10n.T("lbl.region")</label><input class="form-control form-control-sm" style="width:120px" placeholder="RegionCD..." @bind="_st0"/></div>
+            <div><label class="form-label small mb-1">Area</label><input class="form-control form-control-sm" style="width:120px" placeholder="AreaCD..." @bind="_st1"/></div>
+            <div><label class="form-label small mb-1">@L10n.T("lbl.distributor")</label><input type="number" class="form-control form-control-sm" style="width:110px" placeholder="DistID..." @bind="_distId"/></div>
+            <div><label class="form-label small mb-1">@L10n.T("lbl.supervisor")</label><input class="form-control form-control-sm" style="width:120px" placeholder="SupCD..." @bind="_sup"/></div>
+            <button class="btn btn-sm btn-primary" @onclick="LoadAsync"><i class="bi bi-search me-1"></i>@L10n.T("btn.view")</button>
+            @if (_data.Any())
+            {
+                <button class="btn btn-sm btn-success" @onclick="ExportExcel"><i class="bi bi-file-earmark-excel me-1"></i>Excel</button>
+                <span class="text-muted small ms-1">@_data.Count @L10n.T("sync.row_count")</span>
+            }
+        </div>
+    </div></div>
+
+    @if (_error != null) { <div class="alert alert-danger py-2 alert-dismissible">@_error<button class="btn-close" @onclick="()=>_error=null"></button></div> }
+    @if (_loading) { <div class="text-center py-4"><span class="spinner-border text-primary"></span></div> }
+    else
+    {
+        <SortableGrid Items="_data" Context="r" MinWidth="1400px" DefaultPageSize="20">
+            <Columns>
+                <GridColumn TItem="GenericReportRow" Title="@L10n.T("sync.col_date")"       Value="@(x=>x.VisitDate.HasValue?x.VisitDate.Value.ToString("dd/MM/yy"):"")" Align="center"/>
+                <GridColumn TItem="GenericReportRow" Title="@L10n.T("lbl.region")"        Value="@(x=>x.STLvl0Name)"/>
+                <GridColumn TItem="GenericReportRow" Title="@L10n.T("lbl.area")"                          Value="@(x=>x.STLvl1Name)"/>
+                <GridColumn TItem="GenericReportRow" Title="@L10n.T("lbl.distributor")"   Value="@(x=>x.DistributorName)"/>
+                <GridColumn TItem="GenericReportRow" Title="@L10n.T("lbl.supervisor")"    Value="@(x=>x.SalesSupName)"/>
+                <GridColumn TItem="GenericReportRow" Title="@L10n.T("lbl.route")"         Value="@(x=>x.RouteCD)"/>
+                <GridColumn TItem="GenericReportRow" Title="@L10n.T("lbl.salesman")"      Value="@(x=>x.SalesmanName)"/>
+                <GridColumn TItem="GenericReportRow" Title="@L10n.T("sync.col_lng_base")" Value="@(x=>x.LongtitudeBase.ToString("F6"))" Align="end"/>
+                <GridColumn TItem="GenericReportRow" Title="@L10n.T("sync.col_lat_base")" Value="@(x=>x.LatitudeBase.ToString("F6"))"  Align="end"/>
+                <GridColumn TItem="GenericReportRow" Title="@L10n.T("sync.col_lng_sync")" Value="@(x=>x.LongtitudeSync.ToString("F6"))" Align="end"/>
+                <GridColumn TItem="GenericReportRow" Title="@L10n.T("sync.col_lat_sync")" Value="@(x=>x.LatitudeSync.ToString("F6"))"  Align="end"/>
+                <GridColumn TItem="GenericReportRow" Title="@L10n.T("sync.col_distance")" Value="@(x=>x.DistanceWithBase.ToString("N0"))" Align="end"/>
+                <GridColumn TItem="GenericReportRow" Title="@L10n.T("sync.col_valid")"    Value="@(x=>x.ValidDistance==1?"âœ“":"")" Align="center"/>
+                <GridColumn TItem="GenericReportRow" Title="@L10n.T("sync.col_sync_time")"Value="@(x=>x.SystemSyncDate.HasValue?x.SystemSyncDate.Value.ToString("dd/MM HH:mm:ss"):"")"/>
+                <GridColumn TItem="GenericReportRow" Title="@L10n.T("sync.col_status")"   Value="@(x=>SyncLabel(x))" Align="center"/>
+                <GridColumn TItem="GenericReportRow" Title="@L10n.T("sync.col_assess")"   Value="@(x=>AssessLabel(x))" Align="center"/>
+            </Columns>
+            <RowTemplate>
+                <td class="text-center small">@(r.VisitDate.HasValue?r.VisitDate.Value.ToString("dd/MM/yy"):"â€”")</td>
+                <td class="small">@r.STLvl0Name</td>
+                <td class="small">@r.STLvl1Name</td>
+                <td class="small">@r.DistributorName</td>
+                <td class="small font-monospace">@r.SalesSupCD</td>
+                <td class="small">@r.SalesSupName</td>
+                <td class="small font-monospace">@r.RouteCD</td>
+                <td class="small font-monospace">@r.SalesmanCD</td>
+                <td class="fw-semibold small">@r.SalesmanName</td>
+                <td class="text-end small font-monospace">@r.LongtitudeBase.ToString("F6")</td>
+                <td class="text-end small font-monospace">@r.LatitudeBase.ToString("F6")</td>
+                <td class="text-end small font-monospace">@r.LongtitudeSync.ToString("F6")</td>
+                <td class="text-end small font-monospace">@r.LatitudeSync.ToString("F6")</td>
+                <td class="text-end small">@r.DistanceWithBase.ToString("N0")</td>
+                <td class="text-center">@(r.ValidDistance==1 ? new MarkupString("<i class='bi bi-check-circle-fill text-success'></i>") : new MarkupString("<i class='bi bi-x-circle text-secondary'></i>"))</td>
+                <td class="small">@(r.SystemSyncDate.HasValue?r.SystemSyncDate.Value.ToString("dd/MM HH:mm:ss"):"â€”")</td>
+                <td class="text-center"><span class="badge @(r.SyncType=="D"?"bg-success":"bg-secondary")" style="font-size:.65rem">@SyncLabel(r)</span></td>
+                <td class="text-center"><span class="badge @AssessBadge(r)" style="font-size:.65rem">@AssessLabel(r)</span></td>
+            </RowTemplate>
+        </SortableGrid>
+    }
+</div>
+
+@code {
+    private List<GenericReportRow> _data = new();
+    private bool _loading; private string? _error;
+    private DateTime _from = DateTime.Today.AddDays(-7), _to = DateTime.Today;
+    private TimeOnly _timeRegular = new TimeOnly(8, 0);
+    private string _st0 = "", _st1 = "", _sup = ""; private int _distId = 0;
+
+    protected override void OnInitialized() { if (!Auth.IsLoggedIn) Nav.NavigateTo("/", replace: true); }
+
+    private string SyncLabel(GenericReportRow r) => r.SyncType == "D" ? L10n.T("sync.status_synced") : L10n.T("sync.status_not_synced");
+    private string AssessLabel(GenericReportRow r)
+    {
+        if (r.SyncType != "D") return "";
+        return r.IsTimeValid == 1 ? L10n.T("sync.assess_on_time") : L10n.T("sync.assess_late");
+    }
+    private string AssessBadge(GenericReportRow r)
+    {
+        if (r.SyncType != "D") return "bg-secondary";
+        return r.IsTimeValid == 1 ? "bg-success" : "bg-warning text-dark";
+    }
+
+    private async Task LoadAsync()
+    {
+        _loading = true; _error = null;
+        try { _data = await RptSvc.GetReportSynchronousAsync(_from, _to, Auth.UserName, _st0, _st1, _distId, _sup, timeRegular: _timeRegular.ToTimeSpan()); }
+        catch (Exception ex) { _error = ex.Message; }
+        finally { _loading = false; }
+    }
+
+    private async Task ExportExcel()
+    {
+        var rows = _data.Select(r => new Dictionary<string, object?>
+        {
+            ["NgÃ y"] = r.VisitDate?.ToString("dd/MM/yyyy"),
+            ["Region"] = r.STLvl0Name, ["Area"] = r.STLvl1Name,
+            ["NPP"] = r.DistributorName, ["Supervisor CD"] = r.SalesSupCD, ["Supervisor"] = r.SalesSupName,
+            ["Route"] = r.RouteCD, ["Salesman CD"] = r.SalesmanCD, ["Salesman"] = r.SalesmanName,
+            ["Lng Base"] = r.LongtitudeBase, ["Lat Base"] = r.LatitudeBase,
+            ["Lng Sync"] = r.LongtitudeSync, ["Lat Sync"] = r.LatitudeSync,
+            ["Khoáº£ng cÃ¡ch (m)"] = r.DistanceWithBase, ["Há»£p lá»‡"] = r.ValidDistance == 1 ? "CÃ³" : "KhÃ´ng",
+            ["Thá»i gian sync"] = r.SystemSyncDate?.ToString("dd/MM/yyyy HH:mm:ss"),
+            ["Tráº¡ng thÃ¡i"] = SyncLabel(r), ["ÄÃ¡nh giÃ¡"] = AssessLabel(r),
+        }).ToList();
+        var bytes = await ExportSvc.ToExcelAsync(rows, "BÃ¡o cÃ¡o Äá»“ng bá»™");
+        var b64 = Convert.ToBase64String(bytes);
+        await JS.InvokeVoidAsync("downloadBase64", b64, $"ReportSynchronous_{_from:yyyyMMdd}_{_to:yyyyMMdd}.xlsx", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
+    }
+}
+
+
+

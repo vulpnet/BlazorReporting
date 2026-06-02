@@ -1,0 +1,68 @@
+﻿@page "/report/new-outlet"
+@attribute [NavMenu(Title="new_outlet.nav_title", Icon="bi-shop", Group="nav.reports", GroupOrder=20, Order=220)]
+@using BlazorReporting.Services
+@inject AuthService Auth
+@inject ReportService RptSvc
+@inject IExportService ExportSvc
+@inject IJSRuntime JS
+@inject NavigationManager Nav
+@inject LocalizationService L10n
+<PageTitle>@L10n.T("new_outlet.page_title")</PageTitle>
+<div class="container-fluid mt-3">
+    <h5 class="mb-3"><i class="bi bi-shop me-2"></i>@L10n.T("new_outlet.page_title")</h5>
+    <div class="card shadow-sm mb-3"><div class="card-body py-2">
+        <div class="d-flex gap-2 flex-wrap align-items-end">
+            <div><label class="form-label small mb-1">@L10n.T("lbl.from_date")</label><input type="date" class="form-control form-control-sm" style="width:150px" @bind="_from"/></div>
+            <div><label class="form-label small mb-1">@L10n.T("lbl.to_date")</label><input type="date" class="form-control form-control-sm" style="width:150px" @bind="_to"/></div>
+            <div><label class="form-label small mb-1">@L10n.T("lbl.distributor")</label><input type="number" class="form-control form-control-sm" style="width:110px" @bind="_distId"/></div>
+            <div><label class="form-label small mb-1">@L10n.T("lbl.supervisor")</label><input class="form-control form-control-sm" style="width:120px" @bind="_sup"/></div>
+            <div><label class="form-label small mb-1">@L10n.T("lbl.salesman")</label><input class="form-control form-control-sm" style="width:120px" @bind="_salesmanId"/></div>
+            <button class="btn btn-sm btn-primary" @onclick="LoadAsync"><i class="bi bi-search me-1"></i>@L10n.T("btn.view")</button>
+            @if (_data.Any()) { <button class="btn btn-sm btn-success" @onclick="ExportExcel"><i class="bi bi-file-earmark-excel me-1"></i>Excel</button> <span class="text-muted small ms-1">@_data.Count dÃ²ng</span> }
+        </div>
+    </div></div>
+    @if (_error != null) { <div class="alert alert-danger py-2 alert-dismissible">@_error<button class="btn-close" @onclick="()=>_error=null"></button></div> }
+    @if (_loading) { <div class="text-center py-4"><span class="spinner-border text-primary"></span></div> }
+    else {
+        <SortableGrid Items="_data" Context="r" MinWidth="1100px" DefaultPageSize="20">
+            <Columns>
+                <GridColumn TItem="GenericReportRow" Title="@L10n.T("lbl.distributor")"        Value="@(x=>x.DistributorName)"/>
+                <GridColumn TItem="GenericReportRow" Title="@L10n.T("lbl.supervisor")"        Value="@(x=>x.SalesSupName)"/>
+                <GridColumn TItem="GenericReportRow" Title="@L10n.T("lbl.salesman")"          Value="@(x=>x.SalesmanName)"/>
+                <GridColumn TItem="GenericReportRow" Title="@L10n.T("new_outlet.col_outlet_cd")" Value="@(x=>x.OutletID)"/>
+                <GridColumn TItem="GenericReportRow" Title="@L10n.T("lbl.outlet")"            Value="@(x=>x.OutletName)"/>
+                <GridColumn TItem="GenericReportRow" Title="@L10n.T("new_outlet.col_address")"  Value="@(x=>x.Address)"/>
+                <GridColumn TItem="GenericReportRow" Title="@L10n.T("new_outlet.col_phone")"    Value="@(x=>x.Phone)"/>
+                <GridColumn TItem="GenericReportRow" Title="@L10n.T("new_outlet.col_type")"     Value="@(x=>x.OutletType)"/>
+                <GridColumn TItem="GenericReportRow" Title="@L10n.T("new_outlet.col_status")"   Value="@(x=>x.ApprovalStatus)" Align="center"/>
+                <GridColumn TItem="GenericReportRow" Title="@L10n.T("new_outlet.col_created")"  Value="@(x=>x.CreatedDate.HasValue?x.CreatedDate.Value.ToString("dd/MM/yy"):"")" Align="center"/>
+            </Columns>
+            <RowTemplate>
+                <td class="small">@r.DistributorName</td>
+                <td class="small">@r.SalesSupName</td>
+                <td class="fw-semibold small">@r.SalesmanName</td>
+                <td class="small font-monospace">@r.OutletID</td>
+                <td class="small">@r.OutletName</td>
+                <td class="small text-muted">@r.Address</td>
+                <td class="small">@r.Phone</td>
+                <td class="small">@r.OutletType</td>
+                <td class="text-center"><span class="badge @(r.ApprovalStatus=="Approved"?"bg-success":"bg-warning text-dark")" style="font-size:.65rem">@r.ApprovalStatus</span></td>
+                <td class="text-center small">@(r.CreatedDate.HasValue?r.CreatedDate.Value.ToString("dd/MM/yy"):"â€”")</td>
+            </RowTemplate>
+        </SortableGrid>
+    }
+</div>
+@code {
+    private List<GenericReportRow> _data = new(); private bool _loading; private string? _error;
+    private DateTime _from = DateTime.Today.AddDays(-30), _to = DateTime.Today;
+    private string _sup="",_salesmanId=""; private int _distId=0;
+    protected override void OnInitialized() { if (!Auth.IsLoggedIn) Nav.NavigateTo("/", replace: true); }
+    private async Task LoadAsync() { _loading=true;_error=null; try { _data=await RptSvc.GetReportNewOutletAsync(_from,_to,Auth.UserName,_distId,_sup,_salesmanId); } catch(Exception ex){_error=ex.Message;} finally{_loading=false;} }
+    private async Task ExportExcel() {
+        var rows=_data.Select(r=>new Dictionary<string,object?>{["NPP"]=r.DistributorName,["Supervisor"]=r.SalesSupName,["Salesman"]=r.SalesmanName,["Outlet CD"]=r.OutletID,["Outlet"]=r.OutletName,["Äá»‹a chá»‰"]=r.Address,["SÄT"]=r.Phone,["Loáº¡i"]=r.OutletType,["Tráº¡ng thÃ¡i"]=r.ApprovalStatus,["NgÃ y táº¡o"]=r.CreatedDate?.ToString("dd/MM/yyyy")}).ToList();
+        var bytes=await ExportSvc.ToExcelAsync(rows,"Outlet má»›i");
+        await JS.InvokeVoidAsync("downloadBase64",Convert.ToBase64String(bytes),$"NewOutlet_{_from:yyyyMMdd}_{_to:yyyyMMdd}.xlsx","application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
+    }
+}
+
+

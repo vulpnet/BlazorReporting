@@ -1,5 +1,5 @@
-@page "/user"
-@attribute [NavMenu(Title="Người dùng", Icon="bi-people-fill", Group="Quản trị", GroupOrder=90, Order=30)]
+﻿@page "/user"
+@attribute [NavMenu(Title="user.nav_title", Icon="bi-people-fill", Group="nav.admin_menu", GroupOrder=90, Order=30)]
 @using BlazorReporting.Services
 @inject AuthService Auth
 @inject UserManagementService UserSvc
@@ -230,3 +230,5 @@
         _saving = false;
     }
 }
+
+

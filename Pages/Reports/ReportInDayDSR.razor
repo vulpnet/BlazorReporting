@@ -1,0 +1,69 @@
+﻿@page "/report/inday-dsr"
+@attribute [NavMenu(Title="inday.nav_title", Icon="bi-calendar-day", Group="nav.reports", GroupOrder=20, Order=270)]
+@using BlazorReporting.Services
+@inject AuthService Auth
+@inject ReportService RptSvc
+@inject IExportService ExportSvc
+@inject IJSRuntime JS
+@inject NavigationManager Nav
+@inject LocalizationService L10n
+<PageTitle>@L10n.T("inday.page_title")</PageTitle>
+<div class="container-fluid mt-3">
+    <h5 class="mb-3"><i class="bi bi-calendar-day me-2"></i>@L10n.T("inday.page_title")</h5>
+    <div class="card shadow-sm mb-3"><div class="card-body py-2">
+        <div class="d-flex gap-2 flex-wrap align-items-end">
+            <div><label class="form-label small mb-1">@L10n.T("lbl.from_date")</label><input type="date" class="form-control form-control-sm" style="width:150px" @bind="_from"/></div>
+            <div><label class="form-label small mb-1">@L10n.T("lbl.distributor")</label><input type="number" class="form-control form-control-sm" style="width:110px" @bind="_distId"/></div>
+            <div><label class="form-label small mb-1">@L10n.T("lbl.sup_id")</label><input type="number" class="form-control form-control-sm" style="width:110px" @bind="_supId"/></div>
+            <div><label class="form-label small mb-1">@L10n.T("lbl.salesman")</label><input class="form-control form-control-sm" style="width:120px" @bind="_salesmanId"/></div>
+            <button class="btn btn-sm btn-primary" @onclick="LoadAsync"><i class="bi bi-search me-1"></i>@L10n.T("btn.view")</button>
+            @if (_data.Any()) { <button class="btn btn-sm btn-success" @onclick="ExportExcel"><i class="bi bi-file-earmark-excel me-1"></i>Excel</button> <span class="text-muted small ms-1">@_data.Count dÃ²ng</span> }
+        </div>
+    </div></div>
+    @if (_error != null) { <div class="alert alert-danger py-2 alert-dismissible">@_error<button class="btn-close" @onclick="()=>_error=null"></button></div> }
+    @if (_loading) { <div class="text-center py-4"><span class="spinner-border text-primary"></span></div> }
+    else {
+        <SortableGrid Items="_data" Context="r" MinWidth="1200px" DefaultPageSize="20">
+            <Columns>
+                <GridColumn TItem="GenericReportRow" Title="@L10n.T("lbl.distributor")"          Value="@(x=>x.DistributorName)"/>
+                <GridColumn TItem="GenericReportRow" Title="@L10n.T("inday.col_salesman_cd")"   Value="@(x=>x.SalesmanID)"/>
+                <GridColumn TItem="GenericReportRow" Title="@L10n.T("lbl.salesman")"            Value="@(x=>x.SalesmanName)"/>
+                <GridColumn TItem="GenericReportRow" Title="@L10n.T("inday.col_must_visit")"    Value="@(x=>x.OutletMustVisit)" Align="end"/>
+                <GridColumn TItem="GenericReportRow" Title="@L10n.T("inday.col_visited")"       Value="@(x=>x.OutletVisited)" Align="end"/>
+                <GridColumn TItem="GenericReportRow" Title="@L10n.T("inday.col_has_order")"     Value="@(x=>x.OutletHasOrder)" Align="end"/>
+                <GridColumn TItem="GenericReportRow" Title="@L10n.T("inday.col_must_visit_mtd")"Value="@(x=>x.OutletMustVisitMTD)" Align="end"/>
+                <GridColumn TItem="GenericReportRow" Title="@L10n.T("inday.col_visited_mtd")"   Value="@(x=>x.OutletVisitedMTD)" Align="end"/>
+                <GridColumn TItem="GenericReportRow" Title="@L10n.T("inday.col_has_order_mtd")" Value="@(x=>x.OutletHasOrderMTD)" Align="end"/>
+                <GridColumn TItem="GenericReportRow" Title="@L10n.T("inday.col_visit_days_mtd")"Value="@(x=>x.CountVisitDateMTD)" Align="end"/>
+                <GridColumn TItem="GenericReportRow" Title="@L10n.T("inday.col_sales_mtd")"     Value="@(x=>(x.SalesActMTD/1_000_000m).ToString("N2")+"M")" Align="end"/>
+            </Columns>
+            <RowTemplate>
+                <td class="small">@r.DistributorName</td>
+                <td class="small font-monospace">@r.SalesmanID</td>
+                <td class="fw-semibold small">@r.SalesmanName</td>
+                <td class="text-end small">@r.OutletMustVisit</td>
+                <td class="text-end small">@r.OutletVisited</td>
+                <td class="text-end small">@r.OutletHasOrder</td>
+                <td class="text-end small text-muted">@r.OutletMustVisitMTD</td>
+                <td class="text-end small">@r.OutletVisitedMTD</td>
+                <td class="text-end small">@r.OutletHasOrderMTD</td>
+                <td class="text-end small">@r.CountVisitDateMTD</td>
+                <td class="text-end fw-semibold small">@((r.SalesActMTD/1_000_000m).ToString("N2"))M</td>
+            </RowTemplate>
+        </SortableGrid>
+    }
+</div>
+@code {
+    private List<GenericReportRow> _data = new(); private bool _loading; private string? _error;
+    private DateTime _from = DateTime.Today;
+    private string _salesmanId=""; private int _distId=0,_supId=0;
+    protected override void OnInitialized() { if (!Auth.IsLoggedIn) Nav.NavigateTo("/", replace: true); }
+    private async Task LoadAsync() { _loading=true;_error=null; try { _data=await RptSvc.GetReportInDayDSRAsync(_from,Auth.UserName,_distId,_supId,_salesmanId); } catch(Exception ex){_error=ex.Message;} finally{_loading=false;} }
+    private async Task ExportExcel() {
+        var rows=_data.Select(r=>new Dictionary<string,object?>{["NPP"]=r.DistributorName,["Salesman CD"]=r.SalesmanID,["Salesman"]=r.SalesmanName,["Outlet pháº£i thÄƒm"]=r.OutletMustVisit,["ÄÃ£ thÄƒm"]=r.OutletVisited,["CÃ³ Ä‘Æ¡n"]=r.OutletHasOrder,["Pháº£i thÄƒm MTD"]=r.OutletMustVisitMTD,["ÄÃ£ thÄƒm MTD"]=r.OutletVisitedMTD,["CÃ³ Ä‘Æ¡n MTD"]=r.OutletHasOrderMTD,["NgÃ y viáº¿ng MTD"]=r.CountVisitDateMTD,["Doanh sá»‘ MTD"]=r.SalesActMTD}).ToList();
+        var bytes=await ExportSvc.ToExcelAsync(rows,"InDay DSR");
+        await JS.InvokeVoidAsync("downloadBase64",Convert.ToBase64String(bytes),$"InDayDSR_{_from:yyyyMMdd}.xlsx","application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
+    }
+}
+
+

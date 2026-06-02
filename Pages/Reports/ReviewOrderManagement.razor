@@ -1,0 +1,71 @@
+﻿@page "/report/review-order"
+@attribute [NavMenu(Title="review_order.nav_title", Icon="bi-cart-check", Group="nav.reports", GroupOrder=20, Order=320)]
+@using BlazorReporting.Services
+@inject AuthService Auth
+@inject ReportService RptSvc
+@inject IExportService ExportSvc
+@inject IJSRuntime JS
+@inject NavigationManager Nav
+@inject LocalizationService L10n
+<PageTitle>@L10n.T("review_order.page_title")</PageTitle>
+<div class="container-fluid mt-3">
+    <h5 class="mb-3"><i class="bi bi-cart-check me-2"></i>@L10n.T("review_order.page_title")</h5>
+    <div class="card shadow-sm mb-3"><div class="card-body py-2">
+        <div class="d-flex gap-2 flex-wrap align-items-end">
+            <div><label class="form-label small mb-1">@L10n.T("lbl.from_date")</label><input type="date" class="form-control form-control-sm" style="width:150px" @bind="_from"/></div>
+            <div><label class="form-label small mb-1">@L10n.T("lbl.to_date")</label><input type="date" class="form-control form-control-sm" style="width:150px" @bind="_to"/></div>
+            <div><label class="form-label small mb-1">@L10n.T("lbl.salesman")</label><input class="form-control form-control-sm" style="width:130px" placeholder="SalesmanID..." @bind="_salesmanId"/></div>
+            <div>
+                <label class="form-label small mb-1">@L10n.T("review_order.lbl_status")</label>
+                <select class="form-select form-select-sm" style="width:150px" @bind="_status">
+                    <option value="2">@L10n.T("review_order.status_all")</option>
+                    <option value="0">@L10n.T("review_order.status_pending")</option>
+                    <option value="1">@L10n.T("review_order.status_approved")</option>
+                </select>
+            </div>
+            <button class="btn btn-sm btn-primary" @onclick="LoadAsync"><i class="bi bi-search me-1"></i>@L10n.T("btn.view")</button>
+            @if (_data.Any()) { <button class="btn btn-sm btn-success" @onclick="ExportExcel"><i class="bi bi-file-earmark-excel me-1"></i>Excel</button> <span class="text-muted small ms-1">@_data.Count @L10n.T("grid.rows_suffix")</span> }
+        </div>
+    </div></div>
+    @if (!string.IsNullOrEmpty(_error)) { <div class="alert alert-danger py-2 alert-dismissible">@_error<button class="btn-close" @onclick="()=>_error=string.Empty"></button></div> }
+    @if (_loading) { <div class="text-center py-4"><span class="spinner-border text-primary"></span></div> }
+    else {
+        <SortableGrid Items="_data" Context="r" MinWidth="1100px" DefaultPageSize="20">
+            <Columns>
+                <GridColumn TItem="GenericReportRow" Title="@L10n.T("review_order.col_order_code")"  Value="@(x=>x.OrderCode)"/>
+                <GridColumn TItem="GenericReportRow" Title="@L10n.T("lbl.salesman")"                 Value="@(x=>x.SalesmanName)"/>
+                <GridColumn TItem="GenericReportRow" Title="@L10n.T("lbl.distributor")"              Value="@(x=>x.DistributorName)"/>
+                <GridColumn TItem="GenericReportRow" Title="@L10n.T("lbl.outlet")"                   Value="@(x=>x.OutletName)"/>
+                <GridColumn TItem="GenericReportRow" Title="@L10n.T("review_order.col_order_date")"  Value="@(x=>x.OrderDate.HasValue?x.OrderDate.Value.ToString("dd/MM/yyyy"):"")" Align="center"/>
+                <GridColumn TItem="GenericReportRow" Title="@L10n.T("review_order.col_total")"       Value="@(x=>(x.TotalOrder/1_000_000m).ToString("N2")+"M")" Align="end"/>
+                <GridColumn TItem="GenericReportRow" Title="@L10n.T("review_order.col_status")"      Value="@(x=>StatusLabel(x.DeliveryStatus))" Align="center"/>
+            </Columns>
+            <RowTemplate>
+                <td class="small font-monospace">@r.OrderCode</td>
+                <td class="fw-semibold small">@r.SalesmanName</td>
+                <td class="small">@r.DistributorName</td>
+                <td class="small">@r.OutletName</td>
+                <td class="text-center small">@(r.OrderDate.HasValue?r.OrderDate.Value.ToString("dd/MM/yyyy"):"—")</td>
+                <td class="text-end small">@((r.TotalOrder/1_000_000m).ToString("N2"))M</td>
+                <td class="text-center">
+                    <span class="badge @StatusBadge(r.DeliveryStatus)" style="font-size:.65rem">@StatusLabel(r.DeliveryStatus)</span>
+                </td>
+            </RowTemplate>
+        </SortableGrid>
+    }
+</div>
+@code {
+    private List<GenericReportRow> _data=new(); private bool _loading; private string _error="";
+    private DateTime _from=DateTime.Today.AddDays(-7), _to=DateTime.Today;
+    private string _salesmanId=""; private int _status=2;
+    protected override void OnInitialized(){if(!Auth.IsLoggedIn)Nav.NavigateTo("/",replace:true);}
+    private string StatusLabel(int s) => s==1?L10n.T("review_order.status_approved"):L10n.T("review_order.status_pending");
+    private string StatusBadge(int s) => s==1?"bg-success":"bg-warning text-dark";
+    private async Task LoadAsync(){_loading=true;_error="";try{_data=await RptSvc.GetReviewOrderListAsync(_from,_to,_salesmanId,_status);}catch(Exception ex){_error=ex.Message;}finally{_loading=false;}}
+    private async Task ExportExcel(){
+        var rows=_data.Select(r=>new Dictionary<string,object?>{["Order Code"]=r.OrderCode,[L10n.T("lbl.salesman")]=r.SalesmanName,[L10n.T("lbl.distributor")]=r.DistributorName,[L10n.T("lbl.outlet")]=r.OutletName,["Order Date"]=r.OrderDate?.ToString("dd/MM/yyyy"),["Total"]=r.TotalOrder,["Status"]=StatusLabel(r.DeliveryStatus)}).ToList();
+        var bytes=await ExportSvc.ToExcelAsync(rows,L10n.T("review_order.page_title"));
+        await JS.InvokeVoidAsync("downloadBase64",Convert.ToBase64String(bytes),$"ReviewOrder_{_from:yyyyMMdd}_{_to:yyyyMMdd}.xlsx","application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
+    }
+}
+

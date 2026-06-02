@@ -1,5 +1,5 @@
-@page "/tracking"
-@attribute [NavMenu(Title="Theo dõi Nhân viên BH", Icon="bi-broadcast-pin", Group="Tracking", GroupOrder=35, Order=10, Hidden=true)]
+﻿@page "/tracking"
+@attribute [NavMenu(Title="tracking.nav_title", Icon="bi-broadcast-pin", Group="nav.tracking", GroupOrder=35, Order=10, Hidden=true)]
 @using BlazorReporting.Services
 @using System.Text.Json
 @inject AuthService Auth
@@ -232,3 +232,5 @@
         try { await JS.InvokeVoidAsync("mapInterop.destroy"); } catch { }
     }
 }
+
+

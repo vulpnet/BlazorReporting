@@ -1,5 +1,5 @@
-@page "/issues/tasks"
-@attribute [NavMenu(Title="Quản lý Task", Icon="bi-list-check", Group="Issues", GroupOrder=50, Order=20)]
+﻿@page "/issues/tasks"
+@attribute [NavMenu(Title="task.nav_title", Icon="bi-list-check", Group="nav.issues", GroupOrder=50, Order=20)]
 @using BlazorReporting.Services
 @inject AuthService Auth
 @inject IssuesService IssueSvc
@@ -177,3 +177,5 @@
         if (ok) { var idx=_data.FindIndex(x=>x.RefNbr==r.RefNbr); if(idx>=0) _data[idx].Active=!r.Active; }
     }
 }
+
+

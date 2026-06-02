@@ -1,0 +1,771 @@
+@page "/help/{Screen}"
+@using BlazorReporting.Services
+@inject LocalizationService L10n
+@inject NavigationManager Nav
+
+<PageTitle>@(CurrentDef?.Title ?? Screen) – Help</PageTitle>
+
+@if (CurrentDef is null)
+{
+    <div class="container-lg py-5 text-center">
+        <i class="bi bi-question-circle display-3 text-muted opacity-25"></i>
+        <h4 class="mt-3 text-muted">Không tìm thấy hướng dẫn cho màn hình "<code>@Screen</code>"</h4>
+        <a href="/help" class="btn btn-outline-primary mt-3"><i class="bi bi-arrow-left me-1"></i>Về trang Help</a>
+    </div>
+}
+else
+{
+    var d = CurrentDef;
+    <div class="container-lg py-4">
+
+        @* ── Hero ── *@
+        <div class="d-flex align-items-center gap-3 mb-4 pb-3 border-bottom">
+            <div style="width:48px;height:48px;border-radius:12px;background:linear-gradient(135deg,@d.GradFrom,@d.GradTo);
+                        display:flex;align-items:center;justify-content:center;font-size:1.4rem;flex-shrink:0">
+                <i class="bi @d.Icon text-white"></i>
+            </div>
+            <div class="flex-grow-1 min-width-0">
+                <h3 class="mb-0 fw-bold">@d.Title</h3>
+                <p class="text-muted small mb-0">@d.TitleEn &nbsp;·&nbsp; <code class="small">@d.Route</code></p>
+            </div>
+            <div class="d-flex gap-2 flex-wrap">
+                <a href="@d.Route" class="btn btn-primary btn-sm">
+                    <i class="bi bi-box-arrow-up-right me-1"></i>Vào màn hình
+                </a>
+                <a href="/help#screen-directory" class="btn btn-outline-secondary btn-sm">
+                    <i class="bi bi-arrow-left me-1"></i>Danh mục
+                </a>
+            </div>
+        </div>
+
+        @* ── Role badge ── *@
+        <div class="mb-4 d-flex align-items-center gap-2 flex-wrap">
+            <span class="text-muted small">Quyền truy cập:</span>
+            @foreach (var r in d.Roles)
+            {
+                <span class="badge @(r=="All"?"bg-success":"bg-primary")">@r</span>
+            }
+        </div>
+
+        @* ── 1. Mô tả ── *@
+        <section class="mb-4">
+            <h5 class="fw-semibold border-start border-3 border-primary ps-2 mb-3">
+                <i class="bi bi-info-circle me-1 text-primary"></i>Mô tả chức năng
+                <small class="text-muted fw-normal ms-2">/ Overview</small>
+            </h5>
+            <div class="card border-0 shadow-sm">
+                <div class="card-body">@((MarkupString)d.Description)</div>
+            </div>
+        </section>
+
+        @* ── 2. Các bước ── *@
+        @if (d.Steps.Any())
+        {
+            <section class="mb-4">
+                <h5 class="fw-semibold border-start border-3 border-success ps-2 mb-3">
+                    <i class="bi bi-list-ol me-1 text-success"></i>Hướng dẫn sử dụng
+                    <small class="text-muted fw-normal ms-2">/ How to use</small>
+                </h5>
+                <div class="card border-0 shadow-sm">
+                    <div class="card-body">
+                        <ol class="ps-3 mb-0">
+                            @foreach (var step in d.Steps)
+                            {
+                                <li class="mb-2 small">@((MarkupString)step)</li>
+                            }
+                        </ol>
+                    </div>
+                </div>
+            </section>
+        }
+
+        @* ── 3. Giải thích cột ── *@
+        @if (d.Columns.Any())
+        {
+            <section class="mb-4">
+                <h5 class="fw-semibold border-start border-3 border-warning ps-2 mb-3">
+                    <i class="bi bi-table me-1 text-warning"></i>Giải thích cột dữ liệu
+                    <small class="text-muted fw-normal ms-2">/ Column reference</small>
+                </h5>
+                <div class="card border-0 shadow-sm">
+                    <div class="table-responsive">
+                        <table class="table table-sm table-hover mb-0">
+                            <thead class="table-light">
+                                <tr>
+                                    <th style="width:180px">Cột / Column</th>
+                                    <th>Mô tả / Description</th>
+                                    <th style="width:100px" class="text-center">Loại / Type</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                @foreach (var col in d.Columns)
+                                {
+                                    <tr>
+                                        <td class="fw-semibold small font-monospace">@col.Name</td>
+                                        <td class="small">@((MarkupString)col.Desc)</td>
+                                        <td class="text-center">
+                                            <span class="badge @ColTypeBadge(col.Type)" style="font-size:.62rem">@col.Type</span>
+                                        </td>
+                                    </tr>
+                                }
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </section>
+        }
+
+        @* ── 4. Lưu ý ── *@
+        @if (d.Notes.Any())
+        {
+            <section class="mb-4">
+                <h5 class="fw-semibold border-start border-3 border-danger ps-2 mb-3">
+                    <i class="bi bi-exclamation-triangle me-1 text-danger"></i>Lưu ý & Cảnh báo
+                    <small class="text-muted fw-normal ms-2">/ Notes & warnings</small>
+                </h5>
+                <div class="card border-0 shadow-sm">
+                    <div class="card-body">
+                        <ul class="ps-3 mb-0">
+                            @foreach (var note in d.Notes)
+                            {
+                                <li class="mb-2 small">@((MarkupString)note)</li>
+                            }
+                        </ul>
+                    </div>
+                </div>
+            </section>
+        }
+
+        @* ── Footer nav ── *@
+        <div class="d-flex gap-2 pt-3 border-top flex-wrap">
+            <a href="/help#screen-directory" class="btn btn-outline-secondary btn-sm">
+                <i class="bi bi-grid-3x3-gap me-1"></i>Danh mục màn hình
+            </a>
+            <a href="/help" class="btn btn-outline-secondary btn-sm">
+                <i class="bi bi-book me-1"></i>Trang Help chính
+            </a>
+            <a href="@d.Route" class="btn btn-primary btn-sm ms-auto">
+                <i class="bi bi-box-arrow-up-right me-1"></i>Vào @d.Title
+            </a>
+        </div>
+    </div>
+}
+
+@code {
+    [Parameter] public string Screen { get; set; } = "";
+
+    private ScreenHelpDef? CurrentDef => _defs.TryGetValue(Screen.ToLowerInvariant(), out var d) ? d : null;
+
+    private static string ColTypeBadge(string t) => t switch {
+        "Số" or "Number" => "bg-info text-dark",
+        "Ngày" or "Date"  => "bg-success",
+        "%" or "Rate"     => "bg-warning text-dark",
+        "Text"            => "bg-secondary",
+        _                 => "bg-light text-dark border"
+    };
+
+    private sealed record ColDef(string Name, string Desc, string Type);
+    private sealed record ScreenHelpDef(
+        string Route, string Title, string TitleEn, string Icon,
+        string GradFrom, string GradTo,
+        string[] Roles,
+        string Description,
+        string[] Steps,
+        ColDef[] Columns,
+        string[] Notes
+    );
+
+    private static readonly Dictionary<string, ScreenHelpDef> _defs = new(StringComparer.OrdinalIgnoreCase)
+    {
+        ["dashboard"] = new("/dashboard", "Dashboard KPI", "Dashboard", "bi-speedometer2", "#2563eb", "#7c3aed",
+            ["All"],
+            "Tổng quan toàn bộ hoạt động bán hàng trong ngày: số NVBH đã đồng bộ, đang bán, doanh số, tỷ lệ viếng thăm. Dữ liệu cập nhật realtime từ SQL Server.",
+            ["Chọn ngày cần xem (mặc định hôm nay).",
+             "Các thẻ KPI phía trên hiển thị tổng số NVBH, đã đồng bộ, đang bán, có đơn.",
+             "Biểu đồ doanh số theo khu vực và Top 10 NPP cập nhật tự động.",
+             "Click vào thẻ SM trong bảng chi tiết để xem thông tin cụ thể."],
+            [new("TotalSM",    "Tổng số Nhân viên bán hàng trong hệ thống", "Số"),
+             new("Synced",     "Số NVBH đã đồng bộ dữ liệu trong ngày", "Số"),
+             new("Selling",    "Số NVBH đang có hoạt động bán hàng", "Số"),
+             new("HasOrder",   "Số NVBH đã có ít nhất 1 đơn hàng", "Số"),
+             new("Revenue",    "Tổng doanh số tích lũy trong ngày (đơn vị triệu VNĐ)", "Số"),
+             new("VisitRate",  "Tỷ lệ % outlet đã viếng thăm / tổng outlet phải thăm", "%")],
+            ["Dashboard chỉ hiển thị dữ liệu <strong>ngày được chọn</strong> — không phải dữ liệu lịch sử nhiều ngày.",
+             "Nếu không có NVBH nào xuất hiện, kiểm tra lại ngày hoặc kết nối DB."]),
+
+        ["report-visit"] = new("/report/visit", "Báo cáo Viếng thăm", "Visit Report", "bi-shop-window", "#0284c7", "#0ea5e9",
+            ["All"],
+            "Màn hình 3 tab: <strong>Tab 1 – KPI Summary</strong> tổng hợp theo TDV; <strong>Tab 2 – Visit Detail</strong> chi tiết từng lần viếng thăm; <strong>Tab 3 – Image Display</strong> hình ảnh trưng bày.",
+            ["Chọn ngày (bắt buộc — chỉ xem được 1 ngày tại 1 thời điểm).",
+             "Nhập Region, Area, NPP ID, Supervisor, Route để lọc (tất cả tùy chọn).",
+             "Nhấn <strong>Xem</strong> để tải dữ liệu — 3 tab load song song.",
+             "Chuyển tab để xem KPI Summary, chi tiết từng lần ghé thăm, hoặc gallery hình ảnh.",
+             "Nhấn <strong>Excel</strong> để xuất dữ liệu tab đang xem."],
+            [new("SalesmanName",  "Tên Nhân viên bán hàng", "Text"),
+             new("RouteCD",       "Mã tuyến bán hàng", "Text"),
+             new("OutletName",    "Tên cửa hàng được ghé thăm", "Text"),
+             new("StartTime",     "Giờ bắt đầu viếng thăm", "Ngày"),
+             new("EndTime",       "Giờ kết thúc viếng thăm", "Ngày"),
+             new("TimeVisit",     "Thời gian ở lại cửa hàng (phút)", "Số"),
+             new("Distance",      "Khoảng cách di chuyển (km)", "Số"),
+             new("TotalSKU",      "Số dòng sản phẩm đặt hàng", "Số"),
+             new("TotalAmount",   "Tổng doanh số đơn hàng (VNĐ)", "Số"),
+             new("HasOrder",      "Có đơn hàng không (✓ / ✗)", "Text"),
+             new("strIsMCP",      "Outlet có trong tuyến MCP không", "Text")],
+            ["Dữ liệu chỉ lấy theo <strong>1 ngày duy nhất</strong> — không hỗ trợ range ngày.",
+             "Tab Image chỉ hiển thị được khi có dữ liệu hình ảnh từ <code>pp_ReportImageProgram</code>.",
+             "Để xem nhiều ngày, dùng màn hình <a href='/help/report-summary'>Tổng hợp thăm SM</a>."]),
+
+        ["report-summary"] = new("/report/summary", "Tổng hợp thăm SM", "SM Visit Summary", "bi-bar-chart-line-fill", "#16a34a", "#4ade80",
+            ["All"],
+            "Tổng hợp KPI theo Nhân viên bán hàng trong khoảng thời gian: outlet phải thăm, đã thăm, đơn hàng, doanh số, giờ đồng bộ.",
+            ["Chọn From Date và To Date.",
+             "Lọc thêm theo Region, Area, NPP, Supervisor, Route, Salesman nếu cần.",
+             "Nhấn <strong>Xem</strong> — dữ liệu lấy từ <code>pp_ReportSMVisitSummary</code>.",
+             "Xuất Excel để phân tích thêm."],
+            [new("SalesmanName",     "Tên NVBH", "Text"),
+             new("OutletMustVisit",  "Số outlet phải viếng thăm theo kế hoạch", "Số"),
+             new("OutletVisited",    "Số outlet đã viếng thăm thực tế", "Số"),
+             new("OrderCount",       "Số đơn hàng", "Số"),
+             new("TotalAmount",      "Tổng doanh số (VNĐ)", "Số"),
+             new("VisitMCP",         "Tỷ lệ viếng thăm trong MCP (%)", "%"),
+             new("FirstSyncTime",    "Giờ đồng bộ đầu tiên trong ngày", "Ngày")],
+            ["SP <code>pp_ReportSMVisitSummary</code> nhận nhiều tham số thời gian (giờ bắt đầu, kết thúc) — WEBAPP để mặc định null.",
+             "Range ngày dài có thể chậm — nên giới hạn trong 1 tháng."]),
+
+        ["report-sales-effective"] = new("/report/sales-effective", "Hiệu quả bán hàng", "Sales Effectiveness", "bi-check2-circle", "#d97706", "#f59e0b",
+            ["All"],
+            "Báo cáo hiệu quả bán hàng theo ngày: số outlet viếng thăm, đơn hàng, tỷ lệ chuyển đổi.",
+            ["Chọn ngày (From Date).",
+             "Lọc theo Region, Area, NPP, Supervisor, Route.",
+             "Nhấn Xem — dữ liệu từ <code>pp_ReportSalesEffective</code>."],
+            [new("SalesmanName",  "Tên NVBH", "Text"),
+             new("OutletVisited", "Số outlet đã thăm", "Số"),
+             new("HasOrder",      "Số outlet có đơn", "Số"),
+             new("OrderRate",     "Tỷ lệ đơn / outlet thăm (%)", "%"),
+             new("TotalAmount",   "Doanh số (VNĐ)", "Số")],
+            ["Chỉ xem được 1 ngày tại 1 thời điểm."]),
+
+        ["report-sales-daily"] = new("/report/sales-daily", "Doanh số ngày MTD", "Sales Daily MTD", "bi-calendar3", "#0891b2", "#06b6d4",
+            ["All"],
+            "Doanh số từng ngày và cộng dồn MTD (Month-To-Date) theo tuyến và TDV.",
+            ["Chọn From Date và To Date trong cùng 1 tháng.",
+             "Lọc theo Route hoặc Salesman ID.",
+             "Nhấn Xem — dữ liệu từ <code>pp_ReportSalesDailyToMTD</code>."],
+            [new("VisitDate",      "Ngày", "Ngày"),
+             new("SalesmanName",   "Tên NVBH", "Text"),
+             new("RouteCD",        "Mã tuyến", "Text"),
+             new("TotalAmount",    "Doanh số trong ngày (VNĐ)", "Số"),
+             new("MTDTotalAmount", "Doanh số cộng dồn MTD (VNĐ)", "Số"),
+             new("OrderCount",     "Số đơn hàng", "Số"),
+             new("TotalSKU",       "Số dòng SKU", "Số"),
+             new("strIsMCP",       "Trong tuyến MCP hay ngoài", "Text")],
+            ["SP <code>pp_ReportSalesDailyToMTD</code> là SP riêng của WEBAPP — khác với DMS2.0 dùng pp_ReportSMVisitSummary."]),
+
+        ["report-timekeeping"] = new("/report/timekeeping", "Chấm công", "Timekeeping", "bi-fingerprint", "#4f46e5", "#818cf8",
+            ["All"],
+            "Thống kê ngày làm việc, ngày đồng bộ, ngày viếng thăm thực tế của NVBH trong khoảng thời gian.",
+            ["Chọn From Date và To Date.",
+             "Lọc theo Region, Area, NPP, Salesman.",
+             "Nhấn Xem — dữ liệu từ <code>pp_ReportTimekeeping</code>."],
+            [new("SalesmanName",    "Tên NVBH", "Text"),
+             new("ScheduleDateWork","Số ngày lịch làm việc theo kế hoạch", "Số"),
+             new("SynchronizeDate", "Số ngày đã đồng bộ dữ liệu", "Số"),
+             new("VisitedDate",     "Số ngày thực tế viếng thăm outlet", "Số"),
+             new("VisitedDateRate", "Tỷ lệ ngày viếng thăm / kế hoạch (%)", "%")],
+            []),
+
+        ["report-user-log"] = new("/report/user-log", "Nhật ký người dùng", "User Log", "bi-clock-history", "#dc2626", "#f87171",
+            ["Admin","SuperAdmin"],
+            "Lịch sử đăng nhập và thao tác của user trong hệ thống: trang đã xem, thời gian truy cập.",
+            ["Chọn From Date và To Date.",
+             "Lọc theo Username.",
+             "Nhấn Xem — dữ liệu từ <code>pp_ReportUserLog</code>."],
+            [new("UserName",  "Tên đăng nhập", "Text"),
+             new("FullName",  "Họ tên", "Text"),
+             new("Page",      "Trang đã truy cập", "Text"),
+             new("Action",    "Hành động thực hiện", "Text"),
+             new("VisitDate", "Thời điểm truy cập", "Ngày")],
+            ["Chỉ Admin và SuperAdmin mới xem được màn hình này."]),
+
+        ["report-user-mobility"] = new("/report/user-mobility", "Di chuyển nhân viên", "User Mobility", "bi-phone-fill", "#0284c7", "#38bdf8",
+            ["All"],
+            "Thống kê trạng thái thiết bị và đồng bộ của NVBH: đã đăng ký app, đã đồng bộ, vai trò SM/ASM.",
+            ["Chọn From Date và To Date.",
+             "Nhấn <strong>Xem</strong> để tải dữ liệu — từ <code>pp_ReportUserUseMobility</code>."],
+            [new("SalesmanCD",    "Mã NVBH", "Text"),
+             new("SalesmanName",  "Tên NVBH", "Text"),
+             new("SalesSupName",  "Tên Supervisor", "Text"),
+             new("DistributorName","Tên NPP", "Text"),
+             new("STLvl0Name",    "Region", "Text"),
+             new("STLvl1Name",    "Area", "Text"),
+             new("SM",            "Có vai trò SM không (✓ / ✗)", "Text"),
+             new("ASM",           "Có vai trò ASM/SS không (✓ / ✗)", "Text"),
+             new("Register",      "Đã đăng ký tài khoản app (Y/N)", "Text"),
+             new("IsSync",        "Đã đồng bộ dữ liệu (Y/N)", "Text")],
+            ["Dữ liệu lấy theo khoảng ngày — nên chọn range trong 1 tháng để tránh chậm."]),
+
+        ["report-synchronous"] = new("/report/synchronous", "Báo cáo Đồng bộ", "Synchronous Report", "bi-arrow-repeat", "#0284c7", "#38bdf8",
+            ["All"],
+            "Thông tin đồng bộ GPS của NVBH: tọa độ cơ sở, tọa độ lúc đồng bộ, khoảng cách, đánh giá đúng giờ hay trễ.",
+            ["Chọn From Date và To Date.",
+             "Nhập <strong>Giờ chuẩn</strong> (mặc định 08:00) — dùng để đánh giá đúng/trễ giờ.",
+             "Lọc Region, Area, NPP, Supervisor.",
+             "Nhấn Xem."],
+            [new("VisitDate",       "Ngày làm việc", "Ngày"),
+             new("SalesmanName",    "Tên NVBH", "Text"),
+             new("LongtitudeBase",  "Kinh độ vị trí cơ sở (điểm xuất phát)", "Số"),
+             new("LatitudeBase",    "Vĩ độ vị trí cơ sở", "Số"),
+             new("LongtitudeSync",  "Kinh độ lúc đồng bộ", "Số"),
+             new("LatitudeSync",    "Vĩ độ lúc đồng bộ", "Số"),
+             new("DistanceWithBase","Khoảng cách giữa cơ sở và điểm đồng bộ (m)", "Số"),
+             new("ValidDistance",   "Khoảng cách có hợp lệ không (≤ ngưỡng cho phép)", "Text"),
+             new("SystemSyncDate",  "Thời điểm đồng bộ vào hệ thống", "Ngày"),
+             new("SyncType",        "Loại đồng bộ: D = đã đồng bộ", "Text"),
+             new("IsTimeValid",     "1 = đúng giờ, 0 = trễ", "Số")],
+            ["<strong>Giờ chuẩn</strong> mặc định 08:00 — NVBH đồng bộ sau giờ này được đánh giá là <span class='badge bg-warning text-dark'>Trễ</span>.",
+             "NVBH chưa đồng bộ (SyncType ≠ D) sẽ không có đánh giá đúng/trễ."]),
+
+        ["report-pc-sm"] = new("/report/pc-sm", "Báo cáo PCSM", "PCSM Report", "bi-percent", "#7c3aed", "#a78bfa",
+            ["All"],
+            "Tỷ lệ Perfect Call (PC) của NVBH và Supervisor: số outlet đạt PC, không đạt, tỷ lệ MTD.",
+            ["Chọn ngày.",
+             "Lọc Region, Area, NPP, Supervisor, Route.",
+             "Nhấn Xem — dữ liệu từ <code>pp_ReportPC_SM</code>."],
+            [new("SalesmanName", "Tên NVBH", "Text"),
+             new("PCPass",       "Số outlet đạt PC", "Số"),
+             new("PCNotPass",    "Số outlet không đạt PC", "Số"),
+             new("PC_MCP",       "Tỷ lệ PC trong MCP (%)", "%"),
+             new("MTDPCPass",    "Số outlet đạt PC cộng dồn MTD", "Số"),
+             new("MTDPC_MCP",    "Tỷ lệ PC MTD trong MCP (%)", "%")],
+            []),
+
+        ["report-evaluation"] = new("/report/evaluation", "Báo cáo Evaluation", "Evaluation Report", "bi-clipboard-check", "#0284c7", "#0ea5e9",
+            ["All"],
+            "Kết quả chấm điểm trưng bày theo chương trình Evaluation: tổng hình, đã marking, đã duyệt, đạt/không đạt.",
+            ["Chọn From Date và To Date.",
+             "Nhập Program ID và Evaluation ID để lọc chương trình cụ thể.",
+             "Lọc thêm Region, Area, NPP, Supervisor, Route.",
+             "Nhấn Xem — dữ liệu từ <code>usp_GetReportEvalBy</code>."],
+            [new("ProgramName",    "Tên chương trình evaluation", "Text"),
+             new("EvaluationID",   "Mã đợt evaluation", "Text"),
+             new("EvalState",      "Trạng thái evaluation", "Text"),
+             new("TotalImg",       "Tổng số hình ảnh cần chấm", "Số"),
+             new("ImagMarking",    "Số hình đã được marking", "Số"),
+             new("ImgApproved",    "Số hình đã duyệt", "Số"),
+             new("ImgPassProgram", "Số hình đạt chương trình", "Số"),
+             new("ImgRejected",    "Số hình bị từ chối", "Số"),
+             new("ImgReMarking",   "Số hình cần marking lại", "Số"),
+             new("TotalOulet",     "Tổng số outlet trong chương trình", "Số"),
+             new("OuletHasMarking","Số outlet đã có marking", "Số")],
+            ["Dữ liệu từ database Visibility riêng — cần đảm bảo kết nối đúng.",
+             "Program ID và Evaluation ID phân biệt chữ hoa/thường."]),
+
+        ["report-review-order"] = new("/report/review-order", "Duyệt đơn hàng", "Review Order", "bi-cart-check", "#15803d", "#4ade80",
+            ["Admin","SuperAdmin","RSM"],
+            "Xem và theo dõi trạng thái duyệt đơn hàng: đang chờ duyệt hoặc đã duyệt.",
+            ["Chọn From Date và To Date.",
+             "Chọn <strong>Trạng thái</strong>: Tất cả / Chờ duyệt / Đã duyệt.",
+             "Lọc theo Salesman ID nếu cần.",
+             "Nhấn Xem — dữ liệu từ <code>pp_ReportGetListReviewOrder</code>."],
+            [new("OrderCode",      "Mã đơn hàng", "Text"),
+             new("SalesmanName",   "Tên NVBH", "Text"),
+             new("DistributorName","Tên NPP", "Text"),
+             new("OutletName",     "Tên cửa hàng", "Text"),
+             new("OrderDate",      "Ngày đặt hàng", "Ngày"),
+             new("TotalOrder",     "Tổng giá trị đơn hàng (VNĐ)", "Số"),
+             new("DeliveryStatus", "Trạng thái: 1=Đã duyệt, 0=Chờ duyệt", "Số")],
+            ["Chỉ Admin, SuperAdmin và RSM được xem màn hình này."]),
+
+        ["distribution"] = new("/distribution", "Phân phối SKU", "Distribution", "bi-box-seam-fill", "#15803d", "#4ade80",
+            ["All"],
+            "Quản lý phân phối SKU sản phẩm theo NPP: xem tồn kho NPP và tồn kho NVBH.",
+            ["Chọn NPP từ dropdown.",
+             "Hệ thống tải danh sách SKU và số lượng phân phối.",
+             "Xem cột tồn kho NPP và tồn kho NVBH để so sánh."],
+            [new("DistributorName", "Tên NPP", "Text"),
+             new("SalesSupName",    "Tên Supervisor", "Text"),
+             new("StockNPP",        "Tồn kho tại NPP", "Số"),
+             new("StockSalesman",   "Tồn kho tại NVBH", "Số"),
+             new("DistributeDate",  "Ngày phân phối", "Ngày")],
+            ["Cần chọn NPP trước khi xem dữ liệu."]),
+
+        ["distribution-budget"] = new("/distribution/budget", "Phân bổ ngân sách", "Budget Assignment", "bi-currency-dollar", "#b45309", "#f59e0b",
+            ["Admin","SuperAdmin","RSM"],
+            "Phân bổ ngân sách KPI cho NVBH theo Supervisor.",
+            ["Chọn ngân sách từ danh sách.",
+             "Nhấn <strong>Thêm mới</strong> để tạo phân bổ mới.",
+             "Nhập Mã NVBH, chỉ tiêu và lưu.",
+             "Nhấn <strong>Duyệt</strong> để xác nhận phân bổ."],
+            [new("BudgetName",   "Tên ngân sách / chương trình KPI", "Text"),
+             new("SalesmanName", "Tên NVBH được phân bổ", "Text"),
+             new("Target",       "Chỉ tiêu được giao", "Số"),
+             new("BudgetValue",  "Giá trị ngân sách", "Số")],
+            ["Chỉ Admin, SuperAdmin và RSM được phân bổ ngân sách."]),
+
+        ["mcp-report"] = new("/mcp/report", "Báo cáo MCP", "MCP Report", "bi-map-fill", "#0284c7", "#38bdf8",
+            ["All"],
+            "Tỷ lệ phủ MCP (Market Coverage Plan) theo tuyến: số outlet trong tuyến, đã ghé thăm.",
+            ["Chọn NPP.",
+             "Nhấn Xem để tải tỷ lệ phủ MCP theo từng tuyến."],
+            [new("RouteCD",       "Mã tuyến", "Text"),
+             new("SalesmanName",  "Tên NVBH", "Text"),
+             new("OutletsInRoute","Số outlet trong tuyến MCP", "Số"),
+             new("Covered",       "Số outlet đã viếng thăm trong MCP", "Số")],
+            []),
+
+        ["issues"] = new("/issues", "Danh sách sự cố", "Issue List", "bi-exclamation-triangle-fill", "#dc2626", "#f87171",
+            ["All"],
+            "Xem và xử lý sự cố được ghi nhận bởi NVBH: ảnh, nội dung, trạng thái.",
+            ["Lọc theo trạng thái: Chờ xử lý / Đã giải quyết.",
+             "Click vào sự cố để xem chi tiết và ảnh đính kèm.",
+             "Nhấn <strong>Xử lý</strong> để đánh dấu đã giải quyết."],
+            [new("OutletName",  "Cửa hàng xảy ra sự cố", "Text"),
+             new("SalesmanName","NVBH ghi nhận", "Text"),
+             new("Content",     "Mô tả sự cố", "Text"),
+             new("VisitDate",   "Ngày ghi nhận", "Ngày"),
+             new("ImageCount",  "Số ảnh đính kèm", "Số"),
+             new("Status",      "Trạng thái: 0=Chờ, 1=Đã xử lý", "Số")],
+            []),
+
+        ["issues-tasks"] = new("/issues/tasks", "Quản lý Task", "Task Management", "bi-list-check", "#7c3aed", "#a78bfa",
+            ["Admin","SuperAdmin"],
+            "Tạo và theo dõi task giao cho NVBH hoặc nhóm outlet.",
+            ["Lọc theo loại task và đối tượng áp dụng.",
+             "Nhấn <strong>Thêm mới</strong> để tạo task.",
+             "Nhập tiêu đề, mô tả, ngày bắt đầu/kết thúc, đối tượng áp dụng.",
+             "Lưu để giao task cho NVBH."],
+            [new("RefNbr",     "Mã task", "Text"),
+             new("Title",      "Tiêu đề task", "Text"),
+             new("Desc",       "Mô tả chi tiết", "Text"),
+             new("StartDate",  "Ngày bắt đầu", "Ngày"),
+             new("EndDate",    "Ngày kết thúc", "Ngày"),
+             new("ApplyTo",    "Áp dụng cho: NVBH hoặc nhóm outlet", "Text"),
+             new("Active",     "Còn hiệu lực không", "Text")],
+            []),
+
+        ["issues-pda-active"] = new("/issues/pda-active", "PDA Salesman Active", "PDA Active", "bi-phone", "#0284c7", "#38bdf8",
+            ["Admin","SuperAdmin"],
+            "Quản lý kích hoạt thiết bị NVBH: xem IMEI đang active, reset khi đổi máy.",
+            ["Nhập Salesman Code hoặc IMEI để tìm kiếm.",
+             "Nhấn Xem để tải danh sách.",
+             "Nhấn <strong>Reset IMEI</strong> trên dòng cần reset — hệ thống xác nhận trước khi thực hiện."],
+            [new("SalesmanCD",    "Mã NVBH", "Text"),
+             new("IMEI",          "Mã IMEI thiết bị đang active", "Text"),
+             new("ActiveDate",    "Ngày kích hoạt", "Ngày"),
+             new("CreateDatetime","Ngày tạo bản ghi", "Ngày")],
+            ["Reset IMEI <strong>không thể hoàn tác</strong> — NVBH sẽ cần đăng nhập lại trên thiết bị mới."]),
+
+        ["user"] = new("/user", "Quản lý người dùng", "User Management", "bi-people-fill", "#1e293b", "#475569",
+            ["Admin","SuperAdmin"],
+            "Xem, tạo, sửa tài khoản người dùng: gán Role, Active/Inactive, reset mật khẩu.",
+            ["Tìm kiếm user theo tên hoặc email.",
+             "Click <strong>Thêm</strong> để tạo tài khoản mới (cần cấu hình SMTP).",
+             "Click vào user để sửa Role hoặc thông tin.",
+             "Toggle Active/Inactive để khóa/mở tài khoản.",
+             "Click <strong>Reset pass</strong> để gửi email đặt lại mật khẩu."],
+            [new("UserName",    "Tên đăng nhập", "Text"),
+             new("FullName",    "Họ và tên", "Text"),
+             new("Email",       "Email liên hệ", "Text"),
+             new("RoleName",    "Role được gán", "Text"),
+             new("IsConfirmed", "Tài khoản đã xác nhận / đang active", "Text")],
+            ["Tính năng tạo user mới yêu cầu cấu hình SMTP — liên hệ IT nếu cần.",
+             "Tài khoản DMS (ApplicationCD=DMS) không được phép cập nhật qua WEBAPP."]),
+
+        ["admin-route-permission"] = new("/admin/route-permission", "Phân quyền Route", "Route Permission", "bi-shield-lock", "#1e293b", "#475569",
+            ["Admin","SuperAdmin"],
+            "Cấu hình Role nào được phép truy cập từng màn hình trong hệ thống. Route chưa cấu hình = tất cả đều vào được.",
+            ["Trang hiển thị bảng: hàng = Route, cột = Role.",
+             "Tick checkbox để cấp quyền cho Role truy cập Route đó.",
+             "Dùng nút <strong>Tích tất cả</strong> / <strong>Bỏ hết</strong> trên header cột để thao tác nhanh theo Role.",
+             "Nhấn <strong>Lưu</strong> trên từng dòng để lưu riêng, hoặc <strong>Lưu tất cả</strong> để lưu toàn bộ.",
+             "Khi user truy cập route không có quyền → hệ thống tự redirect về /dashboard."],
+            [],
+            ["Route <strong>chưa có trong bảng</strong> = chưa cấu hình = tất cả Role đều vào được (mặc định mở).",
+             "Role <strong>Admin</strong> mặc định có quyền vào tất cả route khi khởi động hệ thống lần đầu."]),
+
+        ["config-settings"] = new("/config/settings", "Cấu hình hệ thống", "System Settings", "bi-sliders", "#475569", "#94a3b8",
+            ["Admin","SuperAdmin"],
+            "Quản lý các tham số cấu hình tùy chỉnh của hệ thống: màu sắc, ngưỡng KPI, tham số vận hành.",
+            ["Tìm kiếm Setting Code trong ô tìm kiếm.",
+             "Click <strong>Chỉnh sửa</strong> trên dòng cần thay đổi.",
+             "Sửa giá trị và nhấn Lưu."],
+            [new("SettingCode",  "Mã cấu hình (unique key)", "Text"),
+             new("SettingName",  "Tên mô tả cấu hình", "Text"),
+             new("SettingValue", "Giá trị hiện tại", "Text")],
+            ["Thay đổi cấu hình có hiệu lực ngay không cần restart app.",
+             "Một số setting ảnh hưởng đến logic nghiệp vụ — cẩn thận khi chỉnh sửa."]),
+
+        ["config-phrase"] = new("/config/phrase", "Quản lý cụm từ", "Phrase Management", "bi-translate", "#0e7490", "#22d3ee",
+            ["Admin","SuperAdmin"],
+            "Quản lý từ điển đa ngôn ngữ (VI/EN/ID) dùng trong DMS app: tên chức năng, thông báo, nhãn.",
+            ["Chọn ngôn ngữ cần xem (VI/EN/ID).",
+             "Tìm kiếm từ khóa.",
+             "Click vào dòng để sửa nội dung cụm từ.",
+             "Nhấn Lưu."],
+            [new("PhraseCode", "Mã cụm từ (key)", "Text"),
+             new("Content",    "Nội dung hiển thị theo ngôn ngữ đã chọn", "Text")],
+            ["Thay đổi cụm từ ảnh hưởng đến DMS app trên thiết bị NVBH — cần test lại sau khi sửa."]),
+
+        ["territory-map"] = new("/territory-map", "Territory Map", "Territory Map", "bi-map", "#0e7490", "#22d3ee",
+            ["All"],
+            "Bản đồ khu vực toàn diện: xem lộ trình NVBH, cảnh báo KPI, replay hành trình, biểu đồ doanh số, phân tích sản phẩm theo khu vực.",
+            ["Chọn ngày.",
+             "Chọn khu vực từ cây tổ chức (Region > Area > Distributor > SaleSup > Salesman).",
+             "Click SM trên bản đồ để xem chi tiết.",
+             "Click <i class='bi bi-signpost-2-fill'></i> để vẽ lộ trình.",
+             "Nhấn Alert để xem cảnh báo KPI.",
+             "Nhấn Replay để phát lại hành trình."],
+            [],
+            ["Bản đồ yêu cầu kết nối internet để load tile từ GeoServer.",
+             "Replay hành trình chỉ hoạt động sau khi đã vẽ lộ trình."]),
+
+        ["sales-strategy"] = new("/sales-strategy", "Chiến lược bán hàng", "Sales Strategy (AI)", "bi-robot", "#7c3aed", "#a78bfa",
+            ["Admin","SuperAdmin","RSM"],
+            "Đề xuất chiến lược nhập/xuất/duy trì tồn kho dựa trên dự đoán ML.NET SSA theo Tỉnh × Sản phẩm.",
+            ["Chọn kỳ phân tích (số tháng lịch sử — khuyến nghị 12–18 tháng).",
+             "Nhấn <strong>Phân tích</strong> — hệ thống train ML model và dự đoán.",
+             "Đọc cột Quyết định: Nhập nhiều / Duy trì / Xuất gấp.",
+             "Click tỉnh trên sidebar để lọc theo khu vực.",
+             "Xem 2 biểu đồ Top SP nên Nhập/Xuất ở cuối trang."],
+            [new("Province",    "Tỉnh/Thành phố", "Text"),
+             new("ProductName", "Tên sản phẩm", "Text"),
+             new("AvgActual",   "Doanh số trung bình 3 tháng thực tế", "Số"),
+             new("AvgForecast", "Dự đoán trung bình 3 tháng tới (ML.NET SSA)", "Số"),
+             new("GrowthRate",  "Tốc độ tăng trưởng dự đoán (%)", "%"),
+             new("Decision",    "Quyết định: Nhập nhiều / Duy trì / Xuất gấp", "Text"),
+             new("Confidence",  "Độ tin cậy của dự đoán (%)", "%")],
+            ["Dự đoán dựa trên lịch sử — <strong>không đảm bảo 100% chính xác</strong>.",
+             "Badge <span class='badge' style='background:#7c3aed'>ML.NET SSA</span> = có đủ dữ liệu. Badge vàng = dùng Linear Regression (kém chính xác hơn).",
+             "Chỉ tin tưởng khi cột Độ tin cậy > 60%."]),
+
+        ["report-summary-sales"] = new("/report/summary-sales", "Tổng hợp doanh số", "Summary Sales", "bi-graph-up-arrow", "#16a34a", "#4ade80",
+            ["All"],
+            "Tổng hợp doanh số theo tuyến, NPP, khu vực trong khoảng thời gian.",
+            ["Chọn From Date và To Date.", "Lọc Region, Area, NPP, Supervisor, Route.", "Nhấn Xem — dữ liệu từ <code>pp_GetSummarySales_Local</code>.", "Xuất Excel để phân tích thêm."],
+            [new("DistributorName","Tên NPP","Text"), new("RouteCD","Mã tuyến","Text"), new("SalesmanName","Tên NVBH","Text"), new("TotalAmount","Doanh số (VNĐ)","Số"), new("OrderCount","Số đơn hàng","Số"), new("TotalSKU","Số dòng SKU","Số")],
+            ["SP local thay thế pp_ReportSummarySales gốc do SP gốc quá chậm với dữ liệu lớn."]),
+
+        ["report-daily-plan"] = new("/report/daily-plan", "Kế hoạch ngày", "Daily Plan", "bi-journal-check", "#0284c7", "#38bdf8",
+            ["All"],
+            "Kế hoạch viếng thăm outlet theo ngày của TDV: outlet phải thăm, giờ dự kiến.",
+            ["Chọn ngày.", "Lọc Region, Area, NPP, Supervisor, Route.", "Nhấn Xem — dữ liệu từ <code>pp_GetDailyPlan_Local</code>."],
+            [new("SalesmanName","Tên NVBH","Text"), new("RouteCD","Mã tuyến","Text"), new("OutletName","Tên outlet","Text"), new("PlannedOutlets","Số outlet kế hoạch","Số"), new("VisitedOutlets","Số outlet đã thăm","Số"), new("Orders","Số đơn hàng","Số"), new("Revenue","Doanh số","Số")],
+            ["Dùng SP local thay pp_ReportDailyPlan do cross-DB."]),
+
+        ["report-3g-offline"] = new("/report/3g-offline", "Báo cáo 3G Offline", "3G Offline", "bi-wifi-off", "#dc2626", "#f87171",
+            ["All"],
+            "Thống kê thời gian TDV bị mất kết nối 3G trong ngày làm việc.",
+            ["Chọn From Date và To Date.", "Lọc Region, Area, NPP, Supervisor, Route.", "Nhấn Xem — dữ liệu từ <code>pp_Report3GOffline</code>."],
+            [new("SalesmanName","Tên NVBH","Text"), new("TimeLimit","Ngưỡng thời gian offline (phút)","Số"), new("ActualTime","Thời gian offline thực tế (phút)","Số"), new("Evaluate","Đánh giá: 0=đạt, 1=không đạt","Số")],
+            ["Ngưỡng thời gian offline cấu hình trong System Settings."]),
+
+        ["report-outlet-invalid-location"] = new("/report/outlet-invalid-location", "Outlet GPS không hợp lệ", "Invalid GPS Outlets", "bi-geo-fill", "#dc2626", "#f87171",
+            ["All"],
+            "Danh sách outlet có tọa độ GPS không hợp lệ hoặc nằm ngoài khu vực cho phép.",
+            ["Lọc Region, Area, NPP, Supervisor.", "Nhấn Xem — dữ liệu từ <code>pp_ReportOutletInvalidLocation</code>."],
+            [new("OutletCD","Mã outlet","Text"), new("OutletName","Tên outlet","Text"), new("City","Tỉnh/Thành phố","Text"), new("Latitude","Vĩ độ","Số"), new("Longitude","Kinh độ","Số"), new("IsActive","Đang hoạt động","Text")],
+            ["GPS không hợp lệ thường do TDV check-in khi chưa đến nơi hoặc thiết bị lỗi GPS."]),
+
+        ["report-issues-full"] = new("/report/issues-full", "Báo cáo vấn đề", "Issues Report", "bi-exclamation-circle-fill", "#dc2626", "#f87171",
+            ["All"],
+            "Tổng hợp sự cố được ghi nhận bởi TDV theo khu vực và trạng thái xử lý.",
+            ["Chọn From Date và To Date.", "Lọc Region, Area, NPP, Status.", "Nhấn Xem — dữ liệu từ <code>pp_ReportIssues</code>."],
+            [new("SalesmanName","Tên NVBH","Text"), new("OutletName","Tên outlet","Text"), new("Content","Mô tả sự cố","Text"), new("VisitDate","Ngày ghi nhận","Ngày"), new("ImageCount","Số ảnh","Số"), new("Status","Trạng thái","Số")],
+            []),
+
+        ["report-visit-reason"] = new("/report/visit-reason", "Lý do thăm viếng", "Visit Reason", "bi-chat-square-text", "#0284c7", "#38bdf8",
+            ["All"],
+            "Thống kê lý do viếng thăm không có đơn hàng theo khu vực.",
+            ["Chọn From Date và To Date.", "Lọc Region, Area, NPP, Supervisor, Route.", "Nhấn Xem — dữ liệu từ <code>pp_ReportVisitReason</code>."],
+            [new("SalesmanName","Tên NVBH","Text"), new("VisitNotOrder","Số lần viếng thăm không đơn","Số"), new("VisitNotOrderRate","Tỷ lệ (%)","%" ), new("Reason","Lý do","Text")],
+            []),
+
+        ["report-outlet-not-visit-mcp"] = new("/report/outlet-not-visit-mcp", "CH không thăm MCP", "Outlets Not in MCP", "bi-shop-window", "#b45309", "#f59e0b",
+            ["All"],
+            "Danh sách cửa hàng nằm trong tuyến MCP nhưng chưa được TDV viếng thăm.",
+            ["Chọn From Date và To Date.", "Lọc Region, Area, NPP, Supervisor.", "Nhấn Xem — dữ liệu từ <code>pp_ReportOutletNotVisitInMCP</code>."],
+            [new("SalesmanName","Tên NVBH","Text"), new("RouteCD","Mã tuyến","Text"), new("OutletName","Tên outlet chưa thăm","Text"), new("DistributorName","Tên NPP","Text")],
+            ["Dùng để kiểm tra TDV có bỏ sót outlet trong kế hoạch không."]),
+
+        ["report-display-image"] = new("/report/display-image", "Hình ảnh trưng bày", "Display Image", "bi-images", "#7c3aed", "#a78bfa",
+            ["All"],
+            "Xem hình ảnh trưng bày tại outlet theo chương trình và TDV.",
+            ["Chọn From Date và To Date.", "Lọc Region, Area, NPP, Supervisor, Route.", "Nhấn Xem — dữ liệu từ <code>pp_ReportDisplayImageByOutlet</code>."],
+            [new("SalesmanName","Tên NVBH","Text"), new("OutletName","Tên outlet","Text"), new("ProgramName","Tên chương trình","Text"), new("ImageCount","Số ảnh","Số")],
+            ["Click vào dòng để xem ảnh chi tiết."]),
+
+        ["report-review-work-with"] = new("/report/review-work-with", "Review Work With", "Review Work With", "bi-people", "#0284c7", "#38bdf8",
+            ["All"],
+            "Tổng hợp kết quả đi cùng ASM/SS: số SM làm việc AM/PM, đơn hàng, GPS sai, visit hợp lệ.",
+            ["Chọn ngày.", "Lọc Region, Area, NPP.", "Nhấn Xem — dữ liệu từ <code>pp_ReportReviewWorkWith</code>."],
+            [new("RegionName","Tên Region","Text"), new("AreaName","Tên Area","Text"), new("WWName","Tên ASM/SS","Text"), new("SalesManName","Tên NVBH","Text"), new("SMWorkAM","SM làm việc buổi sáng","Số"), new("SMWorkPM","SM làm việc buổi chiều","Số"), new("OrderSuccessAM","Đơn hàng AM","Số"), new("OrderSuccessPM","Đơn hàng PM","Số"), new("GPSInvalid","Số GPS sai","Số"), new("VisitValid","Số visit hợp lệ","Số")],
+            []),
+
+        ["report-work-with"] = new("/report/work-with", "Work With", "Work With", "bi-person-check", "#16a34a", "#4ade80",
+            ["All"],
+            "Kết quả làm việc cùng TDV theo tuyến: đơn hàng, GPS sai, visit hợp lệ.",
+            ["Chọn ngày.", "Lọc Region, Area, Supervisor.", "Nhấn Xem — dữ liệu từ <code>pp_ReportWorkWith</code>."],
+            [new("RegionName","Tên Region","Text"), new("DistributorName","Tên NPP","Text"), new("RouteID","Mã tuyến","Text"), new("SalesManName","Tên NVBH","Text"), new("GPSInvalid","Số GPS sai","Số"), new("VisitValid","Số visit hợp lệ","Số")],
+            []),
+
+        ["report-reason-visit"] = new("/report/reason-visit", "Lý do viếng thăm", "Visit Reason Detail", "bi-chat-square-dots", "#0284c7", "#38bdf8",
+            ["All"],
+            "Chi tiết lý do từng lần viếng thăm không có đơn hàng.",
+            ["Chọn From Date và To Date.", "Lọc Region, Area, NPP, Supervisor, Route.", "Nhấn Xem — dữ liệu từ <code>pp_ReportVisitReason</code>."],
+            [new("SalesmanName","Tên NVBH","Text"), new("VisitDate","Ngày viếng thăm","Ngày"), new("OutletName","Tên outlet","Text"), new("Reason","Lý do không đặt hàng","Text"), new("VisitNotOrder","Số lần không đơn","Số"), new("VisitNotOrderRate","Tỷ lệ (%)","%" )],
+            []),
+
+        ["report-visit-distance"] = new("/report/visit-distance", "Khoảng cách viếng thăm", "Visit Distance", "bi-signpost-split", "#0284c7", "#38bdf8",
+            ["All"],
+            "Khoảng cách di chuyển của TDV giữa các outlet trong ngày.",
+            ["Chọn From Date và To Date.", "Lọc NPP, Supervisor, Salesman.", "Nhấn Xem — dữ liệu từ <code>pp_GetOutletVisitDistance</code>."],
+            [new("SalesmanName","Tên NVBH","Text"), new("OutletName","Tên outlet","Text"), new("VisitDate","Ngày","Ngày"), new("VisitDistance","Khoảng cách tới outlet này (m)","Số"), new("TotalDistance","Tổng khoảng cách trong ngày (m)","Số")],
+            []),
+
+        ["report-new-outlet"] = new("/report/new-outlet", "Outlet mới", "New Outlet", "bi-shop", "#16a34a", "#4ade80",
+            ["All"],
+            "Danh sách outlet mới được tạo bởi TDV, kèm trạng thái phê duyệt.",
+            ["Chọn From Date và To Date.", "Lọc NPP, Supervisor, Salesman.", "Nhấn Xem — dữ liệu từ <code>BSDH_ReportNewOutlets</code>."],
+            [new("OutletName","Tên outlet mới","Text"), new("Address","Địa chỉ","Text"), new("Phone","Số điện thoại","Text"), new("OutletType","Loại cửa hàng","Text"), new("ApprovalStatus","Trạng thái duyệt","Text"), new("CreatedDate","Ngày tạo","Ngày")],
+            []),
+
+        ["report-update-outlet"] = new("/report/update-outlet", "Outlet cập nhật", "Updated Outlet", "bi-shop-window", "#0284c7", "#38bdf8",
+            ["All"],
+            "Danh sách outlet đã được TDV cập nhật thông tin.",
+            ["Chọn From Date và To Date.", "Lọc NPP, Supervisor, Salesman.", "Nhấn Xem — dữ liệu từ <code>BSDH_ReportUpdateOutlets</code>."],
+            [new("OutletName","Tên outlet","Text"), new("Address","Địa chỉ mới","Text"), new("Phone","SĐT mới","Text"), new("OutletType","Loại cửa hàng","Text"), new("VisitDate","Ngày cập nhật","Ngày")],
+            []),
+
+        ["report-adoption"] = new("/report/adoption", "Adoption", "Adoption Report", "bi-graph-up", "#16a34a", "#4ade80",
+            ["All"],
+            "Tỷ lệ outlet mới được TDV adoption (ghé thăm lần đầu sau khi tạo).",
+            ["Chọn From Date và To Date.", "Lọc NPP, Supervisor ID, Salesman.", "Nhấn Xem — dữ liệu từ <code>BSDH_ReportAdoption</code>."],
+            [new("SalesmanName","Tên NVBH","Text"), new("RouteCD","Mã tuyến","Text"), new("NewOutlet","Số outlet mới","Số"), new("AdoptionOutlet","Số outlet đã adoption","Số"), new("AdoptionRate","Tỷ lệ adoption (%)","%" )],
+            ["Adoption rate >= 80% là tốt (màu xanh), < 50% cần chú ý (màu đỏ)."]),
+
+        ["report-golden-store"] = new("/report/golden-store", "Golden Store", "Golden Store", "bi-star-fill", "#b45309", "#f59e0b",
+            ["All"],
+            "Danh sách cửa hàng đạt chuẩn Golden Store và điểm số.",
+            ["Chọn ngày.", "Lọc NPP, Supervisor ID, Salesman.", "Nhấn Xem — dữ liệu từ <code>BSDH_ReportGoldenStore</code>."],
+            [new("OutletName","Tên cửa hàng","Text"), new("SalesmanName","Tên NVBH phụ trách","Text"), new("GoldenStoreLevel","Cấp độ Golden Store","Text"), new("GoldenScore","Điểm số","Số")],
+            []),
+
+        ["report-general-manager"] = new("/report/general-manager", "General Manager", "General Manager", "bi-building", "#1e293b", "#475569",
+            ["Admin","SuperAdmin","RSM"],
+            "Tổng hợp KPI dành cho Giám đốc: doanh số, outlet có đơn, % đạt chỉ tiêu.",
+            ["Chọn ngày.", "Lọc NPP, Supervisor ID.", "Nhấn Xem — dữ liệu từ <code>BSDH_ReportGeneralManager</code>."],
+            [new("SalesmanName","Tên NVBH","Text"), new("RouteCD","Mã tuyến","Text"), new("OutletHasOrder","Số outlet có đơn","Số"), new("SalesActMTD","Doanh số thực tế MTD","Số"), new("SalesObj","Chỉ tiêu","Số")],
+            ["Chỉ Admin, SuperAdmin và RSM được xem."]),
+
+        ["report-inday-dsr"] = new("/report/inday-dsr", "InDay DSR", "InDay DSR", "bi-calendar-day", "#0284c7", "#38bdf8",
+            ["All"],
+            "Kết quả bán hàng trong ngày và MTD theo TDV: outlet thăm, đơn hàng, doanh số.",
+            ["Chọn ngày.", "Lọc NPP, Supervisor ID, Salesman.", "Nhấn Xem — dữ liệu từ <code>BSDH_ReportInDayDSR</code>."],
+            [new("SalesmanName","Tên NVBH","Text"), new("OutletMustVisit","Outlet phải thăm hôm nay","Số"), new("OutletVisited","Outlet đã thăm","Số"), new("OutletHasOrder","Outlet có đơn","Số"), new("OutletMustVisitMTD","Phải thăm MTD","Số"), new("OutletVisitedMTD","Đã thăm MTD","Số"), new("SalesActMTD","Doanh số MTD","Số")],
+            []),
+
+        ["report-sales-fundamentals"] = new("/report/sales-fundamentals", "Sales Fundamentals", "Sales Fundamentals", "bi-bar-chart-steps", "#0284c7", "#38bdf8",
+            ["All"],
+            "Chỉ số cơ bản bán hàng: khoảng cách viếng thăm, số lần thăm theo outlet.",
+            ["Chọn From Date và To Date.", "Lọc NPP, Supervisor, Salesman.", "Nhấn Xem — dùng chung SP <code>pp_GetOutletVisitDistance</code>."],
+            [new("SalesmanName","Tên NVBH","Text"), new("OutletName","Tên outlet","Text"), new("VisitDistance","Khoảng cách (m)","Số"), new("TotalDistance","Tổng khoảng cách","Số"), new("VisitCount","Số lần thăm","Số")],
+            []),
+
+        ["report-eval-reason"] = new("/report/eval-reason", "Lý do Evaluation", "Eval Reason", "bi-chat-right-text", "#7c3aed", "#a78bfa",
+            ["All"],
+            "Lý do không đạt trong các đợt đánh giá trưng bày.",
+            ["Chọn From Date và To Date.", "Nhập Route, Salesman, Program ID, Evaluation ID.", "Nhấn Xem — dữ liệu từ <code>usp_GetReportReasonBySS</code>."],
+            [new("SalesmanName","Tên NVBH","Text"), new("ProgramName","Tên chương trình","Text"), new("EvaluationID","Mã evaluation","Text"), new("ReasonCode","Mã lý do","Text"), new("ReasonName","Tên lý do","Text"), new("ReasonCount","Số lần xuất hiện","Số")],
+            []),
+
+        ["report-eval-inventory"] = new("/report/eval-inventory", "Tồn kho Evaluation", "Eval Inventory", "bi-boxes", "#7c3aed", "#a78bfa",
+            ["All"],
+            "Tồn kho sản phẩm theo chương trình đánh giá trưng bày.",
+            ["Chọn From Date và To Date.", "Nhập Region, Area, NPP, Route, Program ID, Evaluation ID.", "Tick <strong>Gộp tồn kho</strong> nếu muốn nhóm theo sản phẩm.", "Nhấn Xem — dữ liệu từ <code>usp_GetReporInventoryBy</code>."],
+            [new("ProgramName","Tên chương trình","Text"), new("EvaluationID","Mã evaluation","Text"), new("OutletName","Tên outlet","Text"), new("Content","Tên sản phẩm","Text"), new("TotalSKU","Số lượng tồn kho","Số")],
+            []),
+
+        ["mcp-detail"] = new("/mcp/detail", "Chi tiết MCP", "MCP Detail", "bi-geo-alt-fill", "#0284c7", "#38bdf8",
+            ["All"],
+            "Xem chi tiết danh sách outlet trong tuyến MCP: tần suất viếng thăm, lần ghé cuối.",
+            ["Nhập mã tuyến (Route Code).", "Chọn hiển thị: Tất cả outlet hoặc Chỉ MCP.", "Xem danh sách outlet và thông tin viếng thăm."],
+            [new("OutletName","Tên outlet","Text"), new("RouteCD","Mã tuyến","Text"), new("Frequency","Tần suất viếng thăm","Số"), new("LastVisit","Ngày ghé thăm cuối","Ngày"), new("Status","Trạng thái MCP","Text")],
+            []),
+
+        ["issues-digital"] = new("/issues/digital", "Nội dung số", "Digital Content", "bi-file-earmark-play", "#7c3aed", "#a78bfa",
+            ["Admin","SuperAdmin"],
+            "Quản lý file nội dung số (video, tài liệu) phân phối cho TDV qua app mobile.",
+            ["Nhập mô tả, ngày hiệu lực, chọn file.", "Tick <strong>Active</strong> nếu muốn kích hoạt ngay.", "Nhấn <strong>Upload</strong> để lưu.", "Danh sách file hiển thị bên dưới."],
+            [new("FileName","Tên file đã upload","Text"), new("Content","Mô tả nội dung","Text"), new("StartTime","Ngày bắt đầu hiệu lực","Ngày"), new("EndTime","Ngày hết hiệu lực","Ngày"), new("UserName","Người upload","Text"), new("IsValid","Đang active","Text")],
+            ["File được lưu vào thư mục <code>App_Data/Upload</code> trên server.",
+             "TDV sẽ tải file này qua app khi đồng bộ."]),
+
+        ["issues-report-usage-app"] = new("/issues/report-usage-app", "Báo cáo sử dụng App", "App Usage Report", "bi-bar-chart-line", "#0284c7", "#38bdf8",
+            ["Admin","SuperAdmin"],
+            "Thống kê tần suất sử dụng ứng dụng mobile theo NPP và Role.",
+            ["Chọn From Date và To Date.", "Lọc NPP, Role.", "Nhấn Xem + xuất Excel — dữ liệu từ <code>pp_ReportSFUsageApp</code>."],
+            [new("SalesmanName","Tên NVBH","Text"), new("DistributorName","Tên NPP","Text"), new("RoleName","Role","Text"), new("Click","Số lần đăng nhập/thao tác","Số"), new("Page","Trang/chức năng sử dụng","Text"), new("VisitDate","Ngày","Ngày")],
+            []),
+
+        ["tracking"] = new("/tracking", "Theo dõi NVBH", "Live Tracking", "bi-broadcast-pin", "#1e293b", "#475569",
+            ["Admin","SuperAdmin","RSM","ASM"],
+            "Theo dõi vị trí NVBH realtime trên bản đồ: xem GPS hiện tại, lộ trình trong ngày.",
+            ["Chọn ngày và khu vực.", "Bản đồ hiển thị vị trí tất cả NVBH đang đồng bộ.", "Click marker NVBH để xem chi tiết.", "Click <i class='bi bi-signpost-2-fill'></i> để vẽ lộ trình."],
+            [],
+            ["Chỉ hiển thị NVBH có đồng bộ GPS trong ngày được chọn.",
+             "Màn hình ẩn khỏi menu — truy cập trực tiếp qua URL <code>/tracking</code>."]),
+
+        ["user-action-log-territory"] = new("/user/action-log-territory", "Log hành động khu vực", "Territory Action Log", "bi-geo-alt", "#1e293b", "#475569",
+            ["Admin","SuperAdmin"],
+            "Lịch sử thay đổi khu vực quản lý của người dùng: ai thay đổi, khu vực nào, khi nào.",
+            ["Chọn From Date và To Date.", "Nhập User ID nếu cần lọc theo user cụ thể.", "Nhấn Xem — dữ liệu từ <code>pp_ReportUserActionLogTerritory</code>.", "Xuất Excel hoặc Excel RAW Data."],
+            [new("SalesmanName","Tên người dùng","Text"), new("TerritoryCD","Mã khu vực","Text"), new("TerritoryName","Tên khu vực","Text"), new("ActionType","Loại hành động","Text"), new("ActionDate","Thời điểm thực hiện","Ngày")],
+            ["Excel RAW Data xuất toàn bộ dữ liệu không qua pivot."]),
+
+        ["admin-security"] = new("/admin/security", "Security Dashboard", "Security Dashboard", "bi-shield-lock-fill", "#1e293b", "#475569",
+            ["Admin","SuperAdmin"],
+            "Giám sát bảo mật: phiên đăng nhập đang hoạt động, thiết bị, cảnh báo đăng nhập bất thường.",
+            ["Xem danh sách phiên đang active.", "Kiểm tra cảnh báo đăng nhập nhiều thiết bị.", "Thu hồi phiên nếu phát hiện bất thường."],
+            [],
+            ["Hệ thống giới hạn tối đa 3 thiết bị đồng thời theo ISO 27001.",
+             "Phiên tự hết hạn sau 2 giờ không hoạt động."]),
+
+        ["config-system"] = new("/config/system", "Tham số hệ thống", "System Parameters", "bi-gear-fill", "#475569", "#94a3b8",
+            ["Admin","SuperAdmin"],
+            "Cấu hình các tham số vận hành hệ thống: ngưỡng GPS, giờ chuẩn, v.v.",
+            ["Xem danh sách tham số hiện tại.", "Click vào dòng cần sửa.", "Nhập giá trị mới và lưu."],
+            [new("SettingCode","Mã tham số","Text"), new("SettingValue","Giá trị hiện tại","Text")],
+            ["Tham số hệ thống ảnh hưởng đến logic tính toán — cẩn thận khi thay đổi."]),
+
+        ["config-shift"] = new("/config/shift", "Ca làm việc", "Shift Setting", "bi-clock-fill", "#475569", "#94a3b8",
+            ["Admin","SuperAdmin"],
+            "Cấu hình ca làm việc: giờ bắt đầu, kết thúc, tên ca cho từng nhóm NVBH.",
+            ["Xem danh sách ca hiện tại.", "Nhấn Thêm để tạo ca mới.", "Nhập tên ca, giờ bắt đầu/kết thúc và lưu."],
+            [new("ShiftName","Tên ca làm việc","Text"), new("StartTime","Giờ bắt đầu","Text"), new("EndTime","Giờ kết thúc","Text")],
+            []),
+
+        ["config-schedule-submit"] = new("/config/schedule-submit", "Mở/Đóng lịch", "Schedule Submit", "bi-calendar-check-fill", "#475569", "#94a3b8",
+            ["Admin","SuperAdmin"],
+            "Mở hoặc đóng chu kỳ nộp lịch làm việc cho NVBH.",
+            ["Xem trạng thái chu kỳ hiện tại.", "Nhấn <strong>Mở</strong> để cho phép NVBH nộp lịch.", "Nhấn <strong>Đóng</strong> để khóa chu kỳ."],
+            [],
+            ["Khi đóng chu kỳ, NVBH không thể nộp hoặc sửa lịch trên app mobile."]),
+
+        ["home-custom-setting"] = new("/home/custom-setting", "Cài màu UI", "UI Custom Color", "bi-palette-fill", "#7c3aed", "#a78bfa",
+            ["Admin","SuperAdmin"],
+            "Tuỳ chỉnh màu sắc và ngưỡng hiển thị cho Dashboard và các widget.",
+            ["Xem danh sách cấu hình màu hiện tại.", "Nhấn Thêm để tạo cấu hình mới.", "Nhập tên, loại, giá trị từ/đến, màu sắc.", "Lưu để áp dụng ngay."],
+            [new("Name","Tên cấu hình màu","Text"), new("Type","Loại (KPI, Status...)","Text"), new("ValueFrom","Ngưỡng từ","Số"), new("ValueTo","Ngưỡng đến","Số"), new("Color","Mã màu HEX","Text")],
+            ["Màu áp dụng ngay cho tất cả user sau khi lưu."]),
+
+        ["product-sales"] = new("/product-sales", "Phân tích sản phẩm", "Product Analysis", "bi-box-seam", "#b45309", "#f59e0b",
+            ["All"],
+            "Phân tích Top N sản phẩm bán chạy theo khu vực + dự đoán xu hướng ML.NET SSA 3 tháng tới.",
+            ["Chọn năm, kỳ (cả năm/quý/tháng), nhóm theo, Top N.", "Chọn metric: Số lượng hoặc Doanh số.", "Xem biểu đồ khu vực.", "Chọn mã sản phẩm để xem xu hướng + dự đoán.", "Xem bảng chiến lược gợi ý cuối trang."],
+            [],
+            ["Cần ít nhất 4 tháng dữ liệu để dùng ML.NET SSA. Dưới 4 tháng tự động dùng Linear Regression.",
+             "Xem trang <a href='/help/sales-strategy'>Chiến lược bán hàng</a> để biết thêm về thuật toán SSA."]),
+    };
+}
+

@@ -1,5 +1,5 @@
-@page "/home/custom-setting"
-@attribute [NavMenu(Title="Cài màu UI", Icon="bi-palette-fill", Group="Quản trị", GroupOrder=90, Order=50)]
+﻿@page "/home/custom-setting"
+@attribute [NavMenu(Title="custom_ui.nav_title", Icon="bi-palette-fill", Group="nav.admin_menu", GroupOrder=90, Order=50)]
 @using BlazorReporting.Services
 @inject AuthService Auth
 @inject DashboardService DashSvc
@@ -167,3 +167,5 @@
         if (ok) { _settings.RemoveAll(x=>x.ID==id); _ok=true; _msg=L10n.T("custom_setting.msg_delete_ok"); }
     }
 }
+
+

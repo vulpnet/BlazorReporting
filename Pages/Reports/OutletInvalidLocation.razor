@@ -1,5 +1,5 @@
-@page "/report/outlet-invalid-location"
-@attribute [NavMenu(Title="Outlet GPS không hợp lệ", Icon="bi-geo-fill", Group="nav.reports", GroupOrder=20, Order=90)]
+﻿@page "/report/outlet-invalid-location"
+@attribute [NavMenu(Title="outlet_invalid.nav_title", Icon="bi-geo-fill", Group="nav.reports", GroupOrder=20, Order=90)]
 @using BlazorReporting.Services
 @inject AuthService Auth
 @inject ReportService RptSvc
@@ -54,3 +54,4 @@
         try{_data=await RptSvc.GetOutletInvalidLocationAsync(Auth.UserName,sup:_sup);}
         catch(Exception ex){_error=ex.Message;}finally{_loading=false;}}
 }
+

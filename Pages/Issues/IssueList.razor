@@ -1,5 +1,5 @@
-@page "/issues"
-@attribute [NavMenu(Title="issues.page_title", Icon="bi-exclamation-triangle-fill", Group="Issues", GroupOrder=50, Order=10)]
+﻿@page "/issues"
+@attribute [NavMenu(Title="issues.page_title", Icon="bi-exclamation-triangle-fill", Group="nav.issues", GroupOrder=50, Order=10)]
 @using BlazorReporting.Services
 @inject AuthService Auth
 @inject IssuesService IssueSvc
@@ -149,3 +149,4 @@
         _editId = 0;
     }
 }
+

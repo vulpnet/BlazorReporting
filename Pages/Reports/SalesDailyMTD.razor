@@ -1,5 +1,5 @@
-@page "/report/sales-daily"
-@attribute [NavMenu(Title="Doanh số ngày MTD", Icon="bi-calendar3", Group="nav.reports", GroupOrder=20, Order=50)]
+﻿@page "/report/sales-daily"
+@attribute [NavMenu(Title="sales_daily.nav_title", Icon="bi-calendar3", Group="nav.reports", GroupOrder=20, Order=50)]
 @using BlazorReporting.Services
 @inject AuthService Auth
 @inject ReportService RptSvc
@@ -56,3 +56,4 @@
         try{_data=await RptSvc.GetSalesDailyToMTDAsync(_from,_to,Auth.UserName,route:_route,salesmanId:_sm);}
         catch(Exception ex){_error=ex.Message;}finally{_loading=false;}}
 }
+

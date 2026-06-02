@@ -1,0 +1,60 @@
+﻿@page "/report/eval-reason"
+@attribute [NavMenu(Title="eval_reason.nav_title", Icon="bi-chat-right-text", Group="nav.reports", GroupOrder=20, Order=300)]
+@using BlazorReporting.Services
+@inject AuthService Auth
+@inject ReportService RptSvc
+@inject IExportService ExportSvc
+@inject IJSRuntime JS
+@inject NavigationManager Nav
+@inject LocalizationService L10n
+<PageTitle>@L10n.T("eval_reason.page_title")</PageTitle>
+<div class="container-fluid mt-3">
+    <h5 class="mb-3"><i class="bi bi-chat-right-text me-2"></i>@L10n.T("eval_reason.page_title")</h5>
+    <div class="card shadow-sm mb-3"><div class="card-body py-2">
+        <div class="d-flex gap-2 flex-wrap align-items-end">
+            <div><label class="form-label small mb-1">@L10n.T("lbl.from_date")</label><input type="date" class="form-control form-control-sm" style="width:150px" @bind="_from"/></div>
+            <div><label class="form-label small mb-1">@L10n.T("lbl.to_date")</label><input type="date" class="form-control form-control-sm" style="width:150px" @bind="_to"/></div>
+            <div><label class="form-label small mb-1">@L10n.T("lbl.route")</label><input class="form-control form-control-sm" style="width:120px" @bind="_routeId"/></div>
+            <div><label class="form-label small mb-1">@L10n.T("lbl.salesman")</label><input class="form-control form-control-sm" style="width:120px" @bind="_salesmanId"/></div>
+            <div><label class="form-label small mb-1">@L10n.T("eval.lbl_program")</label><input class="form-control form-control-sm" style="width:110px" @bind="_programId"/></div>
+            <div><label class="form-label small mb-1">@L10n.T("eval.lbl_eval_id")</label><input class="form-control form-control-sm" style="width:110px" @bind="_evalId"/></div>
+            <button class="btn btn-sm btn-primary" @onclick="LoadAsync"><i class="bi bi-search me-1"></i>@L10n.T("btn.view")</button>
+            @if (_data.Any()) { <button class="btn btn-sm btn-success" @onclick="ExportExcel"><i class="bi bi-file-earmark-excel me-1"></i>Excel</button> <span class="text-muted small ms-1">@_data.Count @L10n.T("grid.rows_suffix")</span> }
+        </div>
+    </div></div>
+    @if (!string.IsNullOrEmpty(_error)) { <div class="alert alert-danger py-2 alert-dismissible">@_error<button class="btn-close" @onclick="()=>_error=string.Empty"></button></div> }
+    @if (_loading) { <div class="text-center py-4"><span class="spinner-border text-primary"></span></div> }
+    else {
+        <SortableGrid Items="_data" Context="r" MinWidth="900px" DefaultPageSize="20">
+            <Columns>
+                <GridColumn TItem="GenericReportRow" Title="@L10n.T("lbl.salesman")"        Value="@(x=>x.SalesmanName)"/>
+                <GridColumn TItem="GenericReportRow" Title="@L10n.T("eval.col_program")"    Value="@(x=>x.ProgramName)"/>
+                <GridColumn TItem="GenericReportRow" Title="@L10n.T("eval.col_eval_id")"    Value="@(x=>x.EvaluationID)"/>
+                <GridColumn TItem="GenericReportRow" Title="@L10n.T("eval_reason.col_reason_code")" Value="@(x=>x.ReasonCode)"/>
+                <GridColumn TItem="GenericReportRow" Title="@L10n.T("eval_reason.col_reason_name")" Value="@(x=>x.ReasonName)"/>
+                <GridColumn TItem="GenericReportRow" Title="@L10n.T("eval_reason.col_count")"Value="@(x=>x.ReasonCount)" Align="end"/>
+            </Columns>
+            <RowTemplate>
+                <td class="fw-semibold small">@r.SalesmanName</td>
+                <td class="small">@r.ProgramName</td>
+                <td class="small font-monospace">@r.EvaluationID</td>
+                <td class="small font-monospace">@r.ReasonCode</td>
+                <td class="small">@r.ReasonName</td>
+                <td class="text-end fw-semibold">@r.ReasonCount</td>
+            </RowTemplate>
+        </SortableGrid>
+    }
+</div>
+@code {
+    private List<GenericReportRow> _data=new(); private bool _loading; private string _error="";
+    private DateTime _from=DateTime.Today.AddMonths(-1), _to=DateTime.Today;
+    private string _routeId="",_salesmanId="",_programId="",_evalId="";
+    protected override void OnInitialized(){if(!Auth.IsLoggedIn)Nav.NavigateTo("/",replace:true);}
+    private async Task LoadAsync(){_loading=true;_error="";try{_data=await RptSvc.GetReportEvalReasonAsync(_from,_to,Auth.UserName,_routeId,_salesmanId,_programId,_evalId);}catch(Exception ex){_error=ex.Message;}finally{_loading=false;}}
+    private async Task ExportExcel(){
+        var rows=_data.Select(r=>new Dictionary<string,object?>{[L10n.T("lbl.salesman")]=r.SalesmanName,["Program"]=r.ProgramName,["EvalID"]=r.EvaluationID,["Reason Code"]=r.ReasonCode,["Reason"]=r.ReasonName,["Count"]=r.ReasonCount}).ToList();
+        var bytes=await ExportSvc.ToExcelAsync(rows,L10n.T("eval_reason.page_title"));
+        await JS.InvokeVoidAsync("downloadBase64",Convert.ToBase64String(bytes),$"EvalReason_{_from:yyyyMMdd}_{_to:yyyyMMdd}.xlsx","application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
+    }
+}
+

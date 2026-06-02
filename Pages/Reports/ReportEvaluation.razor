@@ -1,0 +1,73 @@
+﻿@page "/report/evaluation"
+@attribute [NavMenu(Title="eval.nav_title", Icon="bi-clipboard-check", Group="nav.reports", GroupOrder=20, Order=290)]
+@using BlazorReporting.Services
+@inject AuthService Auth
+@inject ReportService RptSvc
+@inject IExportService ExportSvc
+@inject IJSRuntime JS
+@inject NavigationManager Nav
+@inject LocalizationService L10n
+<PageTitle>@L10n.T("eval.page_title")</PageTitle>
+<div class="container-fluid mt-3">
+    <h5 class="mb-3"><i class="bi bi-clipboard-check me-2"></i>@L10n.T("eval.page_title")</h5>
+    <div class="card shadow-sm mb-3"><div class="card-body py-2">
+        <div class="d-flex gap-2 flex-wrap align-items-end">
+            <div><label class="form-label small mb-1">@L10n.T("lbl.from_date")</label><input type="date" class="form-control form-control-sm" style="width:150px" @bind="_from"/></div>
+            <div><label class="form-label small mb-1">@L10n.T("lbl.to_date")</label><input type="date" class="form-control form-control-sm" style="width:150px" @bind="_to"/></div>
+            <div><label class="form-label small mb-1">@L10n.T("lbl.region")</label><input class="form-control form-control-sm" style="width:110px" @bind="_regionId"/></div>
+            <div><label class="form-label small mb-1">@L10n.T("lbl.area")</label><input class="form-control form-control-sm" style="width:110px" @bind="_areaId"/></div>
+            <div><label class="form-label small mb-1">@L10n.T("lbl.distributor")</label><input type="number" class="form-control form-control-sm" style="width:100px" @bind="_distId"/></div>
+            <div><label class="form-label small mb-1">@L10n.T("lbl.supervisor")</label><input class="form-control form-control-sm" style="width:110px" @bind="_supId"/></div>
+            <div><label class="form-label small mb-1">@L10n.T("lbl.route")</label><input class="form-control form-control-sm" style="width:110px" @bind="_routeId"/></div>
+            <div><label class="form-label small mb-1">@L10n.T("eval.lbl_program")</label><input class="form-control form-control-sm" style="width:110px" @bind="_programId"/></div>
+            <div><label class="form-label small mb-1">@L10n.T("eval.lbl_eval_id")</label><input class="form-control form-control-sm" style="width:110px" @bind="_evalId"/></div>
+            <button class="btn btn-sm btn-primary" @onclick="LoadAsync"><i class="bi bi-search me-1"></i>@L10n.T("btn.view")</button>
+            @if (_data.Any()) { <button class="btn btn-sm btn-success" @onclick="ExportExcel"><i class="bi bi-file-earmark-excel me-1"></i>Excel</button> <span class="text-muted small ms-1">@_data.Count @L10n.T("grid.rows_suffix")</span> }
+        </div>
+    </div></div>
+    @if (!string.IsNullOrEmpty(_error)) { <div class="alert alert-danger py-2 alert-dismissible">@_error<button class="btn-close" @onclick="()=>_error=string.Empty"></button></div> }
+    @if (_loading) { <div class="text-center py-4"><span class="spinner-border text-primary"></span></div> }
+    else {
+        <SortableGrid Items="_data" Context="r" MinWidth="1100px" DefaultPageSize="20">
+            <Columns>
+                <GridColumn TItem="GenericReportRow" Title="@L10n.T("eval.col_program")"        Value="@(x=>x.ProgramName)"/>
+                <GridColumn TItem="GenericReportRow" Title="@L10n.T("eval.col_eval_id")"        Value="@(x=>x.EvaluationID)"/>
+                <GridColumn TItem="GenericReportRow" Title="@L10n.T("eval.col_state")"          Value="@(x=>x.EvalState)" Align="center"/>
+                <GridColumn TItem="GenericReportRow" Title="@L10n.T("eval.col_total_img")"      Value="@(x=>x.TotalImg)" Align="end"/>
+                <GridColumn TItem="GenericReportRow" Title="@L10n.T("eval.col_img_marking")"    Value="@(x=>x.ImagMarking)" Align="end"/>
+                <GridColumn TItem="GenericReportRow" Title="@L10n.T("eval.col_img_approved")"   Value="@(x=>x.ImgApproved)" Align="end"/>
+                <GridColumn TItem="GenericReportRow" Title="@L10n.T("eval.col_img_pass")"       Value="@(x=>x.ImgPassProgram)" Align="end"/>
+                <GridColumn TItem="GenericReportRow" Title="@L10n.T("eval.col_img_rejected")"   Value="@(x=>x.ImgRejected)" Align="end"/>
+                <GridColumn TItem="GenericReportRow" Title="@L10n.T("eval.col_img_remarking")"  Value="@(x=>x.ImgReMarking)" Align="end"/>
+                <GridColumn TItem="GenericReportRow" Title="@L10n.T("eval.col_total_outlet")"   Value="@(x=>x.TotalOulet)" Align="end"/>
+                <GridColumn TItem="GenericReportRow" Title="@L10n.T("eval.col_outlet_marking")" Value="@(x=>x.OuletHasMarking)" Align="end"/>
+            </Columns>
+            <RowTemplate>
+                <td class="small">@r.ProgramName</td>
+                <td class="small font-monospace">@r.EvaluationID</td>
+                <td class="text-center small">@r.EvalState</td>
+                <td class="text-end">@r.TotalImg</td>
+                <td class="text-end">@r.ImagMarking</td>
+                <td class="text-end text-success">@r.ImgApproved</td>
+                <td class="text-end text-primary">@r.ImgPassProgram</td>
+                <td class="text-end text-danger">@r.ImgRejected</td>
+                <td class="text-end text-warning">@r.ImgReMarking</td>
+                <td class="text-end fw-semibold">@r.TotalOulet</td>
+                <td class="text-end">@r.OuletHasMarking</td>
+            </RowTemplate>
+        </SortableGrid>
+    }
+</div>
+@code {
+    private List<GenericReportRow> _data=new(); private bool _loading; private string _error="";
+    private DateTime _from=DateTime.Today.AddMonths(-1), _to=DateTime.Today;
+    private string _regionId="",_areaId="",_supId="",_routeId="",_salesmanId="",_programId="",_evalId=""; private int _distId=0;
+    protected override void OnInitialized(){if(!Auth.IsLoggedIn)Nav.NavigateTo("/",replace:true);}
+    private async Task LoadAsync(){_loading=true;_error="";try{_data=await RptSvc.GetReportEvaluationAsync(_from,_to,Auth.UserName,_regionId,_areaId,_distId,_supId,_routeId,_salesmanId,_programId,_evalId);}catch(Exception ex){_error=ex.Message;}finally{_loading=false;}}
+    private async Task ExportExcel(){
+        var rows=_data.Select(r=>new Dictionary<string,object?>{["Program"]=r.ProgramName,["EvalID"]=r.EvaluationID,["State"]=r.EvalState,["TotalImg"]=r.TotalImg,["Marking"]=r.ImagMarking,["Approved"]=r.ImgApproved,["Pass"]=r.ImgPassProgram,["Rejected"]=r.ImgRejected,["Remarking"]=r.ImgReMarking,["TotalOutlet"]=r.TotalOulet,["OutletMarking"]=r.OuletHasMarking}).ToList();
+        var bytes=await ExportSvc.ToExcelAsync(rows,L10n.T("eval.page_title"));
+        await JS.InvokeVoidAsync("downloadBase64",Convert.ToBase64String(bytes),$"Evaluation_{_from:yyyyMMdd}_{_to:yyyyMMdd}.xlsx","application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
+    }
+}
+

@@ -1,0 +1,62 @@
+﻿@page "/report/adoption"
+@attribute [NavMenu(Title="adoption.nav_title", Icon="bi-graph-up", Group="nav.reports", GroupOrder=20, Order=240)]
+@using BlazorReporting.Services
+@inject AuthService Auth
+@inject ReportService RptSvc
+@inject IExportService ExportSvc
+@inject IJSRuntime JS
+@inject NavigationManager Nav
+@inject LocalizationService L10n
+<PageTitle>@L10n.T("adoption.page_title")</PageTitle>
+<div class="container-fluid mt-3">
+    <h5 class="mb-3"><i class="bi bi-graph-up me-2"></i>@L10n.T("adoption.page_title")</h5>
+    <div class="card shadow-sm mb-3"><div class="card-body py-2">
+        <div class="d-flex gap-2 flex-wrap align-items-end">
+            <div><label class="form-label small mb-1">@L10n.T("lbl.from_date")</label><input type="date" class="form-control form-control-sm" style="width:150px" @bind="_from"/></div>
+            <div><label class="form-label small mb-1">@L10n.T("lbl.to_date")</label><input type="date" class="form-control form-control-sm" style="width:150px" @bind="_to"/></div>
+            <div><label class="form-label small mb-1">@L10n.T("lbl.distributor")</label><input type="number" class="form-control form-control-sm" style="width:110px" @bind="_distId"/></div>
+            <div><label class="form-label small mb-1">@L10n.T("adoption.lbl_sup_id")</label><input type="number" class="form-control form-control-sm" style="width:110px" @bind="_supId"/></div>
+            <div><label class="form-label small mb-1">@L10n.T("lbl.salesman")</label><input class="form-control form-control-sm" style="width:120px" @bind="_salesmanId"/></div>
+            <button class="btn btn-sm btn-primary" @onclick="LoadAsync"><i class="bi bi-search me-1"></i>@L10n.T("btn.view")</button>
+            @if (_data.Any()) { <button class="btn btn-sm btn-success" @onclick="ExportExcel"><i class="bi bi-file-earmark-excel me-1"></i>Excel</button> <span class="text-muted small ms-1">@_data.Count dÃ²ng</span> }
+        </div>
+    </div></div>
+    @if (_error != null) { <div class="alert alert-danger py-2 alert-dismissible">@_error<button class="btn-close" @onclick="()=>_error=null"></button></div> }
+    @if (_loading) { <div class="text-center py-4"><span class="spinner-border text-primary"></span></div> }
+    else {
+        <SortableGrid Items="_data" Context="r" MinWidth="1000px" DefaultPageSize="20">
+            <Columns>
+                <GridColumn TItem="GenericReportRow" Title="@L10n.T("lbl.distributor")"      Value="@(x=>x.DistributorName)"/>
+                <GridColumn TItem="GenericReportRow" Title="@L10n.T("lbl.supervisor")"      Value="@(x=>x.SalesSupName)"/>
+                <GridColumn TItem="GenericReportRow" Title="@L10n.T("lbl.salesman")"        Value="@(x=>x.SalesmanName)"/>
+                <GridColumn TItem="GenericReportRow" Title="@L10n.T("lbl.route")"           Value="@(x=>x.RouteCD)"/>
+                <GridColumn TItem="GenericReportRow" Title="@L10n.T("adoption.col_new_outlet")" Value="@(x=>x.NewOutlet)" Align="end"/>
+                <GridColumn TItem="GenericReportRow" Title="@L10n.T("adoption.col_adopted")"    Value="@(x=>x.AdoptionOutlet)" Align="end"/>
+                <GridColumn TItem="GenericReportRow" Title="@L10n.T("adoption.col_rate")"       Value="@(x=>x.AdoptionRate.ToString("P1"))" Align="end"/>
+            </Columns>
+            <RowTemplate>
+                <td class="small">@r.DistributorName</td>
+                <td class="small">@r.SalesSupName</td>
+                <td class="fw-semibold small">@r.SalesmanName</td>
+                <td class="small font-monospace">@r.RouteCD</td>
+                <td class="text-end small">@r.NewOutlet</td>
+                <td class="text-end small">@r.AdoptionOutlet</td>
+                <td class="text-end small fw-semibold @(r.AdoptionRate>=0.8m?"text-success":r.AdoptionRate>=0.5m?"text-warning":"text-danger")">@r.AdoptionRate.ToString("P1")</td>
+            </RowTemplate>
+        </SortableGrid>
+    }
+</div>
+@code {
+    private List<GenericReportRow> _data = new(); private bool _loading; private string? _error;
+    private DateTime _from = DateTime.Today.AddDays(-30), _to = DateTime.Today;
+    private string _salesmanId=""; private int _distId=0,_supId=0;
+    protected override void OnInitialized() { if (!Auth.IsLoggedIn) Nav.NavigateTo("/", replace: true); }
+    private async Task LoadAsync() { _loading=true;_error=null; try { _data=await RptSvc.GetReportAdoptionAsync(_from,_to,Auth.UserName,_distId,_supId,_salesmanId); } catch(Exception ex){_error=ex.Message;} finally{_loading=false;} }
+    private async Task ExportExcel() {
+        var rows=_data.Select(r=>new Dictionary<string,object?>{["NPP"]=r.DistributorName,["Supervisor"]=r.SalesSupName,["Salesman"]=r.SalesmanName,["Route"]=r.RouteCD,["Outlet má»›i"]=r.NewOutlet,["ÄÃ£ adoption"]=r.AdoptionOutlet,["Tá»· lá»‡"]=r.AdoptionRate}).ToList();
+        var bytes=await ExportSvc.ToExcelAsync(rows,"Adoption");
+        await JS.InvokeVoidAsync("downloadBase64",Convert.ToBase64String(bytes),$"Adoption_{_from:yyyyMMdd}_{_to:yyyyMMdd}.xlsx","application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
+    }
+}
+
+

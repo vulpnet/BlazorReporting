@@ -1,5 +1,5 @@
-@page "/dashboard"
-@attribute [NavMenu(Title="Dashboard", Icon="bi-speedometer2", Group="Tổng quan", GroupOrder=5, Order=10)]
+﻿@page "/dashboard"
+@attribute [NavMenu(Title="Dashboard", Icon="bi-speedometer2", Group="nav.overview", GroupOrder=5, Order=10)]
 @using BlazorReporting.Services
 @using System.Text.Json
 @inject AuthService Auth
@@ -461,3 +461,4 @@
         try { await JS.InvokeVoidAsync("dashboardChart.destroyAll"); } catch { }
     }
 }
+

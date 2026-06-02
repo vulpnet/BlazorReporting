@@ -1,4 +1,4 @@
-@page "/report/user-mobility"
+﻿@page "/report/user-mobility"
 @attribute [NavMenu(Title="user_mobility.nav_title", Icon="bi-phone-fill", Group="nav.reports", GroupOrder=20, Order=150)]
 @using BlazorReporting.Services
 @inject AuthService Auth
@@ -26,7 +26,7 @@
                 <GridColumn TItem="GenericReportRow" Title="@L10n.T("user_mobility.col_supervisor")"          Value="@(x=>x.SalesSupName)"/>
                 <GridColumn TItem="GenericReportRow" Title="NPP" Value="@(x=>x.DistributorName)"/>
                 <GridColumn TItem="GenericReportRow" Title="Region"      Value="@(x=>x.STLvl0Name)"/>
-                <GridColumn TItem="GenericReportRow" Title="Area"        Value="@(x=>x.STLvl1Name)"/>
+                <GridColumn TItem="GenericReportRow" Title="@L10n.T("lbl.area")"        Value="@(x=>x.STLvl1Name)"/>
                 <GridColumn TItem="GenericReportRow" Title="SM"          Value="@(x=>x.SM)" Align="center"/>
                 <GridColumn TItem="GenericReportRow" Title="ASM/SS"      Value="@(x=>x.ASM)" Align="center"/>
                 <GridColumn TItem="GenericReportRow" Title="@L10n.T("user_mobility.col_registered")"     Value="@(x=>x.Register)" Align="center"/>
@@ -60,3 +60,5 @@
         try{_data=await RptSvc.GetUserMobilityAsync(_from,_to,Auth.UserName);}
         catch(Exception ex){_error=ex.Message;}finally{_loading=false;}}
 }
+
+

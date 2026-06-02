@@ -1,5 +1,5 @@
-@page "/sales-strategy"
-@attribute [NavMenu(Title="Chiến lược bán hàng", Icon="bi-robot", Group="AI & Dự báo", GroupOrder=20, Order=10, Badge="AI")]
+﻿@page "/sales-strategy"
+@attribute [NavMenu(Title="sales_strategy.nav_title", Icon="bi-robot", Group="nav.ai", GroupOrder=20, Order=10, Badge="AI")]
 @using BlazorReporting.Data
 @using BlazorReporting.Services
 @using System.Text.Json
@@ -539,3 +539,5 @@ else if (_result != null)
         try { await JS.InvokeVoidAsync("strategyChartInterop.destroyAll"); } catch { }
     }
 }
+
+

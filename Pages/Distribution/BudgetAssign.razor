@@ -1,5 +1,5 @@
-@page "/distribution/budget"
-@attribute [NavMenu(Title="budget_assign.title", Icon="bi-currency-dollar", Group="nav.distribution_group", GroupOrder=30, Order=20)]
+﻿@page "/distribution/budget"
+@attribute [NavMenu(Title="budget_assign.title", Icon="bi-currency-dollar", Group="nav.distribution", GroupOrder=30, Order=20)]
 @using BlazorReporting.Services
 @inject AuthService Auth
 @inject DistributionService DistSvc
@@ -173,3 +173,4 @@
         if (ok) _assigns = await DistSvc.GetBudgetAssignsAsync(Auth.UserName);
     }
 }
+

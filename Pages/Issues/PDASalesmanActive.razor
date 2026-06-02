@@ -1,0 +1,95 @@
+﻿@page "/issues/pda-active"
+@attribute [NavMenu(Title="pda.nav_title", Icon="bi-phone", Group="nav.issues", GroupOrder=50, Order=40)]
+@using BlazorReporting.Services
+@inject AuthService Auth
+@inject ReportService RptSvc
+@inject NavigationManager Nav
+@inject LocalizationService L10n
+<PageTitle>@L10n.T("pda.page_title")</PageTitle>
+<div class="container-fluid mt-3">
+    <h5 class="mb-3"><i class="bi bi-phone me-2"></i>@L10n.T("pda.page_title")</h5>
+    <div class="card shadow-sm mb-3"><div class="card-body py-2">
+        <div class="d-flex gap-2 flex-wrap align-items-end">
+            <div>
+                <label class="form-label small mb-1">@L10n.T("pda.lbl_salesman_cd")</label>
+                <input class="form-control form-control-sm" style="width:160px" placeholder="SalesmanCD..." @bind="_salesmanCd" />
+            </div>
+            <div>
+                <label class="form-label small mb-1">@L10n.T("pda.lbl_imei")</label>
+                <input class="form-control form-control-sm" style="width:200px" placeholder="IMEI..." @bind="_imei" />
+            </div>
+            <button class="btn btn-sm btn-primary" @onclick="LoadAsync">
+                <i class="bi bi-search me-1"></i>@L10n.T("btn.view")
+            </button>
+        </div>
+    </div></div>
+
+    @if (!string.IsNullOrEmpty(_msg))
+    {
+        <div class="alert @(_msgOk?"alert-success":"alert-danger") py-2 alert-dismissible">
+            @_msg <button class="btn-close" @onclick="()=>_msg=string.Empty"></button>
+        </div>
+    }
+    @if (_loading) { <div class="text-center py-4"><span class="spinner-border text-primary"></span></div> }
+    else
+    {
+        <SortableGrid Items="_data" Context="r" MinWidth="700px" DefaultPageSize="20">
+            <Columns>
+                <GridColumn TItem="GenericReportRow" Title="@L10n.T("pda.col_action")"       Value="@(x=>"")" Align="center"/>
+                <GridColumn TItem="GenericReportRow" Title="@L10n.T("pda.col_salesman_cd")"  Value="@(x=>x.SalesmanCD)"/>
+                <GridColumn TItem="GenericReportRow" Title="@L10n.T("pda.col_imei")"         Value="@(x=>x.IMEI)"/>
+                <GridColumn TItem="GenericReportRow" Title="@L10n.T("pda.col_active_date")"  Value="@(x=>x.ActiveDate.HasValue?x.ActiveDate.Value.ToString("dd/MM/yyyy HH:mm"):"")" Align="center"/>
+                <GridColumn TItem="GenericReportRow" Title="@L10n.T("pda.col_created_date")" Value="@(x=>x.CreateDatetime.HasValue?x.CreateDatetime.Value.ToString("dd/MM/yyyy HH:mm"):"")" Align="center"/>
+            </Columns>
+            <RowTemplate>
+                <td class="text-center">
+                    <button class="btn btn-sm btn-outline-danger py-0" @onclick="()=>ResetIMEI(r.SalesmanCD)">
+                        <i class="bi bi-phone-x me-1"></i>@L10n.T("pda.btn_reset_imei")
+                    </button>
+                </td>
+                <td class="small font-monospace">@r.SalesmanCD</td>
+                <td class="small font-monospace">@r.IMEI</td>
+                <td class="text-center small">@(r.ActiveDate.HasValue?r.ActiveDate.Value.ToString("dd/MM/yyyy HH:mm"):"—")</td>
+                <td class="text-center small">@(r.CreateDatetime.HasValue?r.CreateDatetime.Value.ToString("dd/MM/yyyy HH:mm"):"—")</td>
+            </RowTemplate>
+        </SortableGrid>
+    }
+</div>
+
+@code {
+    private List<GenericReportRow> _data = new();
+    private bool _loading; private string _msg = ""; private bool _msgOk;
+    private string _salesmanCd = "", _imei = "";
+
+    protected override async Task OnInitializedAsync()
+    {
+        if (!Auth.IsLoggedIn) { Nav.NavigateTo("/", replace: true); return; }
+        await LoadAsync();
+    }
+
+    private async Task LoadAsync()
+    {
+        _loading = true;
+        try { _data = await RptSvc.GetPDASalesmanActiveAsync(_salesmanCd, _imei); }
+        catch (Exception ex) { _msg = ex.Message; _msgOk = false; }
+        finally { _loading = false; }
+    }
+
+    private async Task ResetIMEI(string salesmanCd)
+    {
+        if (!await ConfirmAsync()) return;
+        try
+        {
+            await RptSvc.ResetIMEIAsync(salesmanCd, Auth.UserName);
+            _msg = L10n.T("pda.reset_success"); _msgOk = true;
+            await LoadAsync();
+        }
+        catch (Exception ex) { _msg = ex.Message; _msgOk = false; }
+    }
+
+    // Blazor Server: dùng JS confirm thay dialog
+    [Microsoft.AspNetCore.Components.Inject] private IJSRuntime JS { get; set; } = default!;
+    private async Task<bool> ConfirmAsync() =>
+        await JS.InvokeAsync<bool>("confirm", L10n.T("pda.confirm_reset"));
+}
+

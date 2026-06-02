@@ -13,6 +13,7 @@
 @inject AuditLogService Audit
 @inject LocalizationService L10n
 @inject IJSRuntime JS
+@inject RoutePermissionService RoutePerm
 @implements IDisposable
 
 @if (!Auth.IsInitialized)
@@ -32,39 +33,134 @@ else
 
         <div class="dm-shell__main">
 
-            <header class="dm-topbar">
-                <button class="dm-topbar__toggle dm-only-desktop" @onclick="ToggleCollapse"
+            <header class="dm-topbar d-flex align-items-center gap-2 px-3 bg-white border-bottom shadow-sm" style="height:56px;position:sticky;top:0;z-index:1020;">
+
+                @* Toggle *@
+                <button class="btn btn-sm btn-light border dm-only-desktop" @onclick="ToggleCollapse"
                         title="@(_collapsed ? L10n.T("topbar.expand_menu") : L10n.T("topbar.collapse_menu"))">
-                    <i class="bi @(_collapsed ? "bi-chevron-double-right" : "bi-chevron-double-left")"></i>
+                    <i class="bi @(_collapsed ? "bi-layout-sidebar" : "bi-layout-sidebar-reverse")"></i>
                 </button>
-                <button class="dm-topbar__toggle dm-only-mobile" @onclick="() => _mobileOpen = !_mobileOpen"
-                        title="Menu">
+                <button class="btn btn-sm btn-light border dm-only-mobile" @onclick="() => _mobileOpen = !_mobileOpen">
                     <i class="bi bi-list"></i>
                 </button>
 
-                <div class="dm-topbar__title">
-                    <span class="dm-topbar__crumb">@CurrentGroup</span>
-                    @CurrentTitle
+                @* Breadcrumb *@
+                <nav class="flex-grow-1 min-width-0" aria-label="breadcrumb">
+                    <ol class="breadcrumb mb-0 small">
+                        <li class="breadcrumb-item text-muted">
+                            <i class="bi bi-house-fill me-1"></i>@CurrentGroup
+                        </li>
+                        <li class="breadcrumb-item active fw-semibold text-truncate" style="max-width:300px">
+                            @CurrentTitle
+                        </li>
+                    </ol>
+                </nav>
+
+                @* Help button — dẫn đến trang hướng dẫn cho màn hình hiện tại *@
+                @if (!string.IsNullOrEmpty(HelpRoute) && !CurrentPath.StartsWith("/help", StringComparison.OrdinalIgnoreCase))
+                {
+                    <a class="btn btn-sm btn-outline-info d-none d-md-inline-flex align-items-center gap-1"
+                       href="@HelpRoute" target="_blank"
+                       title="Hướng dẫn sử dụng màn hình này">
+                        <i class="bi bi-question-circle"></i>
+                        <span style="font-size:.72rem">Help</span>
+                    </a>
+                }
+
+                @* Clock *@
+                <div class="d-none d-lg-flex align-items-center gap-1 text-muted small border-end pe-3 me-1">
+                    <i class="bi bi-clock"></i>
+                    <span class="fw-medium">@_now.ToString("HH:mm")</span>
+                    <span class="text-muted opacity-75">@_now.ToString("dd/MM/yyyy")</span>
                 </div>
 
-                @* Language switcher *@
-                <div class="d-flex gap-1 align-items-center me-1">
-                    @foreach (var lang in new[]{ ("VI","🇻🇳"), ("EN","🇬🇧"), ("ID","🇮🇩") })
-                    {
-                        var code = lang.Item1; var flag = lang.Item2;
-                        <button class="btn btn-xs @(L10n.CurrentLang==code ? "btn-primary" : "btn-light border")"
-                                style="font-size:.72rem;padding:2px 6px;min-width:36px"
-                                title="@L10n.T("lang."+code)"
-                                @onclick="() => SwitchLang(code)">
-                            @flag
-                        </button>
-                    }
-                </div>
+                @* Trigger offcanvas *@
+                <button class="btn btn-light border d-flex align-items-center gap-2 py-1 px-2"
+                        type="button" @onclick="() => _userMenuOpen = true">
+                    <div class="rounded-2 d-flex align-items-center justify-content-center text-white fw-bold"
+                         style="width:30px;height:30px;font-size:.8rem;background:linear-gradient(135deg,#2563eb,#7c3aed);flex-shrink:0">
+                        @(Auth.FullName.Length > 0 ? Auth.FullName[0].ToString().ToUpper() : "U")
+                    </div>
+                    <div class="d-none d-md-block text-start lh-sm">
+                        <div class="small fw-semibold text-dark">@Auth.FullName</div>
+                        <div style="font-size:.68rem" class="text-muted">@Auth.Role</div>
+                    </div>
+                    <i class="bi bi-chevron-down d-none d-md-block text-muted" style="font-size:.65rem"></i>
+                </button>
 
-                <a class="btn btn-sm btn-light border" href="/help" target="_blank" title="@L10n.T("topbar.guide")">
-                    <i class="bi bi-question-circle"></i>
-                </a>
             </header>
+
+            @* Offcanvas user panel — nằm ngoài header, tự động z-index cao nhất *@
+            @if (_userMenuOpen)
+            {
+                <div class="offcanvas offcanvas-end show" tabindex="-1"
+                     style="width:280px;visibility:visible">
+                    <div class="offcanvas-header border-bottom" style="background:linear-gradient(135deg,#f8faff,#f0f4ff)">
+                        <div class="d-flex align-items-center gap-3">
+                            <div class="rounded-2 d-flex align-items-center justify-content-center text-white fw-bold flex-shrink-0"
+                                 style="width:44px;height:44px;font-size:1.1rem;background:linear-gradient(135deg,#2563eb,#7c3aed)">
+                                @(Auth.FullName.Length > 0 ? Auth.FullName[0].ToString().ToUpper() : "U")
+                            </div>
+                            <div>
+                                <div class="fw-semibold">@Auth.FullName</div>
+                                <div class="text-muted small">@Auth.UserName</div>
+                                <span class="badge bg-primary" style="font-size:.65rem">@Auth.Role</span>
+                            </div>
+                        </div>
+                        <button type="button" class="btn-close ms-auto" @onclick="() => _userMenuOpen = false"></button>
+                    </div>
+                    <div class="offcanvas-body p-0">
+                        <ul class="list-group list-group-flush">
+                            <li class="list-group-item px-3 py-2">
+                                <a class="d-flex align-items-center gap-2 text-decoration-none text-dark"
+                                   href="/account/change-password" @onclick="() => _userMenuOpen = false">
+                                    <i class="bi bi-key text-muted"></i>
+                                    <span class="small">@L10n.T("change_password.title")</span>
+                                </a>
+                            </li>
+                            <li class="list-group-item px-3 py-2">
+                                <a class="d-flex align-items-center gap-2 text-decoration-none text-dark"
+                                   href="/admin/security" @onclick="() => _userMenuOpen = false">
+                                    <i class="bi bi-shield-check text-muted"></i>
+                                    <span class="small">Security</span>
+                                </a>
+                            </li>
+                            <li class="list-group-item px-3 py-2">
+                                <a class="d-flex align-items-center gap-2 text-decoration-none text-dark"
+                                   href="/help" target="_blank">
+                                    <i class="bi bi-question-circle text-muted"></i>
+                                    <span class="small">@L10n.T("topbar.guide")</span>
+                                </a>
+                            </li>
+                        </ul>
+
+                        <div class="px-3 py-3 border-top">
+                            <div class="text-muted mb-2" style="font-size:.7rem;text-transform:uppercase;letter-spacing:.07em">
+                                @L10n.T("topbar.language")
+                            </div>
+                            <div class="btn-group w-100" role="group">
+                                @foreach (var (code, flag, label) in new[]{ ("VI","🇻🇳","Việt"), ("EN","🇬🇧","English"), ("ID","🇮🇩","Indonesia") })
+                                {
+                                    <button type="button"
+                                            class="btn btn-sm @(L10n.CurrentLang==code ? "btn-primary" : "btn-outline-secondary")"
+                                            @onclick="() => SwitchLang(code)">
+                                        @flag @(code)
+                                    </button>
+                                }
+                            </div>
+                        </div>
+
+                        <div class="px-3 pb-3 border-top pt-3">
+                            <button class="btn btn-danger w-100 d-flex align-items-center justify-content-center gap-2"
+                                    @onclick="LogoutAsync">
+                                <i class="bi bi-box-arrow-right"></i>
+                                @L10n.T("topbar.logout")
+                            </button>
+                        </div>
+                    </div>
+                </div>
+                <div class="offcanvas-backdrop fade show" @onclick="() => _userMenuOpen = false"></div>
+            }
 
             <main class="dm-content">
                 <AppErrorBoundary @ref="_errorBoundary">
@@ -73,7 +169,11 @@ else
             </main>
 
             <footer class="dm-footer">
-                DMSPRO Reporting &copy; @DateTime.Now.Year &middot; v1.0
+                <span class="dm-footer__brand">
+                    <i class="bi bi-bar-chart-line-fill me-1" style="color:#2563eb"></i>DMSPRO Reporting
+                </span>
+                <span>&copy; @DateTime.Now.Year DMSPRO &middot; Distribution Management System</span>
+                <span class="dm-footer__version">v2.0</span>
             </footer>
         </div>
     </div>
@@ -91,12 +191,28 @@ else
     private IReadOnlyList<ChatNavLink> _reportLinks = [];
     private bool _collapsed;
     private bool _mobileOpen;
+    private bool _userMenuOpen;
+    private DateTime _now = DateTime.Now;
+    private System.Threading.Timer? _clockTimer;
     private AppErrorBoundary? _errorBoundary;
     private DotNetObjectReference<MainLayout>? _jsRef; // S1
     private ChatWindow? _chatWindow;
 
-    private string CurrentTitle => CurrentItem()?.Title ?? L10n.T("nav.home");
-    private string CurrentGroup => CurrentItem()?.Group ?? "";
+    private string CurrentTitle => L10n.T(CurrentItem()?.Title ?? "nav.home");
+    private string CurrentGroup => L10n.T(CurrentItem()?.Group ?? "");
+
+    private string CurrentPath => new Uri(Nav.Uri).AbsolutePath;
+
+    private string HelpRoute
+    {
+        get
+        {
+            var path = new Uri(Nav.Uri).AbsolutePath.TrimEnd('/').TrimStart('/');
+            if (string.IsNullOrEmpty(path)) return "";
+            var screen = path.Replace('/', '-');
+            return $"/help/{screen}";
+        }
+    }
 
     private NavMenuItem? CurrentItem()
     {
@@ -112,6 +228,8 @@ else
         Nav.LocationChanged += OnLocationChanged;
         Auth.OnAuthChanged    += OnAuthChanged;
         L10n.OnChanged        += OnLangChanged;
+        _clockTimer = new System.Threading.Timer(_ =>
+            InvokeAsync(() => { _now = DateTime.Now; StateHasChanged(); }), null, 0, 30_000);
     }
 
     // S1: bat dau/dung session monitor khi auth thay doi
@@ -145,7 +263,15 @@ else
         SessionSec.RecordActivity(); // S1: navigate = hoat dong
         _mobileOpen = false;
         _errorBoundary?.Recover(); // reset lỗi khi navigate sang trang khác
-        InvokeAsync(StateHasChanged);
+        InvokeAsync(async () => { await CheckRoutePermissionAsync(); StateHasChanged(); });
+    }
+
+    private async Task CheckRoutePermissionAsync()
+    {
+        if (!Auth.IsLoggedIn) return;
+        var path = new Uri(Nav.Uri).AbsolutePath;
+        var allowed = await RoutePerm.CanAccessAsync(Auth.Role, path);
+        if (!allowed) Nav.NavigateTo("/dashboard", replace: true);
     }
 
     private void OnLangChanged() => InvokeAsync(StateHasChanged);
@@ -160,6 +286,7 @@ else
 
     public void Dispose()
     {
+        _clockTimer?.Dispose();
         Nav.LocationChanged -= OnLocationChanged;
         Auth.OnAuthChanged  -= OnAuthChanged;
         L10n.OnChanged      -= OnLangChanged;

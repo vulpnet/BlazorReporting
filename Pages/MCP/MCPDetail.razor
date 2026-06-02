@@ -1,5 +1,5 @@
-@page "/mcp/detail"
-@attribute [NavMenu(Title="Chi tiết MCP", Icon="bi-geo-alt-fill", Group="MCP", GroupOrder=40, Order=20)]
+﻿@page "/mcp/detail"
+@attribute [NavMenu(Title="mcp.detail_page_title", Icon="bi-geo-alt-fill", Group="nav.mcp", GroupOrder=40, Order=20)]
 @using BlazorReporting.Services
 @inject AuthService Auth
 @inject MCPService McpSvc
@@ -107,3 +107,5 @@
             ? new MarkupString("<i class='bi bi-check-circle-fill text-success'></i>")
             : new MarkupString("<span class='text-muted'>—</span>");
 }
+
+

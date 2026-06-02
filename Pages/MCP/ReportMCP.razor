@@ -1,5 +1,5 @@
-@page "/mcp/report"
-@attribute [NavMenu(Title="Báo cáo MCP", Icon="bi-map-fill", Group="MCP", GroupOrder=40, Order=10)]
+﻿@page "/mcp/report"
+@attribute [NavMenu(Title="mcp.report_page_title", Icon="bi-map-fill", Group="nav.mcp", GroupOrder=40, Order=10)]
 @using BlazorReporting.Services
 @inject AuthService Auth
 @inject MCPService McpSvc
@@ -91,3 +91,5 @@
         _loading = false;
     }
 }
+
+

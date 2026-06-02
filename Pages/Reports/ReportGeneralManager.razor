@@ -1,0 +1,63 @@
+﻿@page "/report/general-manager"
+@attribute [NavMenu(Title="gm.nav_title", Icon="bi-building", Group="nav.reports", GroupOrder=20, Order=260)]
+@using BlazorReporting.Services
+@inject AuthService Auth
+@inject ReportService RptSvc
+@inject IExportService ExportSvc
+@inject IJSRuntime JS
+@inject NavigationManager Nav
+@inject LocalizationService L10n
+<PageTitle>@L10n.T("gm.page_title")</PageTitle>
+<div class="container-fluid mt-3">
+    <h5 class="mb-3"><i class="bi bi-building me-2"></i>@L10n.T("gm.page_title")</h5>
+    <div class="card shadow-sm mb-3"><div class="card-body py-2">
+        <div class="d-flex gap-2 flex-wrap align-items-end">
+            <div><label class="form-label small mb-1">@L10n.T("lbl.from_date")</label><input type="date" class="form-control form-control-sm" style="width:150px" @bind="_from"/></div>
+            <div><label class="form-label small mb-1">@L10n.T("lbl.distributor")</label><input type="number" class="form-control form-control-sm" style="width:110px" @bind="_distId"/></div>
+            <div><label class="form-label small mb-1">@L10n.T("lbl.sup_id")</label><input type="number" class="form-control form-control-sm" style="width:110px" @bind="_supId"/></div>
+            <button class="btn btn-sm btn-primary" @onclick="LoadAsync"><i class="bi bi-search me-1"></i>@L10n.T("btn.view")</button>
+            @if (_data.Any()) { <button class="btn btn-sm btn-success" @onclick="ExportExcel"><i class="bi bi-file-earmark-excel me-1"></i>Excel</button> <span class="text-muted small ms-1">@_data.Count dÃ²ng</span> }
+        </div>
+    </div></div>
+    @if (_error != null) { <div class="alert alert-danger py-2 alert-dismissible">@_error<button class="btn-close" @onclick="()=>_error=null"></button></div> }
+    @if (_loading) { <div class="text-center py-4"><span class="spinner-border text-primary"></span></div> }
+    else {
+        <SortableGrid Items="_data" Context="r" MinWidth="1100px" DefaultPageSize="20">
+            <Columns>
+                <GridColumn TItem="GenericReportRow" Title="@L10n.T("lbl.distributor")"          Value="@(x=>x.DistributorName)"/>
+                <GridColumn TItem="GenericReportRow" Title="@L10n.T("lbl.supervisor")"          Value="@(x=>x.SalesSupName)"/>
+                <GridColumn TItem="GenericReportRow" Title="@L10n.T("lbl.salesman")"            Value="@(x=>x.SalesmanName)"/>
+                <GridColumn TItem="GenericReportRow" Title="@L10n.T("lbl.route")"               Value="@(x=>x.RouteCD)"/>
+                <GridColumn TItem="GenericReportRow" Title="@L10n.T("gm.col_outlet_has_order")" Value="@(x=>x.OutletHasOrder)" Align="end"/>
+                <GridColumn TItem="GenericReportRow" Title="@L10n.T("gm.col_sales_act")"        Value="@(x=>(x.SalesActMTD/1_000_000m).ToString("N2")+"M")" Align="end"/>
+                <GridColumn TItem="GenericReportRow" Title="@L10n.T("gm.col_sales_obj")"        Value="@(x=>(x.SalesObj/1_000_000m).ToString("N2")+"M")" Align="end"/>
+                <GridColumn TItem="GenericReportRow" Title="@L10n.T("gm.col_achieve_pct")"      Value="@(x=>x.SalesObj>0?(x.SalesActMTD/x.SalesObj).ToString("P0"):"-")" Align="end"/>
+            </Columns>
+            <RowTemplate>
+                <td class="small">@r.DistributorName</td>
+                <td class="small">@r.SalesSupName</td>
+                <td class="fw-semibold small">@r.SalesmanName</td>
+                <td class="small font-monospace">@r.RouteCD</td>
+                <td class="text-end small">@r.OutletHasOrder</td>
+                <td class="text-end small">@((r.SalesActMTD/1_000_000m).ToString("N2"))M</td>
+                <td class="text-end small text-muted">@((r.SalesObj/1_000_000m).ToString("N2"))M</td>
+                @{ var pct = r.SalesObj > 0 ? r.SalesActMTD / r.SalesObj : 0; }
+                <td class="text-end fw-semibold @(pct>=1?"text-success":pct>=0.8m?"text-warning":"text-danger")">@(r.SalesObj>0?pct.ToString("P0"):"-")</td>
+            </RowTemplate>
+        </SortableGrid>
+    }
+</div>
+@code {
+    private List<GenericReportRow> _data = new(); private bool _loading; private string? _error;
+    private DateTime _from = DateTime.Today;
+    private int _distId=0,_supId=0;
+    protected override void OnInitialized() { if (!Auth.IsLoggedIn) Nav.NavigateTo("/", replace: true); }
+    private async Task LoadAsync() { _loading=true;_error=null; try { _data=await RptSvc.GetReportGeneralManagerAsync(_from,Auth.UserName,_distId,_supId); } catch(Exception ex){_error=ex.Message;} finally{_loading=false;} }
+    private async Task ExportExcel() {
+        var rows=_data.Select(r=>new Dictionary<string,object?>{["NPP"]=r.DistributorName,["Supervisor"]=r.SalesSupName,["Salesman"]=r.SalesmanName,["Route"]=r.RouteCD,["Outlet cÃ³ Ä‘Æ¡n"]=r.OutletHasOrder,["Doanh sá»‘"]=r.SalesActMTD,["Má»¥c tiÃªu"]=r.SalesObj,["% Äáº¡t"]=r.SalesObj>0?r.SalesActMTD/r.SalesObj:0}).ToList();
+        var bytes=await ExportSvc.ToExcelAsync(rows,"General Manager");
+        await JS.InvokeVoidAsync("downloadBase64",Convert.ToBase64String(bytes),$"GeneralManager_{_from:yyyyMMdd}.xlsx","application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
+    }
+}
+
+

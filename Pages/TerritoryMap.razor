@@ -1,5 +1,5 @@
-@page "/territory-map"
-@attribute [NavMenu(Title="territory_map.title", Icon="bi-map", Group="Phân tích", GroupOrder=10, Order=25)]
+﻿@page "/territory-map"
+@attribute [NavMenu(Title="territory_map.title", Icon="bi-map", Group="nav.analysis", GroupOrder=10, Order=25)]
 @using BlazorReporting.Data
 @using BlazorReporting.Services
 @using System.Text.Json
@@ -1433,3 +1433,4 @@
         try { await JS.InvokeVoidAsync("productChartInterop.destroyAll"); } catch { }
     }
 }
+

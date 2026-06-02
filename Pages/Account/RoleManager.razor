@@ -1,5 +1,5 @@
-@page "/account/roles"
-@attribute [NavMenu(Title="role.page_title", Icon="bi-shield-shaded", Group="Quản trị", GroupOrder=90, Order=10)]
+﻿@page "/account/roles"
+@attribute [NavMenu(Title="role.page_title", Icon="bi-shield-shaded", Group="nav.admin_menu", GroupOrder=90, Order=10)]
 @using BlazorReporting.Services
 @inject AuthService Auth
 @inject UserManagementService UserSvc
@@ -141,3 +141,4 @@
         _saving = false;
     }
 }
+

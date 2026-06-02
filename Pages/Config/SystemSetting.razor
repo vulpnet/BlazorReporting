@@ -1,5 +1,5 @@
-@page "/config/system"
-@attribute [NavMenu(Title="Tham số hệ thống", Icon="bi-gear-fill", Group="Cấu hình", GroupOrder=80, Order=30)]
+﻿@page "/config/system"
+@attribute [NavMenu(Title="system_setting.nav_title", Icon="bi-gear-fill", Group="nav.config_menu", GroupOrder=80, Order=30)]
 @using BlazorReporting.Services
 @inject AuthService Auth
 @inject ConfigService CfgSvc
@@ -130,3 +130,5 @@
         _saving = false; _showModal = false;
     }
 }
+
+

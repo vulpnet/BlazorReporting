@@ -1,4 +1,4 @@
-@page "/report/timekeeping"
+﻿@page "/report/timekeeping"
 @attribute [NavMenu(Title="timekeeping.nav_title", Icon="bi-fingerprint", Group="nav.reports", GroupOrder=20, Order=120)]
 @using BlazorReporting.Services
 @inject AuthService Auth
@@ -24,7 +24,7 @@
             <Columns>
                 <GridColumn TItem="GenericReportRow" Title="@L10n.T("timekeeping.lbl_salesman")"          Value="@(x=>x.SalesmanName)"/>
                 <GridColumn TItem="GenericReportRow" Title="Region"       Value="@(x=>x.RegionName)"/>
-                <GridColumn TItem="GenericReportRow" Title="Area"         Value="@(x=>x.AreaName)"/>
+                <GridColumn TItem="GenericReportRow" Title="@L10n.T("lbl.area")"         Value="@(x=>x.AreaName)"/>
                 <GridColumn TItem="GenericReportRow" Title="@L10n.T("timekeeping.col_scheduled_days")" Value="@(x=>x.ScheduleDateWork)" Align="end"/>
                 <GridColumn TItem="GenericReportRow" Title="@L10n.T("timekeeping.col_synced_days")"   Value="@(x=>x.SynchronizeDate)" Align="end"/>
                 <GridColumn TItem="GenericReportRow" Title="@L10n.T("timekeeping.col_sales_days")"  Value="@(x=>x.VisitedDate)" Align="end"/>
@@ -52,3 +52,5 @@
         try{_data=await RptSvc.GetTimekeepingAsync(_from,_to,Auth.UserName,salesmanId:_sm);}
         catch(Exception ex){_error=ex.Message;}finally{_loading=false;}}
 }
+
+

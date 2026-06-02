@@ -1,5 +1,5 @@
-@page "/admin/security"
-@attribute [NavMenu(Title="security.nav_title", Icon="bi-shield-lock-fill", Group="Quản trị", GroupOrder=90, Order=5)]
+﻿@page "/admin/security"
+@attribute [NavMenu(Title="security.nav_title", Icon="bi-shield-lock-fill", Group="nav.admin_menu", GroupOrder=90, Order=5)]
 @inject LocalizationService L10n
 @using BlazorReporting.Services
 @using BlazorReporting.Pages.Admin
@@ -195,3 +195,4 @@
         _msg = L10n.T("security.msg_session_kicked");
     }
 }
+

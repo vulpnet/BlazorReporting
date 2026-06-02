@@ -1,0 +1,113 @@
+﻿@page "/user/action-log-territory"
+@attribute [NavMenu(Title="user_action_log.nav_title", Icon="bi-geo-alt", Group="nav.admin_menu", GroupOrder=90, Order=35)]
+@using BlazorReporting.Services
+@inject AuthService Auth
+@inject ReportService RptSvc
+@inject IExportService ExportSvc
+@inject IJSRuntime JS
+@inject NavigationManager Nav
+@inject LocalizationService L10n
+<PageTitle>@L10n.T("user_action_log.page_title")</PageTitle>
+<div class="container-fluid mt-3">
+    <h5 class="mb-3"><i class="bi bi-geo-alt me-2"></i>@L10n.T("user_action_log.page_title")</h5>
+    <div class="card shadow-sm mb-3"><div class="card-body py-2">
+        <div class="d-flex gap-2 flex-wrap align-items-end">
+            <div>
+                <label class="form-label small mb-1">@L10n.T("lbl.from_date")</label>
+                <input type="date" class="form-control form-control-sm" style="width:150px" @bind="_from" />
+            </div>
+            <div>
+                <label class="form-label small mb-1">@L10n.T("lbl.to_date")</label>
+                <input type="date" class="form-control form-control-sm" style="width:150px" @bind="_to" />
+            </div>
+            <div>
+                <label class="form-label small mb-1">@L10n.T("user_action_log.lbl_user_id")</label>
+                <input type="number" class="form-control form-control-sm" style="width:110px" @bind="_userId" />
+            </div>
+            <button class="btn btn-sm btn-primary" @onclick="LoadAsync">
+                <i class="bi bi-search me-1"></i>@L10n.T("btn.view")
+            </button>
+            @if (_data.Any())
+            {
+                <button class="btn btn-sm btn-success" @onclick="ExportExcel">
+                    <i class="bi bi-file-earmark-excel me-1"></i>Excel
+                </button>
+                <button class="btn btn-sm btn-outline-success" @onclick="ExportRawData">
+                    <i class="bi bi-file-earmark-spreadsheet me-1"></i>@L10n.T("user_action_log.btn_export_raw")
+                </button>
+                <span class="text-muted small ms-1">@_data.Count @L10n.T("grid.rows_suffix")</span>
+            }
+        </div>
+    </div></div>
+
+    @if (!string.IsNullOrEmpty(_error)) { <div class="alert alert-danger py-2 alert-dismissible">@_error<button class="btn-close" @onclick="()=>_error=string.Empty"></button></div> }
+    @if (_loading) { <div class="text-center py-4"><span class="spinner-border text-primary"></span></div> }
+    else
+    {
+        <SortableGrid Items="_data" Context="r" MinWidth="1000px" DefaultPageSize="20">
+            <Columns>
+                <GridColumn TItem="GenericReportRow" Title="@L10n.T("lbl.salesman")"                    Value="@(x=>x.SalesmanName)"/>
+                <GridColumn TItem="GenericReportRow" Title="@L10n.T("user_action_log.col_territory_cd")"Value="@(x=>x.TerritoryCD)"/>
+                <GridColumn TItem="GenericReportRow" Title="@L10n.T("user_action_log.col_territory")"   Value="@(x=>x.TerritoryName)"/>
+                <GridColumn TItem="GenericReportRow" Title="@L10n.T("user_action_log.col_action_type")" Value="@(x=>x.ActionType)"/>
+                <GridColumn TItem="GenericReportRow" Title="@L10n.T("user_action_log.col_action_date")" Value="@(x=>x.ActionDate.HasValue?x.ActionDate.Value.ToString("dd/MM/yyyy HH:mm"):"")" Align="center"/>
+            </Columns>
+            <RowTemplate>
+                <td class="fw-semibold small">@r.SalesmanName</td>
+                <td class="small font-monospace">@r.TerritoryCD</td>
+                <td class="small">@r.TerritoryName</td>
+                <td class="small">
+                    <span class="badge bg-secondary" style="font-size:.65rem">@r.ActionType</span>
+                </td>
+                <td class="text-center small">@(r.ActionDate.HasValue?r.ActionDate.Value.ToString("dd/MM/yyyy HH:mm"):"—")</td>
+            </RowTemplate>
+        </SortableGrid>
+    }
+</div>
+
+@code {
+    private List<GenericReportRow> _data = new();
+    private bool _loading; private string _error = "";
+    private DateTime _from = DateTime.Today.AddDays(-30), _to = DateTime.Today;
+    private int _userId = 0;
+
+    protected override void OnInitialized() { if (!Auth.IsLoggedIn) Nav.NavigateTo("/", replace: true); }
+
+    private async Task LoadAsync()
+    {
+        _loading = true; _error = "";
+        try { _data = await RptSvc.GetUserActionLogTerritoryAsync(_from, _to, _userId); }
+        catch (Exception ex) { _error = ex.Message; }
+        finally { _loading = false; }
+    }
+
+    private async Task ExportExcel()
+    {
+        var rows = BuildExportRows();
+        var bytes = await ExportSvc.ToExcelAsync(rows, L10n.T("user_action_log.page_title"));
+        await DownloadAsync(bytes, $"UserActionLog_{_from:yyyyMMdd}_{_to:yyyyMMdd}.xlsx");
+    }
+
+    private async Task ExportRawData()
+    {
+        var rows = BuildExportRows();
+        var bytes = await ExportSvc.ToExcelAsync(rows, L10n.T("user_action_log.page_title") + " RAW");
+        await DownloadAsync(bytes, $"UserActionLog_Raw_{_from:yyyyMMdd}_{_to:yyyyMMdd}.xlsx");
+    }
+
+    private List<Dictionary<string, object?>> BuildExportRows() =>
+        _data.Select(r => new Dictionary<string, object?>
+        {
+            [L10n.T("lbl.salesman")]                    = r.SalesmanName,
+            [L10n.T("user_action_log.col_territory_cd")]= r.TerritoryCD,
+            [L10n.T("user_action_log.col_territory")]   = r.TerritoryName,
+            [L10n.T("user_action_log.col_action_type")] = r.ActionType,
+            [L10n.T("user_action_log.col_action_date")] = r.ActionDate?.ToString("dd/MM/yyyy HH:mm"),
+        }).ToList();
+
+    private async Task DownloadAsync(byte[] bytes, string filename) =>
+        await JS.InvokeVoidAsync("downloadBase64", Convert.ToBase64String(bytes), filename,
+            "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
+}
+
+

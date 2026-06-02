@@ -1,4 +1,4 @@
-@page "/report/summary-sales"
+﻿@page "/report/summary-sales"
 @attribute [NavMenu(Title="rpt.summary_sales.title", Icon="bi-graph-up-arrow", Group="nav.reports", GroupOrder=20, Order=30)]
 @using BlazorReporting.Services
 @inject AuthService Auth
@@ -24,7 +24,7 @@
         <SortableGrid Items="_data" Context="r" MinWidth="1000px" DefaultPageSize="20">
             <Columns>
                 <GridColumn TItem="GenericReportRow" Title="Region"      Value="@(x=>x.STLvl0Name)"/>
-                <GridColumn TItem="GenericReportRow" Title="Area"        Value="@(x=>x.STLvl1Name)"/>
+                <GridColumn TItem="GenericReportRow" Title="@L10n.T("lbl.area")"        Value="@(x=>x.STLvl1Name)"/>
                 <GridColumn TItem="GenericReportRow" Title="NPP" Value="@(x=>x.DistributorName)"/>
                 <GridColumn TItem="GenericReportRow" Title="@L10n.T("lbl.route")"       Value="@(x=>x.RouteCD)"/>
                 <GridColumn TItem="GenericReportRow" Title="@L10n.T("lbl.supervisor")"          Value="@(x=>x.SalesSupName)"/>
@@ -67,3 +67,5 @@
         try{_data=await RptSvc.GetSummarySalesAsync(_from,_to,Auth.UserName,sup:_sup,route:_route);}
         catch(Exception ex){_error=ex.Message;}finally{_loading=false;}}
 }
+
+

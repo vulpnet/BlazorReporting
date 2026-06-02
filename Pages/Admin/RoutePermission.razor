@@ -1,0 +1,199 @@
+﻿@page "/admin/route-permission"
+@attribute [NavMenu(Title="route_perm.nav_title", Icon="bi-shield-lock", Group="nav.admin_menu", GroupOrder=90, Order=6)]
+@using BlazorReporting.Services
+@inject AuthService Auth
+@inject RoutePermissionService RouteSvc
+@inject UserManagementService UserSvc
+@inject NavigationManager Nav
+@inject LocalizationService L10n
+
+<PageTitle>@L10n.T("route_perm.page_title")</PageTitle>
+
+<div class="container-fluid mt-3">
+    <h5 class="mb-3"><i class="bi bi-shield-lock me-2"></i>@L10n.T("route_perm.page_title")</h5>
+    <p class="text-muted small mb-3">@L10n.T("route_perm.desc")</p>
+
+    @if (_loading) { <div class="text-center py-4"><span class="spinner-border text-primary"></span></div> }
+    else if (!string.IsNullOrEmpty(_msg))
+    {
+        <div class="alert @(_msgOk?"alert-success":"alert-danger") py-2 alert-dismissible">
+            @_msg <button class="btn-close" @onclick="()=>_msg=string.Empty"></button>
+        </div>
+    }
+
+    @if (!_loading)
+    {
+        @* Group by Group *@
+        @foreach (var grp in _routeFeatures.GroupBy(r => r.Group).OrderBy(g => g.Key))
+        {
+            <div class="card shadow-sm mb-3">
+                <div class="card-header py-2 fw-semibold small bg-light">
+                    <i class="bi bi-folder me-1"></i>@grp.Key
+                </div>
+                <div class="card-body p-0">
+                    <div class="table-responsive">
+                        <table class="table table-sm table-hover mb-0">
+                            <thead class="table-light">
+                                <tr>
+                                    <th style="width:220px" class="small">Route</th>
+                                    <th class="small">@L10n.T("route_perm.col_name")</th>
+                                    @foreach (var role in _roles)
+                                    {
+                                        <th class="text-center small" style="width:100px">
+                                            <div>@role.RoleName</div>
+                                            <div class="d-flex justify-content-center gap-1 mt-1">
+                                                <button class="btn btn-xs btn-outline-success py-0 px-1" style="font-size:.65rem"
+                                                        @onclick="()=>CheckAllRole(role.ID, grp.Select(r=>r.ID), true)"
+                                                        title="@L10n.T("route_perm.tooltip_check_all")">
+                                                    <i class="bi bi-check-all"></i>
+                                                </button>
+                                                <button class="btn btn-xs btn-outline-secondary py-0 px-1" style="font-size:.65rem"
+                                                        @onclick="()=>CheckAllRole(role.ID, grp.Select(r=>r.ID), false)"
+                                                        title="@L10n.T("route_perm.tooltip_uncheck_all")">
+                                                    <i class="bi bi-x"></i>
+                                                </button>
+                                            </div>
+                                        </th>
+                                    }
+                                    <th class="text-center small" style="width:80px">@L10n.T("btn.save")</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                @foreach (var route in grp)
+                                {
+                                    <tr>
+                                        <td class="small font-monospace text-muted align-middle">@route.Path</td>
+                                        <td class="small align-middle fw-semibold">@route.Name</td>
+                                        @foreach (var role in _roles)
+                                        {
+                                            var key = (route.ID, role.ID);
+                                            <td class="text-center align-middle">
+                                                <input type="checkbox" class="form-check-input"
+                                                       checked="@_checked.GetValueOrDefault(key)"
+                                                       @onchange="e => Toggle(key, (bool)e.Value!)" />
+                                            </td>
+                                        }
+                                        <td class="text-center align-middle">
+                                            <button class="btn btn-sm btn-outline-primary py-0 px-2"
+                                                    @onclick="()=>SaveRouteAsync(route)"
+                                                    title="@L10n.T("btn.save")">
+                                                <i class="bi bi-floppy"></i>
+                                            </button>
+                                        </td>
+                                    </tr>
+                                }
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        }
+
+        <div class="card shadow-sm mb-3">
+            <div class="card-body py-2">
+                <div class="d-flex gap-2 flex-wrap align-items-center">
+                    <span class="small fw-semibold me-1">@L10n.T("route_perm.lbl_quick_check")</span>
+                    @foreach (var role in _roles)
+                    {
+                        <div class="d-flex gap-1 align-items-center">
+                            <span class="badge bg-secondary" style="font-size:.7rem">@role.RoleName</span>
+                            <button class="btn btn-sm btn-outline-success py-0 px-2"
+                                    @onclick="()=>CheckAllRole(role.ID, _routeFeatures.Select(r=>r.ID), true)">
+                                <i class="bi bi-check-all me-1"></i>@L10n.T("route_perm.btn_check_all")
+                            </button>
+                            <button class="btn btn-sm btn-outline-secondary py-0 px-2"
+                                    @onclick="()=>CheckAllRole(role.ID, _routeFeatures.Select(r=>r.ID), false)">
+                                <i class="bi bi-x me-1"></i>@L10n.T("route_perm.btn_uncheck_all")
+                            </button>
+                        </div>
+                    }
+                </div>
+            </div>
+        </div>
+
+        <div class="d-flex gap-2 mt-2">
+            <button class="btn btn-primary" @onclick="SaveAllAsync">
+                <i class="bi bi-floppy me-1"></i>@L10n.T("route_perm.btn_save_all")
+            </button>
+            <button class="btn btn-outline-secondary" @onclick="LoadAsync">
+                <i class="bi bi-arrow-clockwise me-1"></i>@L10n.T("btn.refresh")
+            </button>
+        </div>
+    }
+</div>
+
+@code {
+    private List<RouteFeatureVM> _routeFeatures = new();
+    private List<RoleVM> _roles = new();
+    private Dictionary<(int FeatureId, int RoleId), bool> _checked = new();
+    private bool _loading; private string _msg = ""; private bool _msgOk;
+
+    protected override async Task OnInitializedAsync()
+    {
+        if (!Auth.IsLoggedIn) { Nav.NavigateTo("/", replace: true); return; }
+        await LoadAsync();
+    }
+
+    private async Task LoadAsync()
+    {
+        _loading = true;
+        try
+        {
+            _roles = await UserSvc.GetRolesAsync();
+            _routeFeatures = await RouteSvc.GetRouteFeaturesAsync();
+            _checked.Clear();
+
+            foreach (var route in _routeFeatures)
+            {
+                var roleIds = await RouteSvc.GetRoleIdsByFeatureAsync(route.ID);
+                foreach (var role in _roles)
+                    _checked[(route.ID, role.ID)] = roleIds.Contains(role.ID);
+            }
+        }
+        catch (Exception ex) { _msg = ex.Message; _msgOk = false; }
+        finally { _loading = false; }
+    }
+
+    private void Toggle((int FeatureId, int RoleId) key, bool value)
+        => _checked[key] = value;
+
+    private void CheckAllRole(int roleId, IEnumerable<int> featureIds, bool value)
+    {
+        foreach (var fid in featureIds)
+            _checked[(fid, roleId)] = value;
+    }
+
+    private async Task SaveRouteAsync(RouteFeatureVM route)
+    {
+        try
+        {
+            var allowedRoleIds = _roles
+                .Where(r => _checked.GetValueOrDefault((route.ID, r.ID)))
+                .Select(r => r.ID);
+            await RouteSvc.SaveFeatureRolesAsync(route.ID, allowedRoleIds);
+            _msg = L10n.T("route_perm.msg_saved") + $": {route.Name}"; _msgOk = true;
+        }
+        catch (Exception ex) { _msg = ex.Message; _msgOk = false; }
+    }
+
+    private async Task SaveAllAsync()
+    {
+        _msg = ""; int count = 0;
+        try
+        {
+            foreach (var route in _routeFeatures)
+            {
+                var allowedRoleIds = _roles
+                    .Where(r => _checked.GetValueOrDefault((route.ID, r.ID)))
+                    .Select(r => r.ID);
+                await RouteSvc.SaveFeatureRolesAsync(route.ID, allowedRoleIds);
+                count++;
+            }
+            _msg = L10n.T("route_perm.msg_saved_all"); _msgOk = true;
+        }
+        catch (Exception ex) { _msg = ex.Message; _msgOk = false; }
+    }
+}
+
+
+

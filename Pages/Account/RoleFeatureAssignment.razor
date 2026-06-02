@@ -1,5 +1,5 @@
-@page "/account/role-features"
-@attribute [NavMenu(Title="role_feature.nav_title", Icon="bi-diagram-3-fill", Group="Quản trị", GroupOrder=90, Order=20)]
+﻿@page "/account/role-features"
+@attribute [NavMenu(Title="role_feature.nav_title", Icon="bi-diagram-3-fill", Group="nav.admin_menu", GroupOrder=90, Order=20)]
 @using BlazorReporting.Services
 @inject AuthService Auth
 @inject UserManagementService UserSvc
@@ -112,3 +112,4 @@
         _saveMsg = L10n.T("role_feature.save_success");
     }
 }
+

@@ -1,5 +1,5 @@
-@page "/product-sales"
-@attribute [NavMenu(Title="productsales.nav_title", Icon="bi-box-seam", Group="productsales.group_name", GroupOrder=10, Order=30)]
+﻿@page "/product-sales"
+@attribute [NavMenu(Title="productsales.nav_title", Icon="bi-box-seam", Group="nav.analysis", GroupOrder=10, Order=30)]
 @using BlazorReporting.Data
 @using BlazorReporting.Services
 @using System.Text.Json
@@ -564,3 +564,4 @@ else
         try { await JS.InvokeVoidAsync("productChartInterop.destroyAll"); } catch { }
     }
 }
+

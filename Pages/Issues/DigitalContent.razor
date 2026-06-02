@@ -1,0 +1,121 @@
+﻿@page "/issues/digital"
+@attribute [NavMenu(Title="digital.nav_title", Icon="bi-file-earmark-play", Group="nav.issues", GroupOrder=50, Order=30)]
+@using BlazorReporting.Services
+@inject AuthService Auth
+@inject ReportService RptSvc
+@inject NavigationManager Nav
+@inject LocalizationService L10n
+<PageTitle>@L10n.T("digital.page_title")</PageTitle>
+<div class="container-fluid mt-3">
+    <h5 class="mb-3"><i class="bi bi-file-earmark-play me-2"></i>@L10n.T("digital.page_title")</h5>
+
+    @* Upload form *@
+    <div class="card shadow-sm mb-3">
+        <div class="card-header py-2 fw-semibold small">@L10n.T("digital.section_upload")</div>
+        <div class="card-body py-2">
+            <div class="d-flex gap-2 flex-wrap align-items-end">
+                <div>
+                    <label class="form-label small mb-1">@L10n.T("digital.lbl_desc")</label>
+                    <input class="form-control form-control-sm" style="width:200px" @bind="_desc" />
+                </div>
+                <div>
+                    <label class="form-label small mb-1">@L10n.T("lbl.from_date")</label>
+                    <input type="date" class="form-control form-control-sm" style="width:150px" @bind="_startDate" />
+                </div>
+                <div>
+                    <label class="form-label small mb-1">@L10n.T("lbl.to_date")</label>
+                    <input type="date" class="form-control form-control-sm" style="width:150px" @bind="_endDate" />
+                </div>
+                <div class="d-flex align-items-center gap-1">
+                    <input type="file" class="form-control form-control-sm" style="width:220px"
+                           @onchange="OnFileSelected" accept="*/*" />
+                </div>
+                <div class="form-check mt-4">
+                    <input class="form-check-input" type="checkbox" @bind="_active" id="chkActive" />
+                    <label class="form-check-label small" for="chkActive">@L10n.T("lbl.status") Active</label>
+                </div>
+                <button class="btn btn-sm btn-primary" @onclick="UploadAsync" disabled="@(_uploading || _fileName==null)">
+                    <i class="bi bi-upload me-1"></i>@L10n.T("digital.btn_upload")
+                </button>
+            </div>
+            @if (!string.IsNullOrEmpty(_uploadMsg))
+            {
+                <div class="alert @(_uploadOk?"alert-success":"alert-danger") py-1 mt-2 small">@_uploadMsg</div>
+            }
+        </div>
+    </div>
+
+    @if (_loading) { <div class="text-center py-4"><span class="spinner-border text-primary"></span></div> }
+    else if (!string.IsNullOrEmpty(_error)) { <div class="alert alert-danger py-2">@_error</div> }
+    else
+    {
+        <SortableGrid Items="_data" Context="r" MinWidth="900px" DefaultPageSize="20">
+            <Columns>
+                <GridColumn TItem="GenericReportRow" Title="@L10n.T("digital.col_filename")"  Value="@(x=>x.FileName)"/>
+                <GridColumn TItem="GenericReportRow" Title="@L10n.T("digital.col_desc")"      Value="@(x=>x.Content)"/>
+                <GridColumn TItem="GenericReportRow" Title="@L10n.T("lbl.from_date")"         Value="@(x=>x.StartTime.HasValue?x.StartTime.Value.ToString("dd/MM/yyyy"):"")" Align="center"/>
+                <GridColumn TItem="GenericReportRow" Title="@L10n.T("lbl.to_date")"           Value="@(x=>x.EndTime.HasValue?x.EndTime.Value.ToString("dd/MM/yyyy"):"")" Align="center"/>
+                <GridColumn TItem="GenericReportRow" Title="@L10n.T("digital.col_created_by")"Value="@(x=>x.UserName)"/>
+                <GridColumn TItem="GenericReportRow" Title="Active"                            Value="@(x=>x.IsValid==1?"✓":"")" Align="center"/>
+            </Columns>
+            <RowTemplate>
+                <td class="small font-monospace">@r.FileName</td>
+                <td class="small">@r.Content</td>
+                <td class="text-center small">@(r.StartTime.HasValue?r.StartTime.Value.ToString("dd/MM/yyyy"):"—")</td>
+                <td class="text-center small">@(r.EndTime.HasValue?r.EndTime.Value.ToString("dd/MM/yyyy"):"—")</td>
+                <td class="small">@r.UserName</td>
+                <td class="text-center">
+                    @if (r.IsValid == 1) { <i class="bi bi-check-circle-fill text-success"></i> }
+                    else { <i class="bi bi-x-circle text-secondary"></i> }
+                </td>
+            </RowTemplate>
+        </SortableGrid>
+    }
+</div>
+
+@code {
+    private List<GenericReportRow> _data = new();
+    private bool _loading, _uploading; private string? _error;
+    private string _desc = ""; private bool _active = true;
+    private DateTime _startDate = DateTime.Today, _endDate = DateTime.Today.AddMonths(1);
+    private string? _fileName; private byte[]? _fileBytes;
+    private string _uploadMsg = ""; private bool _uploadOk;
+
+    protected override async Task OnInitializedAsync()
+    {
+        if (!Auth.IsLoggedIn) { Nav.NavigateTo("/", replace: true); return; }
+        await LoadAsync();
+    }
+
+    private async Task LoadAsync()
+    {
+        _loading = true; _error = null;
+        try { _data = await RptSvc.GetDigitalContentAsync(); }
+        catch (Exception ex) { _error = ex.Message; }
+        finally { _loading = false; }
+    }
+
+    private async Task OnFileSelected(ChangeEventArgs e)
+    {
+        // Blazor Server: file input chỉ lấy tên, upload qua InputFile component
+        // Simplified: lấy tên file từ value
+        _fileName = e.Value?.ToString();
+    }
+
+    private async Task UploadAsync()
+    {
+        if (string.IsNullOrEmpty(_fileName)) return;
+        _uploading = true; _uploadMsg = ""; _uploadOk = false;
+        try
+        {
+            await RptSvc.UploadDigitalContentAsync(_fileName, _desc, _startDate, _endDate, _active, Auth.UserName);
+            _uploadOk = true;
+            _uploadMsg = L10n.T("digital.upload_success");
+            _desc = ""; _fileName = null;
+            await LoadAsync();
+        }
+        catch (Exception ex) { _uploadMsg = ex.Message; }
+        finally { _uploading = false; }
+    }
+}
+

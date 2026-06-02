@@ -1,5 +1,5 @@
-@page "/report/3g-offline"
-@attribute [NavMenu(Title="Báo cáo 3G Offline", Icon="bi-wifi-off", Group="nav.reports", GroupOrder=20, Order=80)]
+﻿@page "/report/3g-offline"
+@attribute [NavMenu(Title="report_3g.nav_title", Icon="bi-wifi-off", Group="nav.reports", GroupOrder=20, Order=80)]
 @using BlazorReporting.Services
 @inject AuthService Auth
 @inject ReportService RptSvc
@@ -57,3 +57,4 @@
         try{_data=await RptSvc.GetReport3GOfflineAsync(_from,_to,Auth.UserName,route:_route);}
         catch(Exception ex){_error=ex.Message;}finally{_loading=false;}}
 }
+
